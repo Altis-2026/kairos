@@ -1,0 +1,94 @@
+/**
+ * Global map state. The Globe component is a pure renderer of this store:
+ * it never owns state itself, so any component can drive the map.
+ */
+import { create } from "zustand";
+import type { BBox, DrawMode, PointLayer, RasterLayer } from "../types/map";
+
+interface FlyToTarget {
+  center: [number, number];
+  zoom: number;
+  ts: number; // changes on every request so Globe's effect re-fires
+}
+
+interface MapState {
+  coords: { lng: number; lat: number } | null;
+  layers: RasterLayer[];
+  pointLayers: PointLayer[];
+  aoi: BBox | null;
+  drawMode: DrawMode;
+  flyTo: FlyToTarget | null;
+  baseStyle: "satellite" | "dark";
+  viewportBbox: BBox | null;
+
+  setCoords: (c: { lng: number; lat: number } | null) => void;
+  setViewportBbox: (b: BBox) => void;
+  addRasterLayer: (layer: RasterLayer) => void;
+  addPointLayer: (layer: PointLayer) => void;
+  removeLayer: (id: string) => void;
+  setLayerOpacity: (id: string, opacity: number) => void;
+  toggleLayerVisible: (id: string) => void;
+  clearLayers: () => void;
+  setAoi: (bbox: BBox | null) => void;
+  setDrawMode: (mode: DrawMode) => void;
+  requestFlyTo: (center: [number, number], zoom: number) => void;
+  setBaseStyle: (s: "satellite" | "dark") => void;
+}
+
+export const useMapStore = create<MapState>((set) => ({
+  coords: null,
+  layers: [],
+  pointLayers: [],
+  aoi: null,
+  drawMode: null,
+  flyTo: null,
+  baseStyle: "satellite",
+  viewportBbox: null,
+
+  setCoords: (coords) => set({ coords }),
+  setViewportBbox: (viewportBbox) => set({ viewportBbox }),
+  addRasterLayer: (layer) =>
+    set((s) => ({
+      layers: [...s.layers.filter((l) => l.id !== layer.id), layer],
+    })),
+  addPointLayer: (layer) =>
+    set((s) => ({
+      pointLayers: [...s.pointLayers.filter((l) => l.id !== layer.id), layer],
+    })),
+  removeLayer: (id) =>
+    set((s) => ({
+      layers: s.layers.filter((l) => l.id !== id),
+      pointLayers: s.pointLayers.filter((l) => l.id !== id),
+    })),
+  setLayerOpacity: (id, opacity) =>
+    set((s) => ({
+      layers: s.layers.map((l) => (l.id === id ? { ...l, opacity } : l)),
+    })),
+  toggleLayerVisible: (id) =>
+    set((s) => ({
+      layers: s.layers.map((l) =>
+        l.id === id ? { ...l, visible: !l.visible } : l
+      ),
+      pointLayers: s.pointLayers.map((l) =>
+        l.id === id ? { ...l, visible: !l.visible } : l
+      ),
+    })),
+  clearLayers: () => set({ layers: [], pointLayers: [] }),
+  setAoi: (aoi) => set({ aoi }),
+  setDrawMode: (drawMode) => set({ drawMode }),
+  requestFlyTo: (center, zoom) =>
+    set({ flyTo: { center, zoom, ts: Date.now() } }),
+  setBaseStyle: (baseStyle) => set({ baseStyle }),
+}));
+
+/** Center + sensible zoom for a bbox — used after analyses complete. */
+export function bboxCenterZoom(bbox: BBox): { center: [number, number]; zoom: number } {
+  const [minLon, minLat, maxLon, maxLat] = bbox;
+  const center: [number, number] = [
+    (minLon + maxLon) / 2,
+    (minLat + maxLat) / 2,
+  ];
+  const span = Math.max(maxLon - minLon, maxLat - minLat);
+  const zoom = span > 8 ? 4.5 : span > 4 ? 5.5 : span > 2 ? 6.5 : span > 1 ? 7.5 : 8.5;
+  return { center, zoom };
+}

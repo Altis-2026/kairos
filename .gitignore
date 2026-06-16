@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Node
+node_modules/
+dist/
+
+# Secrets — never commit these
+.env
+*.env.local
+serviceAccount*.json
+
+# OS / editor
+.DS_Store
+.vscode/
+*.log
