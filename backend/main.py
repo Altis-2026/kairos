@@ -52,6 +52,7 @@ app = FastAPI(
 allowed_origins = [
     "http://localhost:5173",   # Vite dev server
     "http://localhost:4173",   # Vite preview build
+    "https://kairos-mu-liart.vercel.app",
 ]
 # Production frontend origin, set via env when deployed
 prod_origin = os.getenv("FRONTEND_ORIGIN")
