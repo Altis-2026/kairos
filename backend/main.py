@@ -17,7 +17,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize Google Earth Engine once at startup."""
@@ -28,6 +27,13 @@ async def lifespan(app: FastAPI):
             "and fill in your GCP project ID."
         )
     try:
+        ee_creds = os.getenv("EE_CREDENTIALS")
+        if ee_creds:
+            import json
+            creds_path = os.path.expanduser("~/.config/earthengine/credentials")
+            os.makedirs(os.path.dirname(creds_path), exist_ok=True)
+            with open(creds_path, "w") as f:
+                f.write(ee_creds)
         ee.Initialize(project=project_id)
         print(f"[kairos] Google Earth Engine initialized — project: {project_id}")
     except Exception as e:
@@ -35,7 +41,6 @@ async def lifespan(app: FastAPI):
         print("[kairos] Run: earthengine authenticate")
         raise
     yield
-
 
 app = FastAPI(
     title="Kairos API",
