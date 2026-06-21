@@ -12,7 +12,7 @@ import {
   Minus,
   Plus,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMapStore } from "../stores/mapStore";
 import LayerPanel from "./Panels/LayerPanel";
 import AnalyticsPanel from "./Panels/AnalyticsPanel";
@@ -52,6 +52,18 @@ export default function RightToolbar() {
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
   const projection = useMapStore((s) => s.projection);
   const toggleProjection = useMapStore((s) => s.toggleProjection);
+  const panelRequest = useMapStore((s) => s.panelRequest);
+  const clearPanelRequest = useMapStore((s) => s.clearPanelRequest);
+
+  // The tutorial's "Try it" buttons ask us to open a specific panel.
+  useEffect(() => {
+    if (!panelRequest) return;
+    const known = ["layers", "analytics", "research", "history", "batch", "alerts"];
+    if (known.includes(panelRequest)) {
+      setOpenPanel(panelRequest as typeof openPanel);
+    }
+    clearPanelRequest();
+  }, [panelRequest, clearPanelRequest]);
 
   const zoomBy = (delta: number) => {
     // Globe listens to flyTo; for zoom buttons we nudge using current viewport

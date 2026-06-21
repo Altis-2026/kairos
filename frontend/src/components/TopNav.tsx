@@ -30,6 +30,7 @@ export default function TopNav() {
   // Set right after a pick so the debounce effect doesn't re-open the dropdown.
   const justPickedRef = useRef(false);
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
+  const setTutorialOpen = useMapStore((s) => s.setTutorialOpen);
   const toggleSidebar = useSidebarStore((s) => s.toggleSidebar);
   const user = useAuthStore((s) => s.user);
 
@@ -218,15 +219,13 @@ export default function TopNav() {
           <Radio size={15} className="text-amber" />
           <span className="text-xs font-medium hidden sm:inline">Live Watch</span>
         </button>
-        <a
-          href="https://docs.kairos.earth"
-          target="_blank"
-          rel="noreferrer"
-          title="Help"
+        <button
+          onClick={() => setTutorialOpen(true)}
+          title="How to use Kairos — interactive guide"
           className="h-10 w-10 grid place-items-center rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-ink transition-colors"
         >
           <HelpCircle size={17} />
-        </a>
+        </button>
         {user ? (
           <div className="flex items-center gap-2">
             {user.photoUrl ? (

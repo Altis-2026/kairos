@@ -11,8 +11,10 @@ import TelemetryFooter from "./components/TelemetryFooter";
 import QuickAnalysisPanel from "./components/Panels/QuickAnalysisPanel";
 import CompareSlider from "./components/Map/CompareSlider";
 import TimelineScrubber from "./components/Map/TimelineScrubber";
+import MapLegend from "./components/Map/MapLegend";
 import LiveWatch from "./components/Watch/LiveWatch";
 import EmbedView from "./components/Embed/EmbedView";
+import Tutorial, { TUTORIAL_SEEN_KEY } from "./components/Tutorial/Tutorial";
 import { useMapStore } from "./stores/mapStore";
 import { restoreFromHash } from "./lib/share";
 import { getRoute } from "./lib/embed";
@@ -21,6 +23,7 @@ export default function App() {
   const quickAnalysisOpen = useMapStore((s) => s.quickAnalysisOpen);
   const compare = useMapStore((s) => s.compare);
   const timeline = useMapStore((s) => s.timeline);
+  const setTutorialOpen = useMapStore((s) => s.setTutorialOpen);
 
   // Hash routes for the public/embed entry points are evaluated once at load.
   const route = getRoute();
@@ -29,6 +32,18 @@ export default function App() {
   useEffect(() => {
     if (route === "app") void restoreFromHash();
   }, [route]);
+
+  // First-time visitors get the guide once; afterwards it's the ? button.
+  useEffect(() => {
+    if (route !== "app") return;
+    let seen = false;
+    try {
+      seen = localStorage.getItem(TUTORIAL_SEEN_KEY) === "1";
+    } catch {
+      seen = false;
+    }
+    if (!seen) setTutorialOpen(true);
+  }, [route, setTutorialOpen]);
 
   if (route === "watch") return <LiveWatch />;
   if (route === "embed") return <EmbedView />;
@@ -41,12 +56,14 @@ export default function App() {
       <LeftToolbar />
       <RightToolbar />
       <ChatBar />
+      <MapLegend />
       <TelemetryFooter />
       <AnimatePresence>
         {quickAnalysisOpen && <QuickAnalysisPanel />}
         {compare && <CompareSlider />}
         {timeline && <TimelineScrubber />}
       </AnimatePresence>
+      <Tutorial />
     </div>
   );
 }

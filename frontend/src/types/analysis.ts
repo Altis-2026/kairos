@@ -116,6 +116,14 @@ export interface EventsResponse {
   note?: string;
 }
 
+/** Plain-language interpretation of a result (and optional regional context). */
+export interface InterpretResponse {
+  available: boolean;
+  text: string;
+  source?: "ai" | "template" | "web";
+  note?: string;
+}
+
 /** Population & infrastructure impact for a detection footprint. */
 export interface ImpactResponse {
   analysis_type: string;

@@ -247,6 +247,42 @@ class ImpactRequest(BaseModel):
         return self
 
 
+class InterpretRequest(BaseModel):
+    """
+    POST /interpret and /interpret/context — turn a finished result into a
+    plain-language explanation (and optionally live regional context).
+    Carries the headline figures so the AI is grounded in real numbers.
+    """
+
+    analysis_type: str
+    bbox: List[float]
+    start_date: str
+    end_date: str
+    display_name: Optional[str] = None
+    place_name: Optional[str] = None
+    data_date: Optional[str] = None
+    confidence: Optional[float] = None
+    headline_label: Optional[str] = None
+    headline_value: Optional[float] = None
+    headline_unit: Optional[str] = None
+    stats: Optional[dict] = None
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+    @field_validator("start_date")
+    @classmethod
+    def validate_start(cls, v):
+        return _validate_date(v, "start_date")
+
+    @field_validator("end_date")
+    @classmethod
+    def validate_end(cls, v):
+        return _validate_date(v, "end_date")
+
+
 class ConversationTurn(BaseModel):
     """One prior message in the chat thread, sent so the parser has context."""
 

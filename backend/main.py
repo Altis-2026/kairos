@@ -77,6 +77,7 @@ from api.exports import router as exports_router  # noqa: E402
 from api.impact import router as impact_router  # noqa: E402
 from api.events import router as events_router  # noqa: E402
 from api.alerts import router as alerts_router  # noqa: E402
+from api.interpret import router as interpret_router  # noqa: E402
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -88,6 +89,7 @@ app.include_router(exports_router)
 app.include_router(impact_router)
 app.include_router(events_router)
 app.include_router(alerts_router)
+app.include_router(interpret_router)
 
 
 @app.get("/health")
