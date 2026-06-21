@@ -195,6 +195,7 @@ class EventsRequest(BaseModel):
     bbox: List[float]
     days: int = 3650           # how far back to look (default ~10 years)
     category: Optional[str] = None  # EONET category id (e.g. 'floods', 'wildfires')
+    status: str = "all"        # 'open' (active), 'closed', or 'all'
 
     @field_validator("bbox")
     @classmethod
@@ -206,6 +207,13 @@ class EventsRequest(BaseModel):
     def validate_days(cls, v):
         if not (1 <= v <= 7300):  # cap at ~20 years
             raise ValueError("days must be between 1 and 7300")
+        return v
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v):
+        if v not in ("open", "closed", "all"):
+            raise ValueError("status must be 'open', 'closed' or 'all'")
         return v
 
 

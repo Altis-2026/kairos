@@ -6,6 +6,7 @@ export function fetchHistoricalEvents(p: {
   bbox: BBox;
   days?: number;
   category?: string;
+  status?: "open" | "closed" | "all";
 }): Promise<EventsResponse> {
   return apiFetch<EventsResponse>("/events/historical", {
     method: "POST",

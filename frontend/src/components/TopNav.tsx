@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { HelpCircle, Menu, Search, LogOut, MapPin } from "lucide-react";
+import { HelpCircle, Menu, Search, LogOut, MapPin, Radio } from "lucide-react";
 import { useMapStore } from "../stores/mapStore";
 import { useSidebarStore } from "../stores/sidebarStore";
 import { useAuthStore } from "../stores/authStore";
@@ -207,6 +207,17 @@ export default function TopNav() {
 
       {/* Help + Auth */}
       <div className="flex items-center gap-3 pointer-events-auto">
+        <button
+          onClick={() => {
+            location.hash = "watch";
+            location.reload();
+          }}
+          title="Live Watch — active disasters worldwide"
+          className="h-10 px-3.5 grid grid-flow-col items-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-amber transition-colors"
+        >
+          <Radio size={15} className="text-amber" />
+          <span className="text-xs font-medium hidden sm:inline">Live Watch</span>
+        </button>
         <a
           href="https://docs.kairos.earth"
           target="_blank"

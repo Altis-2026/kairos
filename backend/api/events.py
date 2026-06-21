@@ -93,7 +93,7 @@ def historical_events(req: EventsRequest):
     eonet_bbox = f"{min_lon},{max_lat},{max_lon},{min_lat}"
     params = {
         "bbox": eonet_bbox,
-        "status": "all",
+        "status": req.status,
         "days": req.days,
         "limit": 200,
     }

@@ -14,6 +14,7 @@ import {
   Bell,
   Building2,
   Check,
+  Code2,
   Download,
   FileText,
   GitCompareArrows,
@@ -36,6 +37,7 @@ import {
   type AnalysisRef,
 } from "../../api/research";
 import { fetchImpact } from "../../api/impact";
+import { buildEmbedSnippet } from "../../lib/embed";
 import type { ImpactResponse } from "../../types/analysis";
 import {
   downloadGeoTIFF,
@@ -59,6 +61,7 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const [impact, setImpact] = useState<ImpactResponse | null>(null);
   const [watched, setWatched] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
 
   const ref: AnalysisRef | null = lastResult
     ? {
@@ -90,6 +93,14 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
     navigator.clipboard.writeText(buildShareUrl(ref)).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function copyEmbed() {
+    if (!ref) return;
+    navigator.clipboard.writeText(buildEmbedSnippet(ref)).then(() => {
+      setEmbedCopied(true);
+      setTimeout(() => setEmbedCopied(false), 2000);
     });
   }
 
@@ -476,18 +487,32 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
                 Report
               </button>
             </div>
-            <button
-              onClick={copyShare}
-              className="w-full h-9 rounded-xl text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition"
-              title="Copy a reproducible link to this analysis"
-            >
-              {copied ? (
-                <Check size={12} className="text-teal" />
-              ) : (
-                <Share2 size={12} />
-              )}
-              {copied ? "Link copied" : "Copy share link"}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={copyShare}
+                className="h-9 rounded-xl text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition"
+                title="Copy a reproducible link to this analysis"
+              >
+                {copied ? (
+                  <Check size={12} className="text-teal" />
+                ) : (
+                  <Share2 size={12} />
+                )}
+                {copied ? "Copied" : "Share link"}
+              </button>
+              <button
+                onClick={copyEmbed}
+                className="h-9 rounded-xl text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition"
+                title="Copy an <iframe> snippet to embed this live result"
+              >
+                {embedCopied ? (
+                  <Check size={12} className="text-teal" />
+                ) : (
+                  <Code2 size={12} />
+                )}
+                {embedCopied ? "Copied" : "Embed code"}
+              </button>
+            </div>
             {(errors.geotiff || errors.report) && (
               <p className="text-[10px] text-amber leading-snug px-1">
                 {errors.geotiff || errors.report}

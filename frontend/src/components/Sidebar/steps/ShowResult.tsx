@@ -2,6 +2,7 @@
 import { useState } from "react";
 import {
   Check,
+  Code2,
   Copy,
   Download,
   FileText,
@@ -16,10 +17,12 @@ import {
   type ExportSource,
 } from "../../../lib/exporters";
 import { buildShareUrl } from "../../../lib/share";
+import { buildEmbedSnippet } from "../../../lib/embed";
 
 export default function ShowResult() {
   const { result, reset, compareNewDates, selectedTask } = useSidebarStore();
   const [copied, setCopied] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [exportErr, setExportErr] = useState<string | null>(null);
 
@@ -90,6 +93,22 @@ export default function ShowResult() {
       });
   }
 
+  function copyEmbedCode() {
+    navigator.clipboard
+      .writeText(
+        buildEmbedSnippet({
+          analysis_type: result!.analysis_type,
+          bbox: result!.bbox,
+          start_date: result!.start_date,
+          end_date: result!.end_date,
+        })
+      )
+      .then(() => {
+        setEmbedCopied(true);
+        setTimeout(() => setEmbedCopied(false), 2000);
+      });
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl bg-bg/70 ring-1 ring-teal/30 p-4">
@@ -156,13 +175,27 @@ export default function ShowResult() {
             <Download size={13} /> GeoJSON (points)
           </button>
         )}
-        <button
-          onClick={copyShareLink}
-          className="w-full h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors"
-        >
-          {copied ? <Check size={13} className="text-teal" /> : <Copy size={13} />}
-          {copied ? "Link copied" : "Copy share link"}
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={copyShareLink}
+            className="h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors"
+          >
+            {copied ? <Check size={13} className="text-teal" /> : <Copy size={13} />}
+            {copied ? "Copied" : "Share link"}
+          </button>
+          <button
+            onClick={copyEmbedCode}
+            title="Copy an <iframe> snippet to embed this live result"
+            className="h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors"
+          >
+            {embedCopied ? (
+              <Check size={13} className="text-teal" />
+            ) : (
+              <Code2 size={13} />
+            )}
+            {embedCopied ? "Copied" : "Embed code"}
+          </button>
+        </div>
         {exportErr && (
           <p className="text-[10px] text-amber leading-snug">{exportErr}</p>
         )}
