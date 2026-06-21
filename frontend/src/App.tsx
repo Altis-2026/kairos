@@ -13,6 +13,7 @@ import CompareSlider from "./components/Map/CompareSlider";
 import TimelineScrubber from "./components/Map/TimelineScrubber";
 import MapLegend from "./components/Map/MapLegend";
 import LiveWatch from "./components/Watch/LiveWatch";
+import Guardian from "./components/Guardian/Guardian";
 import EmbedView from "./components/Embed/EmbedView";
 import Tutorial, { TUTORIAL_SEEN_KEY } from "./components/Tutorial/Tutorial";
 import { useMapStore } from "./stores/mapStore";
@@ -46,6 +47,7 @@ export default function App() {
   }, [route, setTutorialOpen]);
 
   if (route === "watch") return <LiveWatch />;
+  if (route === "guardian") return <Guardian />;
   if (route === "embed") return <EmbedView />;
 
   return (

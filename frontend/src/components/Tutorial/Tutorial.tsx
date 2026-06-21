@@ -22,6 +22,7 @@ import {
   PanelRightOpen,
   Radio,
   Satellite,
+  Shield,
   Sparkles,
   X,
 } from "lucide-react";
@@ -47,6 +48,10 @@ function openPanel(name: string) {
 }
 function openLiveWatch() {
   location.hash = "watch";
+  location.reload();
+}
+function openGuardian() {
+  location.hash = "guardian";
   location.reload();
 }
 
@@ -140,6 +145,17 @@ const STEPS: Step[] = [
       "Have many locations? Upload a CSV of areas and analysis types to run them " +
       "all at once, watch live progress, and export the results as a single CSV.",
     action: { label: "Open batch mode", run: () => openPanel("batch") },
+  },
+  {
+    icon: <Shield size={20} />,
+    chip: "Take part",
+    title: "Guardian — help patrol the planet",
+    body:
+      "Open Guardian, a login-free mode that spotlights real hotspots of illegal " +
+      "mining, clearing and fishing. Scan a watch zone, see what the radar flags, " +
+      "and submit your verdict — you help vet detections from space.",
+    tip: "It's environmental transparency: candidate activity for review, never an accusation.",
+    action: { label: "Open Guardian", run: openGuardian },
   },
   {
     icon: <Radio size={20} />,
