@@ -18,5 +18,20 @@ service cloud.firestore {
                     && resource.data.userId == request.auth.uid;
       allow update: if false;
     }
+
+    // Alert mode: a user watches an area + analysis type. Unlike cases, alerts
+    // are mutable (each check updates lastDataDate / lastCheckedAt), but always
+    // stay owned by their creator.
+    match /alerts/{alertId} {
+      allow read:   if request.auth != null
+                    && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+                    && resource.data.userId == request.auth.uid
+                    && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+                    && resource.data.userId == request.auth.uid;
+    }
   }
 }

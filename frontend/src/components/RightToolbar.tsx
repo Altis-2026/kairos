@@ -1,6 +1,7 @@
 /** Right-side controls: analytics, globe view, layers, zoom, locate. */
 import {
   BarChart3,
+  Bell,
   FileSpreadsheet,
   FlaskConical,
   Globe2,
@@ -18,6 +19,7 @@ import AnalyticsPanel from "./Panels/AnalyticsPanel";
 import ResearchPanel from "./Panels/ResearchPanel";
 import HistoryPanel from "./Panels/HistoryPanel";
 import BatchPanel from "./Panels/BatchPanel";
+import AlertsPanel from "./Panels/AlertsPanel";
 
 function ToolButton({
   title,
@@ -45,7 +47,7 @@ function ToolButton({
 
 export default function RightToolbar() {
   const [openPanel, setOpenPanel] = useState<
-    "layers" | "analytics" | "research" | "history" | "batch" | null
+    "layers" | "analytics" | "research" | "history" | "batch" | "alerts" | null
   >(null);
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
   const projection = useMapStore((s) => s.projection);
@@ -117,6 +119,13 @@ export default function RightToolbar() {
         >
           <FileSpreadsheet size={17} />
         </ToolButton>
+        <ToolButton
+          title="Alerts"
+          active={openPanel === "alerts"}
+          onClick={() => setOpenPanel(openPanel === "alerts" ? null : "alerts")}
+        >
+          <Bell size={17} />
+        </ToolButton>
         <ToolButton title="Zoom in" onClick={() => zoomBy(1)}>
           <Plus size={17} />
         </ToolButton>
@@ -144,6 +153,9 @@ export default function RightToolbar() {
       )}
       {openPanel === "batch" && (
         <BatchPanel onClose={() => setOpenPanel(null)} />
+      )}
+      {openPanel === "alerts" && (
+        <AlertsPanel onClose={() => setOpenPanel(null)} />
       )}
       {openPanel === "analytics" && (
         <AnalyticsPanel onClose={() => setOpenPanel(null)} />

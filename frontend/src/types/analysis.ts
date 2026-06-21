@@ -84,6 +84,16 @@ export interface TimeSeriesResponse {
   unit: string;
 }
 
+/** Result of an alert-mode check ("is there a new pass?"). */
+export interface AlertCheckResponse {
+  new: boolean;
+  data_date: string | null;
+  checked_at: string;
+  note?: string;
+  headline_stat?: HeadlineStat;
+  result: AnalysisResult | null;
+}
+
 /** Historical natural-disaster markers (NASA EONET). */
 export interface EventMarker {
   id: string;

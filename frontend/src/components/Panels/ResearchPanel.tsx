@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
+  Bell,
   Building2,
   Check,
   Download,
@@ -25,6 +26,8 @@ import {
   X,
 } from "lucide-react";
 import { useMapStore } from "../../stores/mapStore";
+import { useAuthStore } from "../../stores/authStore";
+import { createAlert, alertsAvailable } from "../../lib/alerts";
 import {
   fetchBackscatter,
   fetchCompare,
@@ -50,10 +53,12 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
   const compare = useMapStore((s) => s.compare);
   const timeline = useMapStore((s) => s.timeline);
 
+  const user = useAuthStore((s) => s.user);
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
   const [impact, setImpact] = useState<ImpactResponse | null>(null);
+  const [watched, setWatched] = useState(false);
 
   const ref: AnalysisRef | null = lastResult
     ? {
@@ -91,10 +96,19 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
   const backscatterOn = layers.some((l) => l.id === BACKSCATTER_ID);
   const opticalOn = layers.some((l) => l.id === OPTICAL_ID);
 
-  // A new analysis invalidates the previous impact figures.
+  // A new analysis invalidates the previous impact figures + watch state.
   useEffect(() => {
     setImpact(null);
+    setWatched(false);
   }, [lastResult]);
+
+  async function watchArea() {
+    if (!lastResult) return;
+    await guard("watch", async () => {
+      await createAlert(lastResult);
+      setWatched(true);
+    });
+  }
 
   async function runImpact() {
     if (!ref) return;
@@ -377,6 +391,51 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
                   modelled estimates.
                 </p>
               </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
+              Monitor
+            </h3>
+            <button
+              onClick={watchArea}
+              disabled={busy === "watch" || watched || !user || !alertsAvailable()}
+              className={`w-full flex items-center gap-2.5 rounded-xl ring-1 px-3 py-2.5 text-left transition disabled:opacity-60 ${
+                watched
+                  ? "bg-raised text-teal ring-teal/50"
+                  : "bg-bg/70 text-dim ring-line hover:text-ink"
+              }`}
+              title={
+                !user
+                  ? "Sign in to watch areas for new passes"
+                  : "Re-check this area on future Sentinel-1 passes"
+              }
+            >
+              <span className={watched ? "text-teal" : "text-dim"}>
+                {busy === "watch" ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : watched ? (
+                  <Check size={14} />
+                ) : (
+                  <Bell size={14} />
+                )}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs text-ink">
+                  {watched ? "Watching this area" : "Watch this area"}
+                </span>
+                <span className="block text-[10px] text-dim leading-tight">
+                  {!user
+                    ? "Sign in to enable alerts"
+                    : "Alert on the next Sentinel-1 pass"}
+                </span>
+              </span>
+            </button>
+            {errors.watch && (
+              <p className="text-[10px] text-amber leading-snug px-1">
+                {errors.watch}
+              </p>
             )}
           </div>
 

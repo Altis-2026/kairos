@@ -154,6 +154,41 @@ class TimeSeriesRequest(BaseModel):
         return v
 
 
+class AlertCheckRequest(BaseModel):
+    """
+    POST /alerts/check — has a new Sentinel-1 pass produced a fresh detection
+    for a watched area since we last looked? Drives "alert mode".
+    """
+
+    analysis_type: str
+    bbox: List[float]
+    since_date: Optional[str] = None   # latest data_date already seen/notified
+    end_date: Optional[str] = None     # window end; defaults to today (UTC)
+    lookback_days: int = 24            # ~2 Sentinel-1 revisit cycles
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+    @field_validator("since_date")
+    @classmethod
+    def validate_since(cls, v):
+        return _validate_date(v, "since_date") if v else v
+
+    @field_validator("end_date")
+    @classmethod
+    def validate_end(cls, v):
+        return _validate_date(v, "end_date") if v else v
+
+    @field_validator("lookback_days")
+    @classmethod
+    def validate_lookback(cls, v):
+        if not (6 <= v <= 90):
+            raise ValueError("lookback_days must be between 6 and 90")
+        return v
+
+
 class EventsRequest(BaseModel):
     """POST /events/historical — past natural disasters near an area (NASA EONET)."""
 
