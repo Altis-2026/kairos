@@ -28,6 +28,7 @@ _BASE_SCALE = {
     "oil_spill": 50,
     "deforestation": 30,
     "sea_ice": 100,
+    "surface_deformation": 30,
 }
 
 # Quantitative method detail for the methodology report, keyed by analysis type.
@@ -85,6 +86,18 @@ _METHOD = {
         "baseline": "Mean composite over the analysis window",
         "masking": "None (polar EW acquisitions)",
         "resolution": "100 m",
+    },
+    "surface_deformation": {
+        "collection": "COPERNICUS/S1_GRD",
+        "band": "VV",
+        "mode": "IW",
+        "threshold": (
+            "Recent VV deviates from its 12-month mean by > 2 baseline σ "
+            "(amplitude temporal-coherence proxy, not phase InSAR)"
+        ),
+        "baseline": "365-day per-pixel mean + standard deviation",
+        "masking": "Permanent water (occurrence > 50%) excluded",
+        "resolution": "30 m",
     },
 }
 

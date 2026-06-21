@@ -8,9 +8,10 @@
  * Each acts on mapStore.lastResult, so it works whether the result came from
  * the wizard, the chat, or the quick-analysis pin.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
+  Building2,
   Check,
   Download,
   FileText,
@@ -20,6 +21,7 @@ import {
   Radar,
   Share2,
   Timer,
+  Users,
   X,
 } from "lucide-react";
 import { useMapStore } from "../../stores/mapStore";
@@ -30,6 +32,8 @@ import {
   fetchTimeSeries,
   type AnalysisRef,
 } from "../../api/research";
+import { fetchImpact } from "../../api/impact";
+import type { ImpactResponse } from "../../types/analysis";
 import {
   downloadGeoTIFF,
   downloadReport,
@@ -49,6 +53,7 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
+  const [impact, setImpact] = useState<ImpactResponse | null>(null);
 
   const ref: AnalysisRef | null = lastResult
     ? {
@@ -85,6 +90,19 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
 
   const backscatterOn = layers.some((l) => l.id === BACKSCATTER_ID);
   const opticalOn = layers.some((l) => l.id === OPTICAL_ID);
+
+  // A new analysis invalidates the previous impact figures.
+  useEffect(() => {
+    setImpact(null);
+  }, [lastResult]);
+
+  async function runImpact() {
+    if (!ref) return;
+    await guard("impact", async () => {
+      const data = await fetchImpact(ref);
+      setImpact(data);
+    });
+  }
 
   function setError(key: string, msg: string | null) {
     setErrors((e) => {
@@ -302,6 +320,64 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
               error={errors.timeline}
               onClick={toggleTimeline}
             />
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
+              Human impact
+            </h3>
+            <button
+              onClick={runImpact}
+              disabled={busy === "impact"}
+              className="w-full flex items-center gap-2.5 rounded-xl ring-1 ring-line bg-bg/70 px-3 py-2.5 text-left text-dim hover:text-ink transition disabled:opacity-60"
+              title="People and built-up area inside the detection footprint"
+            >
+              <span className="text-dim">
+                {busy === "impact" ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Users size={14} />
+                )}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs text-ink">
+                  Estimate people affected
+                </span>
+                <span className="block text-[10px] text-dim leading-tight">
+                  Population &amp; built-up area in the footprint
+                </span>
+              </span>
+            </button>
+            {errors.impact && (
+              <p className="text-[10px] text-amber leading-snug px-1">
+                {errors.impact}
+              </p>
+            )}
+            {impact && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-bg/70 ring-1 ring-teal/30 p-3">
+                  <div className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.15em] text-dim uppercase">
+                    <Users size={11} /> People
+                  </div>
+                  <div className="mt-1 font-display text-2xl text-teal leading-none">
+                    {impact.population_affected.toLocaleString()}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-bg/70 ring-1 ring-teal/30 p-3">
+                  <div className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.15em] text-dim uppercase">
+                    <Building2 size={11} /> Built-up
+                  </div>
+                  <div className="mt-1 font-display text-2xl text-teal leading-none">
+                    {impact.built_up_km2.toLocaleString()}
+                    <span className="ml-1 text-xs text-dim">km²</span>
+                  </div>
+                </div>
+                <p className="col-span-2 text-[10px] text-dim leading-snug">
+                  Inside the detection footprint · GHSL 2020 · figures are
+                  modelled estimates.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

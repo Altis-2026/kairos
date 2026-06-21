@@ -84,6 +84,15 @@ export interface TimeSeriesResponse {
   unit: string;
 }
 
+/** Population & infrastructure impact for a detection footprint. */
+export interface ImpactResponse {
+  analysis_type: string;
+  population_affected: number;
+  built_up_km2: number;
+  data_date: string;
+  headline_stat: HeadlineStat;
+}
+
 export interface SceneInfo {
   scene_id: string;
   date: string;

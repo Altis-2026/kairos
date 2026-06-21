@@ -14,6 +14,7 @@ import {
   Droplets,
   Trees,
   Snowflake,
+  Activity,
   Loader2,
   Zap,
   X,
@@ -32,6 +33,7 @@ const ICONS: Record<string, LucideIcon> = {
   droplets: Droplets,
   trees: Trees,
   snowflake: Snowflake,
+  activity: Activity,
 };
 
 function isoDaysAgo(days: number): string {

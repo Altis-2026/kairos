@@ -15,6 +15,7 @@ from gee.fire import detect_burn_scar
 from gee.oil import detect_oil_spill
 from gee.deforestation import detect_deforestation
 from gee.ice import detect_sea_ice
+from gee.deformation import detect_deformation
 
 ANALYSIS_REGISTRY = {
     "flood_extent": {
@@ -118,6 +119,25 @@ ANALYSIS_REGISTRY = {
         "icon": "snowflake",
         "sar_polarization": "HH",
         "instrument_mode": "EW",
+    },
+    "surface_deformation": {
+        "function": detect_deformation,
+        "display_name": "Surface Deformation / Change",
+        "description": (
+            "Flags ground that has changed beyond its normal variability — "
+            "subsidence, landslide scarring, construction or ground disturbance. "
+            "Uses an amplitude temporal-coherence proxy: pixels whose recent VV "
+            "backscatter deviates from a 12-month stability baseline by more than "
+            "two standard deviations. (GRD amplitude, not phase InSAR.)"
+        ),
+        "category": "Environmental",
+        "data_sources": ["S1"],
+        "estimated_seconds": 35,
+        "output_type": "raster",
+        "color_palette": ["#C77DFF"],
+        "icon": "activity",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
     },
 }
 

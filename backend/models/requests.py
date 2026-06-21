@@ -154,6 +154,36 @@ class TimeSeriesRequest(BaseModel):
         return v
 
 
+class ImpactRequest(BaseModel):
+    """POST /impact/population — people & buildings within a detection footprint."""
+
+    analysis_type: str
+    bbox: List[float]
+    start_date: str
+    end_date: str
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+    @field_validator("start_date")
+    @classmethod
+    def validate_start(cls, v):
+        return _validate_date(v, "start_date")
+
+    @field_validator("end_date")
+    @classmethod
+    def validate_end(cls, v):
+        return _validate_date(v, "end_date")
+
+    @model_validator(mode="after")
+    def validate_date_order(self):
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be before end_date")
+        return self
+
+
 class ConversationTurn(BaseModel):
     """One prior message in the chat thread, sent so the parser has context."""
 
