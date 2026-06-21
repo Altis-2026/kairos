@@ -6,19 +6,13 @@ from ai.parser import ParsedQuery, parse_query_response
 
 # OpenRouter's canonical slug uses a dot ("3.5"), not a dash. The dash form is
 # an older alias that has been seen routing to a dead Bedrock-hosted snapshot
-# even with provider.ignore set — use the canonical id to avoid that path.
+# even with provider.ignore set, so use the canonical id to avoid that path.
 MODEL = "anthropic/claude-3.5-haiku"
-# Amazon Bedrock's hosted snapshot of this model has been deprecated and 404s on
-# every call. Prefer Anthropic's own endpoint first and ignore Bedrock outright,
-# but keep allow_fallbacks on so a transient Anthropic outage doesn't take the
-# whole feature down — OpenRouter will still skip the ignored provider.
-_PROVIDER_PREFS = {
-    "provider": {
-        "order": ["anthropic"],
-        "ignore": ["amazon-bedrock"],
-        "allow_fallbacks": True,
-    }
-}
+# Amazon Bedrock's hosted snapshot of this model is deprecated and 404s on every
+# call. Rather than subtract Bedrock with "ignore" (which can combine with an
+# account's default ignored-providers list and accidentally exclude everything),
+# positively pin the request to Anthropic's own first-party endpoint with "only".
+_PROVIDER_PREFS = {"provider": {"only": ["anthropic"]}}
 _SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
 
 _client = None
