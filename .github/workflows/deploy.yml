@@ -6,7 +6,7 @@
 #   GCP_SA_KEY            JSON key for a service account with
 #                         Cloud Run Admin + Artifact Registry Writer +
 #                         Service Account User roles
-#   ANTHROPIC_API_KEY     for the deployed backend
+#   OPENROUTER_API_KEY    for the deployed backend (AI chat + result explainer)
 #   FIREBASE_SA_KEY       JSON key for Firebase Hosting deploys
 #   VITE_MAPBOX_TOKEN     baked into the frontend build
 #   VITE_API_BASE_URL     the Cloud Run URL after first deploy
@@ -45,7 +45,7 @@ jobs:
             --allow-unauthenticated \
             --memory 1Gi \
             --timeout 300 \
-            --set-env-vars GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            --set-env-vars GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
 
   frontend:
     runs-on: ubuntu-latest
