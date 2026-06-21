@@ -75,6 +75,7 @@ from api.status import router as status_router    # noqa: E402
 from api.research import router as research_router  # noqa: E402
 from api.exports import router as exports_router  # noqa: E402
 from api.impact import router as impact_router  # noqa: E402
+from api.events import router as events_router  # noqa: E402
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -84,6 +85,7 @@ app.include_router(status_router)
 app.include_router(research_router)
 app.include_router(exports_router)
 app.include_router(impact_router)
+app.include_router(events_router)
 
 
 @app.get("/health")

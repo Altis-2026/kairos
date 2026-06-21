@@ -167,6 +167,32 @@ export default function Globe() {
     map.on("touchstart", stopSpin);
     map.on("load", spin);
 
+    // Popup for point features that carry metadata (historical event markers).
+    map.on("click", (e) => {
+      const ptLayerIds = (map.getStyle()?.layers ?? [])
+        .map((l) => l.id)
+        .filter((id) => id.startsWith("kairos-pts-lyr-") && map.getLayer(id));
+      if (!ptLayerIds.length) return;
+      const feats = map.queryRenderedFeatures(e.point, { layers: ptLayerIds });
+      const f = feats.find((ff) => ff.properties && ff.properties.title);
+      if (!f || !f.properties) return;
+      const p = f.properties as Record<string, string>;
+      const meta = [p.category, p.date].filter(Boolean).join(" · ");
+      const link = p.link
+        ? `<a href="${p.link}" target="_blank" rel="noreferrer" style="color:#00BFA8;text-decoration:none;font-size:10px">Source ↗</a>`
+        : "";
+      new mapboxgl.Popup({ closeButton: true, maxWidth: "240px" })
+        .setLngLat(e.lngLat)
+        .setHTML(
+          `<div style="font-family:ui-sans-serif,system-ui;color:#E8EFE9">
+             <div style="font-size:12px;font-weight:600;margin-bottom:2px">${p.title}</div>
+             <div style="font-size:10px;color:#8A9E8C;margin-bottom:4px">${meta}</div>
+             ${link}
+           </div>`
+        )
+        .addTo(map);
+    });
+
     // Coordinate readout + viewport tracking
     map.on("mousemove", (e) => {
       useMapStore.getState().setCoords({ lng: e.lngLat.lng, lat: e.lngLat.lat });
@@ -230,8 +256,10 @@ export default function Globe() {
           type: "circle",
           source: srcId,
           paint: {
-            "circle-radius": 4,
-            "circle-color": layer.color,
+            // Event markers carry a per-feature title => render them larger.
+            "circle-radius": ["case", ["has", "title"], 6, 4],
+            // Per-feature colour (historical events) falls back to the layer colour.
+            "circle-color": ["coalesce", ["get", "color"], layer.color],
             "circle-stroke-width": 1,
             "circle-stroke-color": "#0B120E",
           },

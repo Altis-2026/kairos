@@ -84,6 +84,28 @@ export interface TimeSeriesResponse {
   unit: string;
 }
 
+/** Historical natural-disaster markers (NASA EONET). */
+export interface EventMarker {
+  id: string;
+  title: string;
+  category: string;
+  category_id: string;
+  color: string;
+  date: string;
+  lon: number;
+  lat: number;
+  closed: boolean;
+  link: string | null;
+}
+
+export interface EventsResponse {
+  available: boolean;
+  events: EventMarker[];
+  count?: number;
+  source: string;
+  note?: string;
+}
+
 /** Population & infrastructure impact for a detection footprint. */
 export interface ImpactResponse {
   analysis_type: string;

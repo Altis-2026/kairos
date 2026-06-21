@@ -154,6 +154,26 @@ class TimeSeriesRequest(BaseModel):
         return v
 
 
+class EventsRequest(BaseModel):
+    """POST /events/historical — past natural disasters near an area (NASA EONET)."""
+
+    bbox: List[float]
+    days: int = 3650           # how far back to look (default ~10 years)
+    category: Optional[str] = None  # EONET category id (e.g. 'floods', 'wildfires')
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+    @field_validator("days")
+    @classmethod
+    def validate_days(cls, v):
+        if not (1 <= v <= 7300):  # cap at ~20 years
+            raise ValueError("days must be between 1 and 7300")
+        return v
+
+
 class ImpactRequest(BaseModel):
     """POST /impact/population — people & buildings within a detection footprint."""
 
