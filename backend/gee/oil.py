@@ -51,6 +51,7 @@ def detect_oil_spill(bbox: list, start_date: str, end_date: str) -> dict:
 
     return {
         "tile_url": url,
+        "result_image": slick,
         "suspected_oil_km2": slick_km2,
         "confidence": 0.70,  # low-wind false positives are inherent to this method
         "data_date": data_date,

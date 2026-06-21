@@ -15,6 +15,7 @@ from gee.fire import detect_burn_scar
 from gee.oil import detect_oil_spill
 from gee.deforestation import detect_deforestation
 from gee.ice import detect_sea_ice
+from gee.deformation import detect_deformation
 
 ANALYSIS_REGISTRY = {
     "flood_extent": {
@@ -31,6 +32,8 @@ ANALYSIS_REGISTRY = {
         "output_type": "raster",
         "color_palette": ["#00BFA8"],
         "icon": "waves",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
     },
     "ship_detection": {
         "function": detect_ships,
@@ -46,6 +49,8 @@ ANALYSIS_REGISTRY = {
         "output_type": "raster+points",
         "color_palette": ["#E8A318"],
         "icon": "ship",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
     },
     "wildfire_burn_scar": {
         "function": detect_burn_scar,
@@ -61,6 +66,8 @@ ANALYSIS_REGISTRY = {
         "output_type": "raster",
         "color_palette": ["#E8541E"],
         "icon": "flame",
+        "sar_polarization": "VH",
+        "instrument_mode": "IW",
     },
     "oil_spill": {
         "function": detect_oil_spill,
@@ -76,6 +83,8 @@ ANALYSIS_REGISTRY = {
         "output_type": "raster",
         "color_palette": ["#7B61FF"],
         "icon": "droplets",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
     },
     "deforestation": {
         "function": detect_deforestation,
@@ -91,6 +100,8 @@ ANALYSIS_REGISTRY = {
         "output_type": "raster",
         "color_palette": ["#E84855"],
         "icon": "trees",
+        "sar_polarization": "VH",
+        "instrument_mode": "IW",
     },
     "sea_ice": {
         "function": detect_sea_ice,
@@ -106,6 +117,27 @@ ANALYSIS_REGISTRY = {
         "output_type": "raster",
         "color_palette": ["#BFEFFF"],
         "icon": "snowflake",
+        "sar_polarization": "HH",
+        "instrument_mode": "EW",
+    },
+    "surface_deformation": {
+        "function": detect_deformation,
+        "display_name": "Surface Deformation / Change",
+        "description": (
+            "Flags ground that has changed beyond its normal variability — "
+            "subsidence, landslide scarring, construction or ground disturbance. "
+            "Uses an amplitude temporal-coherence proxy: pixels whose recent VV "
+            "backscatter deviates from a 12-month stability baseline by more than "
+            "two standard deviations. (GRD amplitude, not phase InSAR.)"
+        ),
+        "category": "Environmental",
+        "data_sources": ["S1"],
+        "estimated_seconds": 35,
+        "output_type": "raster",
+        "color_palette": ["#C77DFF"],
+        "icon": "activity",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
     },
 }
 

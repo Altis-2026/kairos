@@ -18,7 +18,10 @@ mapboxgl.accessToken = TOKEN;
 const STYLES = {
   satellite: "mapbox://styles/mapbox/satellite-streets-v12",
   dark: "mapbox://styles/mapbox/dark-v11",
+  terrain: "mapbox://styles/mapbox/outdoors-v12",
 };
+
+const DEM_SOURCE = "kairos-dem";
 
 const AOI_SOURCE = "kairos-aoi";
 const AOI_FILL = "kairos-aoi-fill";
@@ -53,6 +56,29 @@ function applyAtmosphere(map: mapboxgl.Map) {
     "space-color": "#070d0a",
     "star-intensity": 0.35,
   });
+}
+
+/**
+ * Real elevation shading for the Terrain base style. We add a DEM source and
+ * exaggerate it slightly so mountains and valleys read on the globe; for the
+ * flat styles we drop the terrain so they render crisp and fast. Re-applied on
+ * every style swap because setStyle clears custom sources.
+ */
+function syncTerrain(map: mapboxgl.Map) {
+  const style = useMapStore.getState().baseStyle;
+  if (style === "terrain") {
+    if (!map.getSource(DEM_SOURCE)) {
+      map.addSource(DEM_SOURCE, {
+        type: "raster-dem",
+        url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+        tileSize: 512,
+        maxzoom: 14,
+      });
+    }
+    map.setTerrain({ source: DEM_SOURCE, exaggeration: 1.4 });
+  } else {
+    map.setTerrain(null);
+  }
 }
 
 function ensureAoiLayers(map: mapboxgl.Map) {
@@ -96,6 +122,7 @@ export default function Globe() {
   const drawMode = useMapStore((s) => s.drawMode);
   const flyTo = useMapStore((s) => s.flyTo);
   const baseStyle = useMapStore((s) => s.baseStyle);
+  const projection = useMapStore((s) => s.projection);
 
   // ---------- map init (once) ----------
   useEffect(() => {
@@ -103,7 +130,7 @@ export default function Globe() {
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: STYLES.satellite,
-      projection: { name: "globe" },
+      projection: { name: useMapStore.getState().projection },
       center: [25, 18],
       zoom: 2.1,
     });
@@ -111,6 +138,7 @@ export default function Globe() {
 
     map.on("style.load", () => {
       applyAtmosphere(map);
+      syncTerrain(map);
       ensureAoiLayers(map);
       // Re-sync everything after any style swap
       syncRasterLayers(map);
@@ -138,6 +166,32 @@ export default function Globe() {
     map.on("wheel", stopSpin);
     map.on("touchstart", stopSpin);
     map.on("load", spin);
+
+    // Popup for point features that carry metadata (historical event markers).
+    map.on("click", (e) => {
+      const ptLayerIds = (map.getStyle()?.layers ?? [])
+        .map((l) => l.id)
+        .filter((id) => id.startsWith("kairos-pts-lyr-") && map.getLayer(id));
+      if (!ptLayerIds.length) return;
+      const feats = map.queryRenderedFeatures(e.point, { layers: ptLayerIds });
+      const f = feats.find((ff) => ff.properties && ff.properties.title);
+      if (!f || !f.properties) return;
+      const p = f.properties as Record<string, string>;
+      const meta = [p.category, p.date].filter(Boolean).join(" · ");
+      const link = p.link
+        ? `<a href="${p.link}" target="_blank" rel="noreferrer" style="color:#00BFA8;text-decoration:none;font-size:10px">Source ↗</a>`
+        : "";
+      new mapboxgl.Popup({ closeButton: true, maxWidth: "240px" })
+        .setLngLat(e.lngLat)
+        .setHTML(
+          `<div style="font-family:ui-sans-serif,system-ui;color:#E8EFE9">
+             <div style="font-size:12px;font-weight:600;margin-bottom:2px">${p.title}</div>
+             <div style="font-size:10px;color:#8A9E8C;margin-bottom:4px">${meta}</div>
+             ${link}
+           </div>`
+        )
+        .addTo(map);
+    });
 
     // Coordinate readout + viewport tracking
     map.on("mousemove", (e) => {
@@ -202,8 +256,10 @@ export default function Globe() {
           type: "circle",
           source: srcId,
           paint: {
-            "circle-radius": 4,
-            "circle-color": layer.color,
+            // Event markers carry a per-feature title => render them larger.
+            "circle-radius": ["case", ["has", "title"], 6, 4],
+            // Per-feature colour (historical events) falls back to the layer colour.
+            "circle-color": ["coalesce", ["get", "color"], layer.color],
             "circle-stroke-width": 1,
             "circle-stroke-color": "#0B120E",
           },
@@ -267,6 +323,12 @@ export default function Globe() {
     map.setStyle(STYLES[baseStyle]); // 'style.load' handler re-syncs everything
   }, [baseStyle]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setProjection({ name: projection });
+  }, [projection]);
+
   // ---------- AOI drawing (click-drag rectangle / click pin) ----------
   useEffect(() => {
     const map = mapRef.current;
@@ -281,17 +343,19 @@ export default function Globe() {
     }
 
     const onDown = (e: mapboxgl.MapMouseEvent) => {
-      if (drawMode === "pin") {
+      if (drawMode === "pin" || drawMode === "quickpin") {
         const d = 0.25; // ~25 km half-box around the pin
-        useMapStore
-          .getState()
-          .setAoi([
-            e.lngLat.lng - d,
-            e.lngLat.lat - d,
-            e.lngLat.lng + d,
-            e.lngLat.lat + d,
-          ]);
-        useMapStore.getState().setDrawMode(null);
+        const store = useMapStore.getState();
+        store.setAoi([
+          e.lngLat.lng - d,
+          e.lngLat.lat - d,
+          e.lngLat.lng + d,
+          e.lngLat.lat + d,
+        ]);
+        store.setDrawMode(null);
+        // The quick-analysis pin opens the fast-lane panel; the plain pin just
+        // sets the AOI for the wizard.
+        if (drawMode === "quickpin") store.setQuickAnalysisOpen(true);
         return;
       }
       // rectangle: begin drag

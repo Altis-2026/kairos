@@ -1,15 +1,64 @@
-/** Layer management: visibility, opacity, removal, base style. */
-import { Eye, EyeOff, Trash2, X } from "lucide-react";
+/** Layer management: visibility, opacity, removal, base style, overlays. */
+import { useState } from "react";
+import { AlertTriangle, Eye, EyeOff, Loader2, Trash2, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { useMapStore } from "../../stores/mapStore";
+import { fetchHistoricalEvents, eventsToFeatureCollection } from "../../api/events";
+
+const EVENTS_LAYER_ID = "historical-events";
 
 export default function LayerPanel({ onClose }: { onClose: () => void }) {
-  const layers = useMapStore((s) => s.layers);
+  // Compare/timeline frames are managed by their own floating controls.
+  const layers = useMapStore((s) => s.layers.filter((l) => !l.group));
+  const pointLayers = useMapStore((s) => s.pointLayers);
   const baseStyle = useMapStore((s) => s.baseStyle);
   const setBaseStyle = useMapStore((s) => s.setBaseStyle);
   const toggleLayerVisible = useMapStore((s) => s.toggleLayerVisible);
   const setLayerOpacity = useMapStore((s) => s.setLayerOpacity);
   const removeLayer = useMapStore((s) => s.removeLayer);
+
+  const eventsOn = pointLayers.some((l) => l.id === EVENTS_LAYER_ID);
+  const [eventsBusy, setEventsBusy] = useState(false);
+  const [eventsNote, setEventsNote] = useState<string | null>(null);
+
+  async function toggleHistoricalEvents() {
+    const map = useMapStore.getState();
+    if (eventsOn) {
+      map.removeLayer(EVENTS_LAYER_ID);
+      setEventsNote(null);
+      return;
+    }
+    const bbox = map.viewportBbox;
+    if (!bbox) {
+      setEventsNote("Move the globe to set a view first.");
+      return;
+    }
+    setEventsBusy(true);
+    setEventsNote(null);
+    try {
+      const data = await fetchHistoricalEvents({ bbox, days: 3650 });
+      if (!data.available) {
+        setEventsNote(data.note ?? "Events feed unavailable right now.");
+        return;
+      }
+      if (data.events.length === 0) {
+        setEventsNote("No recorded disasters in this view (last ~10 years).");
+        return;
+      }
+      map.addPointLayer({
+        id: EVENTS_LAYER_ID,
+        name: `Historical disasters (${data.events.length})`,
+        data: eventsToFeatureCollection(data.events),
+        color: "#E8A318",
+        visible: true,
+      });
+      setEventsNote(`${data.events.length} events · click a marker for detail.`);
+    } catch (e) {
+      setEventsNote(e instanceof Error ? e.message : "Could not load events.");
+    } finally {
+      setEventsBusy(false);
+    }
+  }
 
   return (
     <motion.aside
@@ -28,7 +77,7 @@ export default function LayerPanel({ onClose }: { onClose: () => void }) {
 
       {/* Base style */}
       <div className="flex gap-2">
-        {(["satellite", "dark"] as const).map((s) => (
+        {(["satellite", "dark", "terrain"] as const).map((s) => (
           <button
             key={s}
             onClick={() => setBaseStyle(s)}
@@ -41,6 +90,44 @@ export default function LayerPanel({ onClose }: { onClose: () => void }) {
             {s}
           </button>
         ))}
+      </div>
+
+      {/* Context overlays */}
+      <div className="space-y-1.5">
+        <button
+          onClick={toggleHistoricalEvents}
+          disabled={eventsBusy}
+          className={`w-full flex items-center gap-2.5 rounded-xl ring-1 px-3 py-2.5 text-left transition disabled:opacity-60 ${
+            eventsOn
+              ? "bg-raised text-amber ring-amber/50"
+              : "bg-bg/70 text-dim ring-line hover:text-ink"
+          }`}
+          title="Show past floods, fires and storms near this view (NASA EONET)"
+        >
+          <span className={eventsOn ? "text-amber" : "text-dim"}>
+            {eventsBusy ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <AlertTriangle size={14} />
+            )}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-xs text-ink">Historical disasters</span>
+            <span className="block text-[10px] text-dim leading-tight">
+              Past events in view · NASA EONET
+            </span>
+          </span>
+          <span
+            className={`ml-auto font-mono text-[9px] tracking-wider ${
+              eventsOn ? "text-amber" : "text-dim"
+            }`}
+          >
+            {eventsOn ? "ON" : "OFF"}
+          </span>
+        </button>
+        {eventsNote && (
+          <p className="text-[10px] text-dim leading-snug px-1">{eventsNote}</p>
+        )}
       </div>
 
       {/* Analysis layers */}

@@ -14,6 +14,7 @@ import {
   onAuthStateChanged,
   type Auth,
 } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
 import { useAuthStore } from "../stores/authStore";
 
 const apiKey = import.meta.env.VITE_FIREBASE_API_KEY as string | undefined;
@@ -24,11 +25,16 @@ export const firebaseEnabled = Boolean(apiKey && authDomain && projectId);
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
+let firestore: Firestore | null = null;
 
 if (firebaseEnabled) {
   app = initializeApp({ apiKey, authDomain, projectId });
   auth = getAuth(app);
+  firestore = getFirestore(app);
 }
+
+/** Firestore handle — null when Firebase config is absent. */
+export const db = firestore;
 
 export function initAuthListener() {
   const { setUser, setAuthReady } = useAuthStore.getState();

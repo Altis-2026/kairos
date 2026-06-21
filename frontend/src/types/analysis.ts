@@ -18,6 +18,14 @@ export interface HeadlineStat {
   unit: string;
 }
 
+export interface ContextLayer {
+  id: string;
+  name: string;
+  tile_url: string;
+  color: string;
+  kind: string;
+}
+
 export interface AnalysisResult {
   analysis_type: string;
   display_name: string;
@@ -28,6 +36,7 @@ export interface AnalysisResult {
   data_date: string;
   confidence: number;
   headline_stat: HeadlineStat;
+  context_layers?: ContextLayer[];
   stats: Record<string, unknown>;
 }
 
@@ -37,6 +46,83 @@ export interface QueryResponse {
   parameters: Record<string, unknown> | null;
   result: AnalysisResult | null;
   explanation: string | null;
+}
+
+/** Research views (backscatter / optical / compare / time-series). */
+export interface ResearchLayerResponse {
+  kind: string;
+  tile_url: string;
+  data_date: string;
+  label: string;
+  color: string;
+  cloud_percent?: number;
+}
+
+export interface CompareComposite {
+  tile_url: string;
+  data_date: string;
+  label: string;
+}
+
+export interface CompareResponse {
+  polarization: string;
+  before: CompareComposite;
+  after: CompareComposite;
+}
+
+export interface TimeSeriesFrame {
+  date: string;
+  tile_url: string;
+  value: number;
+  label: string;
+  unit: string;
+}
+
+export interface TimeSeriesResponse {
+  frames: TimeSeriesFrame[];
+  metric: string;
+  unit: string;
+}
+
+/** Result of an alert-mode check ("is there a new pass?"). */
+export interface AlertCheckResponse {
+  new: boolean;
+  data_date: string | null;
+  checked_at: string;
+  note?: string;
+  headline_stat?: HeadlineStat;
+  result: AnalysisResult | null;
+}
+
+/** Historical natural-disaster markers (NASA EONET). */
+export interface EventMarker {
+  id: string;
+  title: string;
+  category: string;
+  category_id: string;
+  color: string;
+  date: string;
+  lon: number;
+  lat: number;
+  closed: boolean;
+  link: string | null;
+}
+
+export interface EventsResponse {
+  available: boolean;
+  events: EventMarker[];
+  count?: number;
+  source: string;
+  note?: string;
+}
+
+/** Population & infrastructure impact for a detection footprint. */
+export interface ImpactResponse {
+  analysis_type: string;
+  population_affected: number;
+  built_up_km2: number;
+  data_date: string;
+  headline_stat: HeadlineStat;
 }
 
 export interface SceneInfo {

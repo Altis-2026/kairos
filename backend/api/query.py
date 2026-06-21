@@ -15,9 +15,16 @@ router = APIRouter()
 
 @router.post("/query")
 def query(request: QueryRequest):
-    # 1. Parse intent with Claude
+    # 1. Parse intent with Claude (prior turns give follow-ups their context)
+    history = (
+        [{"role": t.role, "content": t.content} for t in request.history]
+        if request.history
+        else None
+    )
     try:
-        parsed = parse_natural_language(request.query, request.viewport_bbox)
+        parsed = parse_natural_language(
+            request.query, request.viewport_bbox, history
+        )
     except RuntimeError as e:
         # Missing API key — configuration problem, tell the user plainly
         raise HTTPException(status_code=503, detail=str(e))

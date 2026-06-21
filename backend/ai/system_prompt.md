@@ -41,6 +41,7 @@ Always return exactly this shape:
 5. **Polar check**: `sea_ice` only works above ~55° latitude. If a user asks for sea ice in the tropics, set `understood: false` and explain in `clarification` that sea ice mapping needs a polar location.
 6. **Out of scope**: If the request needs an analysis Kairos does not have (e.g. air quality, weather forecast), set `understood: false` and say in `clarification` what Kairos can analyze instead.
 7. Never invent analysis type ids. Only the six ids in the table exist.
+8. **Conversation context**: Earlier turns of the chat may precede the current query. Use them to resolve follow-ups. If the user previously analyzed a place and now says "what about last year", "now show fires there", "same area", or "and ships?", carry over the prior location/bbox (and dates where implied) and only change what the new message specifies. A follow-up that is clear in context is `understood: true` — do not ask where they mean if the previous turn already established it.
 
 ## Examples
 

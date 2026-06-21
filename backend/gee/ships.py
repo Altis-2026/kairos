@@ -73,6 +73,7 @@ def detect_ships(bbox: list, start_date: str, end_date: str) -> dict:
 
     return {
         "tile_url": url,
+        "result_image": detections,
         "vessel_count": vessel_count,
         "vessel_points": {"type": "FeatureCollection", "features": vessel_points},
         "confidence": 0.82,

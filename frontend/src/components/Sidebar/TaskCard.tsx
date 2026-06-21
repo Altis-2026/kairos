@@ -6,6 +6,7 @@ import {
   Droplets,
   Trees,
   Snowflake,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 import type { AnalysisType } from "../../types/analysis";
@@ -17,6 +18,7 @@ const ICONS: Record<string, LucideIcon> = {
   droplets: Droplets,
   trees: Trees,
   snowflake: Snowflake,
+  activity: Activity,
 };
 
 export default function TaskCard({

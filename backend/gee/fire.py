@@ -41,6 +41,7 @@ def detect_burn_scar(bbox: list, start_date: str, end_date: str) -> dict:
 
     return {
         "tile_url": url,
+        "result_image": burn,
         "burn_area_km2": burn_km2,
         "confidence": round(min(0.92, 0.68 + 0.02 * post_count), 2),
         "data_date": data_date,

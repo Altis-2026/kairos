@@ -31,7 +31,27 @@ def _get_system_prompt() -> str:
         _system_prompt = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
     return _system_prompt
 
-def parse_natural_language(query: str, viewport_bbox: list = None) -> ParsedQuery:
+def _history_messages(history: list = None) -> list:
+    """
+    Convert prior chat turns into OpenAI-style messages so the parser can
+    resolve follow-ups ("now show fires there"). Kairos turns become assistant
+    messages; we drop the current (latest) user turn — it's sent separately as
+    the structured user_message — to avoid duplicating it.
+    """
+    if not history:
+        return []
+    messages = []
+    for turn in history:
+        role = "assistant" if turn.get("role") == "kairos" else "user"
+        content = (turn.get("content") or "").strip()
+        if content:
+            messages.append({"role": role, "content": content})
+    return messages
+
+
+def parse_natural_language(
+    query: str, viewport_bbox: list = None, history: list = None
+) -> ParsedQuery:
     client = _get_client()
     system = _get_system_prompt()
 
@@ -40,13 +60,15 @@ def parse_natural_language(query: str, viewport_bbox: list = None) -> ParsedQuer
         context_lines.append(f"viewport_bbox: {viewport_bbox}")
     user_message = "\n".join(context_lines) + f"\n\nUser query: {query}"
 
+    prior = _history_messages(history)
+    messages = [{"role": "system", "content": system}]
+    messages.extend(prior)
+    messages.append({"role": "user", "content": user_message})
+
     response = client.chat.completions.create(
         model=MODEL,
         max_tokens=1000,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user_message},
-        ],
+        messages=messages,
     )
     text = response.choices[0].message.content
 
@@ -57,8 +79,7 @@ def parse_natural_language(query: str, viewport_bbox: list = None) -> ParsedQuer
             model=MODEL,
             max_tokens=1000,
             messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user_message},
+                *messages,
                 {"role": "assistant", "content": text},
                 {
                     "role": "user",

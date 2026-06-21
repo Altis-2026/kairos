@@ -1,9 +1,14 @@
 /** Right-side controls: analytics, globe view, layers, zoom, locate. */
 import {
   BarChart3,
+  Bell,
+  FileSpreadsheet,
+  FlaskConical,
   Globe2,
+  History,
   Layers,
   LocateFixed,
+  Map as MapIcon,
   Minus,
   Plus,
 } from "lucide-react";
@@ -11,6 +16,10 @@ import { useState } from "react";
 import { useMapStore } from "../stores/mapStore";
 import LayerPanel from "./Panels/LayerPanel";
 import AnalyticsPanel from "./Panels/AnalyticsPanel";
+import ResearchPanel from "./Panels/ResearchPanel";
+import HistoryPanel from "./Panels/HistoryPanel";
+import BatchPanel from "./Panels/BatchPanel";
+import AlertsPanel from "./Panels/AlertsPanel";
 
 function ToolButton({
   title,
@@ -37,8 +46,12 @@ function ToolButton({
 }
 
 export default function RightToolbar() {
-  const [openPanel, setOpenPanel] = useState<"layers" | "analytics" | null>(null);
+  const [openPanel, setOpenPanel] = useState<
+    "layers" | "analytics" | "research" | "history" | "batch" | "alerts" | null
+  >(null);
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
+  const projection = useMapStore((s) => s.projection);
+  const toggleProjection = useMapStore((s) => s.toggleProjection);
 
   const zoomBy = (delta: number) => {
     // Globe listens to flyTo; for zoom buttons we nudge using current viewport
@@ -68,11 +81,50 @@ export default function RightToolbar() {
           <Globe2 size={17} />
         </ToolButton>
         <ToolButton
+          title={
+            projection === "globe"
+              ? "Switch to 2D flat map"
+              : "Switch to 3D globe"
+          }
+          active={projection === "mercator"}
+          onClick={toggleProjection}
+        >
+          {projection === "globe" ? <MapIcon size={17} /> : <Globe2 size={17} />}
+        </ToolButton>
+        <ToolButton
           title="Layers"
           active={openPanel === "layers"}
           onClick={() => setOpenPanel(openPanel === "layers" ? null : "layers")}
         >
           <Layers size={17} />
+        </ToolButton>
+        <ToolButton
+          title="Research tools"
+          active={openPanel === "research"}
+          onClick={() => setOpenPanel(openPanel === "research" ? null : "research")}
+        >
+          <FlaskConical size={17} />
+        </ToolButton>
+        <ToolButton
+          title="My analyses"
+          active={openPanel === "history"}
+          onClick={() => setOpenPanel(openPanel === "history" ? null : "history")}
+        >
+          <History size={17} />
+        </ToolButton>
+        <ToolButton
+          title="Batch mode (CSV)"
+          active={openPanel === "batch"}
+          onClick={() => setOpenPanel(openPanel === "batch" ? null : "batch")}
+        >
+          <FileSpreadsheet size={17} />
+        </ToolButton>
+        <ToolButton
+          title="Alerts"
+          active={openPanel === "alerts"}
+          onClick={() => setOpenPanel(openPanel === "alerts" ? null : "alerts")}
+        >
+          <Bell size={17} />
         </ToolButton>
         <ToolButton title="Zoom in" onClick={() => zoomBy(1)}>
           <Plus size={17} />
@@ -93,6 +145,18 @@ export default function RightToolbar() {
       </div>
 
       {openPanel === "layers" && <LayerPanel onClose={() => setOpenPanel(null)} />}
+      {openPanel === "research" && (
+        <ResearchPanel onClose={() => setOpenPanel(null)} />
+      )}
+      {openPanel === "history" && (
+        <HistoryPanel onClose={() => setOpenPanel(null)} />
+      )}
+      {openPanel === "batch" && (
+        <BatchPanel onClose={() => setOpenPanel(null)} />
+      )}
+      {openPanel === "alerts" && (
+        <AlertsPanel onClose={() => setOpenPanel(null)} />
+      )}
       {openPanel === "analytics" && (
         <AnalyticsPanel onClose={() => setOpenPanel(null)} />
       )}

@@ -3,7 +3,17 @@
  * it never owns state itself, so any component can drive the map.
  */
 import { create } from "zustand";
-import type { BBox, DrawMode, PointLayer, RasterLayer } from "../types/map";
+import type {
+  BaseStyle,
+  BBox,
+  CompareControl,
+  DrawMode,
+  PointLayer,
+  Projection,
+  RasterLayer,
+  ResultRef,
+  TimelineControl,
+} from "../types/map";
 
 interface FlyToTarget {
   center: [number, number];
@@ -18,21 +28,38 @@ interface MapState {
   aoi: BBox | null;
   drawMode: DrawMode;
   flyTo: FlyToTarget | null;
-  baseStyle: "satellite" | "dark";
+  baseStyle: BaseStyle;
+  projection: Projection;
+  quickAnalysisOpen: boolean;
   viewportBbox: BBox | null;
+
+  // Research tools operate on the most recent analysis result.
+  lastResult: ResultRef | null;
+  compare: CompareControl | null;
+  timeline: TimelineControl | null;
+  timelineIndex: number;
 
   setCoords: (c: { lng: number; lat: number } | null) => void;
   setViewportBbox: (b: BBox) => void;
   addRasterLayer: (layer: RasterLayer) => void;
   addPointLayer: (layer: PointLayer) => void;
   removeLayer: (id: string) => void;
+  clearGroup: (group: "compare" | "timeline") => void;
   setLayerOpacity: (id: string, opacity: number) => void;
   toggleLayerVisible: (id: string) => void;
+  setLayerVisible: (id: string, visible: boolean) => void;
   clearLayers: () => void;
   setAoi: (bbox: BBox | null) => void;
   setDrawMode: (mode: DrawMode) => void;
   requestFlyTo: (center: [number, number], zoom: number) => void;
-  setBaseStyle: (s: "satellite" | "dark") => void;
+  setBaseStyle: (s: BaseStyle) => void;
+  setProjection: (p: Projection) => void;
+  toggleProjection: () => void;
+  setQuickAnalysisOpen: (open: boolean) => void;
+  setLastResult: (r: ResultRef) => void;
+  setCompare: (c: CompareControl | null) => void;
+  setTimeline: (t: TimelineControl | null) => void;
+  setTimelineIndex: (i: number) => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -43,7 +70,13 @@ export const useMapStore = create<MapState>((set) => ({
   drawMode: null,
   flyTo: null,
   baseStyle: "satellite",
+  projection: "globe",
+  quickAnalysisOpen: false,
   viewportBbox: null,
+  lastResult: null,
+  compare: null,
+  timeline: null,
+  timelineIndex: 0,
 
   setCoords: (coords) => set({ coords }),
   setViewportBbox: (viewportBbox) => set({ viewportBbox }),
@@ -60,6 +93,8 @@ export const useMapStore = create<MapState>((set) => ({
       layers: s.layers.filter((l) => l.id !== id),
       pointLayers: s.pointLayers.filter((l) => l.id !== id),
     })),
+  clearGroup: (group) =>
+    set((s) => ({ layers: s.layers.filter((l) => l.group !== group) })),
   setLayerOpacity: (id, opacity) =>
     set((s) => ({
       layers: s.layers.map((l) => (l.id === id ? { ...l, opacity } : l)),
@@ -73,12 +108,44 @@ export const useMapStore = create<MapState>((set) => ({
         l.id === id ? { ...l, visible: !l.visible } : l
       ),
     })),
+  setLayerVisible: (id, visible) =>
+    set((s) => ({
+      layers: s.layers.map((l) => (l.id === id ? { ...l, visible } : l)),
+      pointLayers: s.pointLayers.map((l) =>
+        l.id === id ? { ...l, visible } : l
+      ),
+    })),
   clearLayers: () => set({ layers: [], pointLayers: [] }),
   setAoi: (aoi) => set({ aoi }),
   setDrawMode: (drawMode) => set({ drawMode }),
   requestFlyTo: (center, zoom) =>
     set({ flyTo: { center, zoom, ts: Date.now() } }),
   setBaseStyle: (baseStyle) => set({ baseStyle }),
+  setProjection: (projection) => set({ projection }),
+  toggleProjection: () =>
+    set((s) => ({
+      projection: s.projection === "globe" ? "mercator" : "globe",
+    })),
+  setQuickAnalysisOpen: (quickAnalysisOpen) => set({ quickAnalysisOpen }),
+  // A new result invalidates the research overlays tied to the old one
+  // (compare/timeline frames + the backscatter/optical reference tiles).
+  setLastResult: (lastResult) =>
+    set((s) => ({
+      lastResult,
+      layers: s.layers.filter(
+        (l) =>
+          l.group !== "compare" &&
+          l.group !== "timeline" &&
+          l.id !== "research-backscatter" &&
+          l.id !== "research-optical"
+      ),
+      compare: null,
+      timeline: null,
+      timelineIndex: 0,
+    })),
+  setCompare: (compare) => set({ compare }),
+  setTimeline: (timeline) => set({ timeline }),
+  setTimelineIndex: (timelineIndex) => set({ timelineIndex }),
 }));
 
 /** Center + sensible zoom for a bbox — used after analyses complete. */

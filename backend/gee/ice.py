@@ -34,6 +34,7 @@ def detect_sea_ice(bbox: list, start_date: str, end_date: str) -> dict:
 
     return {
         "tile_url": url,
+        "result_image": ice_mask,
         "ice_extent_km2": ice_km2,
         "confidence": 0.88,
         "data_date": data_date,

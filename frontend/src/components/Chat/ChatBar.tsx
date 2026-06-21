@@ -6,40 +6,16 @@ import { useState } from "react";
 import { ArrowUp } from "lucide-react";
 import { runQuery } from "../../api/query";
 import { useChatStore } from "../../stores/chatStore";
-import { bboxCenterZoom, useMapStore } from "../../stores/mapStore";
+import { useMapStore } from "../../stores/mapStore";
 import SuggestionChips from "./SuggestionChips";
 import ChatMessages from "./ChatMessage";
-import type { AnalysisResult } from "../../types/analysis";
+import { applyResultToGlobe } from "../../lib/applyResult";
+
+// Re-exported for existing importers; canonical home is lib/applyResult.
+export { applyResultToGlobe };
 
 let msgId = 0;
 const nextId = () => `m${++msgId}-${Date.now()}`;
-
-export function applyResultToGlobe(result: AnalysisResult) {
-  const map = useMapStore.getState();
-  const layerId = `${result.analysis_type}-${Date.now()}`;
-  map.addRasterLayer({
-    id: layerId,
-    name: `${result.display_name} · ${result.data_date}`,
-    tileUrl: result.tile_url,
-    opacity: 0.85,
-    visible: true,
-    color: "#00BFA8",
-  });
-  const points = result.stats?.vessel_points as
-    | GeoJSON.FeatureCollection
-    | undefined;
-  if (points?.features?.length) {
-    map.addPointLayer({
-      id: `${layerId}-pts`,
-      name: `${result.display_name} points`,
-      data: points,
-      color: "#E8A318",
-      visible: true,
-    });
-  }
-  const { center, zoom } = bboxCenterZoom(result.bbox);
-  map.requestFlyTo(center, zoom);
-}
 
 export default function ChatBar() {
   const [input, setInput] = useState("");
@@ -49,6 +25,12 @@ export default function ChatBar() {
     const query = text.trim();
     if (!query || loading) return;
     setInput("");
+    // Capture history BEFORE adding the new turn so we send prior context only.
+    const history = useChatStore
+      .getState()
+      .messages.filter((m) => !m.pending)
+      .slice(-8)
+      .map((m) => ({ role: m.role, content: m.text }));
     addMessage({ id: nextId(), role: "user", text: query });
     const pendingId = nextId();
     addMessage({
@@ -61,7 +43,7 @@ export default function ChatBar() {
 
     try {
       const viewport = useMapStore.getState().viewportBbox ?? undefined;
-      const res = await runQuery(query, viewport);
+      const res = await runQuery(query, viewport, history);
 
       if (!res.understood) {
         updateMessage(pendingId, {

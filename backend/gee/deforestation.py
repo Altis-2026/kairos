@@ -48,6 +48,7 @@ def detect_deforestation(bbox: list, start_date: str, end_date: str) -> dict:
 
     return {
         "tile_url": url,
+        "result_image": loss,
         "forest_loss_km2": loss_km2,
         "confidence": round(min(0.90, 0.65 + 0.015 * current_count), 2),
         "data_date": data_date,

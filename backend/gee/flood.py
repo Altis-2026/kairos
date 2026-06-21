@@ -67,6 +67,7 @@ def detect_flood(bbox: list, start_date: str, end_date: str) -> dict:
 
     return {
         "tile_url": url,
+        "result_image": new_flood,
         "flood_area_km2": flood_km2,
         "confidence": confidence,
         "data_date": data_date,
