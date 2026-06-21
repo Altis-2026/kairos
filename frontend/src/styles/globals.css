@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #0b120e;
+  color: #e8efe9;
+  font-family: Inter, sans-serif;
+  overflow: hidden;
+}
+
+/* Thin dark scrollbars to match the space theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #243027 transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #243027;
+  border-radius: 3px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Mapbox chrome adjustments */
+.mapboxgl-ctrl-logo {
+  opacity: 0.4;
+}
+.mapboxgl-ctrl-attrib {
+  background: rgba(11, 18, 14, 0.6) !important;
+  color: #8a9e8c !important;
+  font-size: 10px !important;
+}
+.mapboxgl-ctrl-attrib a {
+  color: #8a9e8c !important;
+}
+.mapboxgl-canvas {
+  outline: none;
+}
+
+/* Crosshair cursor while drawing an AOI */
+.draw-crosshair .mapboxgl-canvas-container {
+  cursor: crosshair !important;
+}
+
+/* Soft pulse for the live telemetry dot */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.animate-pulse-soft {
+  animation: pulse-soft 2.4s ease-in-out infinite;
+}
+
+/* Scanning line for the processing log — the radar signature motif */
+@keyframes scanline {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.scanline::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, rgba(0, 191, 168, 0.18), transparent);
+  animation: scanline 1.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanline::after { animation: none; }
+  .animate-pulse-soft { animation: none; }
+}

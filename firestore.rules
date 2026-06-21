@@ -1,0 +1,37 @@
+rules_version = '2';
+
+// Kairos saved analyses ("cases").
+//
+// Each case is private to the user who created it: a signed-in user can create
+// cases under their own uid, and read/delete only their own. Cases are never
+// editable after creation (immutable provenance).
+//
+// Deploy with:  firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /cases/{caseId} {
+      allow read:   if request.auth != null
+                    && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+                    && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
+    // Alert mode: a user watches an area + analysis type. Unlike cases, alerts
+    // are mutable (each check updates lastDataDate / lastCheckedAt), but always
+    // stay owned by their creator.
+    match /alerts/{alertId} {
+      allow read:   if request.auth != null
+                    && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+                    && resource.data.userId == request.auth.uid
+                    && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+                    && resource.data.userId == request.auth.uid;
+    }
+  }
+}
