@@ -5,6 +5,9 @@ from openai import OpenAI
 from ai.parser import ParsedQuery, parse_query_response
 
 MODEL = "anthropic/claude-3-5-haiku"
+# Amazon Bedrock's hosted snapshot of this model has been deprecated and 404s on
+# every call; route OpenRouter around it instead of around the model itself.
+_PROVIDER_PREFS = {"provider": {"ignore": ["amazon-bedrock"]}}
 _SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
 
 _client = None
@@ -69,6 +72,7 @@ def parse_natural_language(
         model=MODEL,
         max_tokens=1000,
         messages=messages,
+        extra_body=_PROVIDER_PREFS,
     )
     text = response.choices[0].message.content
 
@@ -90,6 +94,7 @@ def parse_natural_language(
                     ),
                 },
             ],
+            extra_body=_PROVIDER_PREFS,
         )
         return parse_query_response(retry.choices[0].message.content)
 
@@ -112,6 +117,7 @@ def narrate_result(result: dict) -> str:
             {"role": "system", "content": system},
             {"role": "user", "content": "NARRATE: " + _json.dumps(slim, default=str)},
         ],
+        extra_body=_PROVIDER_PREFS,
     )
     return response.choices[0].message.content.strip()
 
@@ -183,6 +189,7 @@ def interpret_result(
             {"role": "system", "content": _INTERPRET_SYSTEM},
             {"role": "user", "content": _result_facts(result, method_description, place_name)},
         ],
+        extra_body=_PROVIDER_PREFS,
     )
     return response.choices[0].message.content.strip()
 
@@ -209,6 +216,7 @@ def search_regional_context(result: dict, place_name: str = None) -> str:
             {"role": "system", "content": _CONTEXT_SYSTEM},
             {"role": "user", "content": prompt},
         ],
+        extra_body=_PROVIDER_PREFS,
     )
     return response.choices[0].message.content.strip()
 
