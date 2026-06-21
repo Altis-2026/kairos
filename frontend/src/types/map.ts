@@ -20,6 +20,11 @@ export interface ResultRef {
   startDate: string;
   endDate: string;
   dataDate: string;
+  confidence: number;
+  headlineLabel: string;
+  headlineValue: number;
+  headlineUnit: string;
+  stats?: Record<string, unknown>;
 }
 
 export interface CompareControl {

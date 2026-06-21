@@ -11,10 +11,14 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
+  Check,
+  Download,
+  FileText,
   GitCompareArrows,
   Image as ImageIcon,
   Loader2,
   Radar,
+  Share2,
   Timer,
   X,
 } from "lucide-react";
@@ -26,6 +30,12 @@ import {
   fetchTimeSeries,
   type AnalysisRef,
 } from "../../api/research";
+import {
+  downloadGeoTIFF,
+  downloadReport,
+  type ExportSource,
+} from "../../lib/exporters";
+import { buildShareUrl } from "../../lib/share";
 
 const BACKSCATTER_ID = "research-backscatter";
 const OPTICAL_ID = "research-optical";
@@ -38,6 +48,7 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
 
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [copied, setCopied] = useState(false);
 
   const ref: AnalysisRef | null = lastResult
     ? {
@@ -47,6 +58,30 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
         end_date: lastResult.endDate,
       }
     : null;
+
+  const exportSrc: ExportSource | null = lastResult
+    ? {
+        analysis_type: lastResult.analysisType,
+        display_name: lastResult.displayName,
+        bbox: lastResult.bbox,
+        start_date: lastResult.startDate,
+        end_date: lastResult.endDate,
+        data_date: lastResult.dataDate,
+        confidence: lastResult.confidence,
+        headline_label: lastResult.headlineLabel,
+        headline_value: lastResult.headlineValue,
+        headline_unit: lastResult.headlineUnit,
+        stats: lastResult.stats,
+      }
+    : null;
+
+  function copyShare() {
+    if (!ref) return;
+    navigator.clipboard.writeText(buildShareUrl(ref)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   const backscatterOn = layers.some((l) => l.id === BACKSCATTER_ID);
   const opticalOn = layers.some((l) => l.id === OPTICAL_ID);
@@ -267,6 +302,62 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
               error={errors.timeline}
               onClick={toggleTimeline}
             />
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
+              Export &amp; share
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() =>
+                  exportSrc &&
+                  guard("geotiff", () => downloadGeoTIFF(exportSrc))
+                }
+                disabled={busy === "geotiff"}
+                className="h-9 rounded-xl text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+                title="Download the result raster as a GeoTIFF"
+              >
+                {busy === "geotiff" ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Download size={12} />
+                )}
+                GeoTIFF
+              </button>
+              <button
+                onClick={() =>
+                  exportSrc && guard("report", () => downloadReport(exportSrc))
+                }
+                disabled={busy === "report"}
+                className="h-9 rounded-xl text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+                title="Download a methodology report (markdown)"
+              >
+                {busy === "report" ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <FileText size={12} />
+                )}
+                Report
+              </button>
+            </div>
+            <button
+              onClick={copyShare}
+              className="w-full h-9 rounded-xl text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition"
+              title="Copy a reproducible link to this analysis"
+            >
+              {copied ? (
+                <Check size={12} className="text-teal" />
+              ) : (
+                <Share2 size={12} />
+              )}
+              {copied ? "Link copied" : "Copy share link"}
+            </button>
+            {(errors.geotiff || errors.report) && (
+              <p className="text-[10px] text-amber leading-snug px-1">
+                {errors.geotiff || errors.report}
+              </p>
+            )}
           </div>
         </>
       )}

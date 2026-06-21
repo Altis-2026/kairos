@@ -1,11 +1,27 @@
 /** Step 6 — the result: headline, confidence, exports, next actions. */
 import { useState } from "react";
-import { Check, Copy, Download, GitCompareArrows, RotateCcw } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  FileText,
+  GitCompareArrows,
+  Loader2,
+  RotateCcw,
+} from "lucide-react";
 import { useSidebarStore } from "../../../stores/sidebarStore";
+import {
+  downloadGeoTIFF,
+  downloadReport,
+  type ExportSource,
+} from "../../../lib/exporters";
+import { buildShareUrl } from "../../../lib/share";
 
 export default function ShowResult() {
   const { result, reset, compareNewDates, selectedTask } = useSidebarStore();
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [exportErr, setExportErr] = useState<string | null>(null);
 
   if (!result) {
     return (
@@ -18,6 +34,32 @@ export default function ShowResult() {
   const vesselPoints = result.stats?.vessel_points as
     | GeoJSON.FeatureCollection
     | undefined;
+
+  const exportSrc: ExportSource = {
+    analysis_type: result.analysis_type,
+    display_name: result.display_name,
+    bbox: result.bbox,
+    start_date: result.start_date,
+    end_date: result.end_date,
+    data_date: result.data_date,
+    confidence: result.confidence,
+    headline_label: result.headline_stat.label,
+    headline_value: result.headline_stat.value,
+    headline_unit: result.headline_stat.unit,
+    stats: result.stats,
+  };
+
+  async function runExport(key: string, fn: () => Promise<void>) {
+    setBusy(key);
+    setExportErr(null);
+    try {
+      await fn();
+    } catch (e) {
+      setExportErr(e instanceof Error ? e.message : "Export failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   function downloadGeoJSON() {
     if (!vesselPoints) return;
@@ -33,14 +75,15 @@ export default function ShowResult() {
   }
 
   function copyShareLink() {
-    const params = new URLSearchParams({
-      task: result!.analysis_type,
-      bbox: result!.bbox.join(","),
-      start: result!.start_date,
-      end: result!.end_date,
-    });
     navigator.clipboard
-      .writeText(`${location.origin}${location.pathname}#${params.toString()}`)
+      .writeText(
+        buildShareUrl({
+          analysis_type: result!.analysis_type,
+          bbox: result!.bbox,
+          start_date: result!.start_date,
+          end_date: result!.end_date,
+        })
+      )
       .then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -78,25 +121,41 @@ export default function ShowResult() {
         </h3>
         <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={downloadGeoJSON}
-            disabled={!vesselPoints}
-            title={
-              vesselPoints
-                ? "Download detections as GeoJSON"
-                : "GeoJSON export is available for point results (e.g. ships)"
-            }
-            className="h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors disabled:opacity-40"
+            onClick={() => runExport("geotiff", () => downloadGeoTIFF(exportSrc))}
+            disabled={busy === "geotiff"}
+            title="Download the result raster as a GeoTIFF"
+            className="h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors disabled:opacity-50"
           >
-            <Download size={13} /> GeoJSON
+            {busy === "geotiff" ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Download size={13} />
+            )}
+            GeoTIFF
           </button>
           <button
-            disabled
-            title="GeoTIFF export ships in Phase 2"
-            className="h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim opacity-40"
+            onClick={() => runExport("report", () => downloadReport(exportSrc))}
+            disabled={busy === "report"}
+            title="Download a methodology report (markdown)"
+            className="h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors disabled:opacity-50"
           >
-            <Download size={13} /> GeoTIFF
+            {busy === "report" ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <FileText size={13} />
+            )}
+            Report
           </button>
         </div>
+        {vesselPoints && (
+          <button
+            onClick={downloadGeoJSON}
+            title="Download detections as GeoJSON"
+            className="w-full h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors"
+          >
+            <Download size={13} /> GeoJSON (points)
+          </button>
+        )}
         <button
           onClick={copyShareLink}
           className="w-full h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors"
@@ -104,6 +163,9 @@ export default function ShowResult() {
           {copied ? <Check size={13} className="text-teal" /> : <Copy size={13} />}
           {copied ? "Link copied" : "Copy share link"}
         </button>
+        {exportErr && (
+          <p className="text-[10px] text-amber leading-snug">{exportErr}</p>
+        )}
       </div>
 
       <div className="space-y-2">

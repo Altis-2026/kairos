@@ -1,4 +1,5 @@
 /** Kairos — layout composition. The globe is the page; everything floats. */
+import { useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import Globe from "./components/Globe";
 import TopNav from "./components/TopNav";
@@ -11,11 +12,17 @@ import QuickAnalysisPanel from "./components/Panels/QuickAnalysisPanel";
 import CompareSlider from "./components/Map/CompareSlider";
 import TimelineScrubber from "./components/Map/TimelineScrubber";
 import { useMapStore } from "./stores/mapStore";
+import { restoreFromHash } from "./lib/share";
 
 export default function App() {
   const quickAnalysisOpen = useMapStore((s) => s.quickAnalysisOpen);
   const compare = useMapStore((s) => s.compare);
   const timeline = useMapStore((s) => s.timeline);
+
+  // A shared link (#task=...&bbox=...) re-runs its analysis onto the globe.
+  useEffect(() => {
+    void restoreFromHash();
+  }, []);
 
   return (
     <div className="relative h-full w-full bg-bg overflow-hidden">

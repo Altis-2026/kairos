@@ -10,6 +10,10 @@ router = APIRouter()
 # the GEE function returns goes into the `stats` dict.
 TOP_LEVEL_KEYS = {"tile_url", "data_date", "confidence", "headline_stat"}
 
+# Keys that must never be serialized into the JSON response (e.g. the raw
+# ee.Image kept for GeoTIFF export).
+NON_SERIALIZED_KEYS = {"result_image"}
+
 # Analyses whose whole point is distinguishing anomalous dark water from water
 # that is permanently there. For these we attach a permanent-water reference
 # layer so a single query returns the detection PLUS its context, not one
@@ -57,7 +61,11 @@ def run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: str)
     config = ANALYSIS_REGISTRY[analysis_type]
     raw = config["function"](bbox=bbox, start_date=start_date, end_date=end_date)
 
-    stats = {k: v for k, v in raw.items() if k not in TOP_LEVEL_KEYS}
+    stats = {
+        k: v
+        for k, v in raw.items()
+        if k not in TOP_LEVEL_KEYS and k not in NON_SERIALIZED_KEYS
+    }
 
     return {
         "analysis_type": analysis_type,

@@ -3,6 +3,7 @@ import {
   BarChart3,
   FlaskConical,
   Globe2,
+  History,
   Layers,
   LocateFixed,
   Map as MapIcon,
@@ -14,6 +15,7 @@ import { useMapStore } from "../stores/mapStore";
 import LayerPanel from "./Panels/LayerPanel";
 import AnalyticsPanel from "./Panels/AnalyticsPanel";
 import ResearchPanel from "./Panels/ResearchPanel";
+import HistoryPanel from "./Panels/HistoryPanel";
 
 function ToolButton({
   title,
@@ -41,7 +43,7 @@ function ToolButton({
 
 export default function RightToolbar() {
   const [openPanel, setOpenPanel] = useState<
-    "layers" | "analytics" | "research" | null
+    "layers" | "analytics" | "research" | "history" | null
   >(null);
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
   const projection = useMapStore((s) => s.projection);
@@ -99,6 +101,13 @@ export default function RightToolbar() {
         >
           <FlaskConical size={17} />
         </ToolButton>
+        <ToolButton
+          title="My analyses"
+          active={openPanel === "history"}
+          onClick={() => setOpenPanel(openPanel === "history" ? null : "history")}
+        >
+          <History size={17} />
+        </ToolButton>
         <ToolButton title="Zoom in" onClick={() => zoomBy(1)}>
           <Plus size={17} />
         </ToolButton>
@@ -120,6 +129,9 @@ export default function RightToolbar() {
       {openPanel === "layers" && <LayerPanel onClose={() => setOpenPanel(null)} />}
       {openPanel === "research" && (
         <ResearchPanel onClose={() => setOpenPanel(null)} />
+      )}
+      {openPanel === "history" && (
+        <HistoryPanel onClose={() => setOpenPanel(null)} />
       )}
       {openPanel === "analytics" && (
         <AnalyticsPanel onClose={() => setOpenPanel(null)} />

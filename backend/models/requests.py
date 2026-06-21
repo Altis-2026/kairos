@@ -89,6 +89,37 @@ class OpticalRequest(BaseModel):
         return self
 
 
+class ReportRequest(BaseModel):
+    """POST /export/report — build a methodology report from a finished result."""
+
+    analysis_type: str
+    display_name: str
+    bbox: List[float]
+    start_date: str
+    end_date: str
+    data_date: str
+    confidence: float
+    headline_label: str
+    headline_value: float
+    headline_unit: str
+    stats: Optional[dict] = None
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+    @field_validator("start_date")
+    @classmethod
+    def validate_start(cls, v):
+        return _validate_date(v, "start_date")
+
+    @field_validator("end_date")
+    @classmethod
+    def validate_end(cls, v):
+        return _validate_date(v, "end_date")
+
+
 class TimeSeriesRequest(BaseModel):
     """POST /research/timeseries — run an analysis across stepped time windows."""
 

@@ -7,6 +7,7 @@
  * pin-drop quick-analysis panel so they behave identically.
  */
 import { bboxCenterZoom, useMapStore } from "../stores/mapStore";
+import { saveCase } from "./cases";
 import type { AnalysisResult } from "../types/analysis";
 
 export function applyResultToGlobe(result: AnalysisResult) {
@@ -48,8 +49,8 @@ export function applyResultToGlobe(result: AnalysisResult) {
     });
   }
 
-  // Record it so the research tools (backscatter, optical, compare, timeline)
-  // can act on the latest result regardless of how it was produced.
+  // Record it so the research/export tools can act on the latest result
+  // regardless of how it was produced.
   map.setLastResult({
     analysisType: result.analysis_type,
     displayName: result.display_name,
@@ -57,7 +58,15 @@ export function applyResultToGlobe(result: AnalysisResult) {
     startDate: result.start_date,
     endDate: result.end_date,
     dataDate: result.data_date,
+    confidence: result.confidence,
+    headlineLabel: result.headline_stat.label,
+    headlineValue: result.headline_stat.value,
+    headlineUnit: result.headline_stat.unit,
+    stats: result.stats,
   });
+
+  // Persist for signed-in users (no-op otherwise) — fire and forget.
+  void saveCase(result);
 
   const { center, zoom } = bboxCenterZoom(result.bbox);
   map.requestFlyTo(center, zoom);

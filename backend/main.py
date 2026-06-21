@@ -73,6 +73,7 @@ from api.scenes import router as scenes_router    # noqa: E402
 from api.registry import router as registry_router  # noqa: E402
 from api.status import router as status_router    # noqa: E402
 from api.research import router as research_router  # noqa: E402
+from api.exports import router as exports_router  # noqa: E402
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -80,6 +81,7 @@ app.include_router(scenes_router)
 app.include_router(registry_router)
 app.include_router(status_router)
 app.include_router(research_router)
+app.include_router(exports_router)
 
 
 @app.get("/health")
