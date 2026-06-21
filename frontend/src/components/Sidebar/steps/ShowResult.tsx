@@ -18,6 +18,7 @@ import {
 } from "../../../lib/exporters";
 import { buildShareUrl } from "../../../lib/share";
 import { buildEmbedSnippet } from "../../../lib/embed";
+import ResultInsight from "../../Insight/ResultInsight";
 
 export default function ShowResult() {
   const { result, reset, compareNewDates, selectedTask } = useSidebarStore();
@@ -133,6 +134,22 @@ export default function ShowResult() {
           try different dates or a larger area.
         </p>
       )}
+
+      <ResultInsight
+        input={{
+          analysis_type: result.analysis_type,
+          display_name: result.display_name,
+          bbox: result.bbox,
+          start_date: result.start_date,
+          end_date: result.end_date,
+          data_date: result.data_date,
+          confidence: result.confidence,
+          headline_label: result.headline_stat.label,
+          headline_value: result.headline_stat.value,
+          headline_unit: result.headline_stat.unit,
+          stats: result.stats,
+        }}
+      />
 
       <div className="space-y-2">
         <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">

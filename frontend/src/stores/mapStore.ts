@@ -33,6 +33,11 @@ interface MapState {
   quickAnalysisOpen: boolean;
   viewportBbox: BBox | null;
 
+  // Interactive tutorial overlay + a one-shot request to open a toolbar panel
+  // (used by the tutorial's "Try it" buttons, which live outside the toolbar).
+  tutorialOpen: boolean;
+  panelRequest: string | null;
+
   // Research tools operate on the most recent analysis result.
   lastResult: ResultRef | null;
   compare: CompareControl | null;
@@ -56,6 +61,9 @@ interface MapState {
   setProjection: (p: Projection) => void;
   toggleProjection: () => void;
   setQuickAnalysisOpen: (open: boolean) => void;
+  setTutorialOpen: (open: boolean) => void;
+  requestPanel: (panel: string) => void;
+  clearPanelRequest: () => void;
   setLastResult: (r: ResultRef) => void;
   setCompare: (c: CompareControl | null) => void;
   setTimeline: (t: TimelineControl | null) => void;
@@ -73,6 +81,8 @@ export const useMapStore = create<MapState>((set) => ({
   projection: "globe",
   quickAnalysisOpen: false,
   viewportBbox: null,
+  tutorialOpen: false,
+  panelRequest: null,
   lastResult: null,
   compare: null,
   timeline: null,
@@ -127,6 +137,9 @@ export const useMapStore = create<MapState>((set) => ({
       projection: s.projection === "globe" ? "mercator" : "globe",
     })),
   setQuickAnalysisOpen: (quickAnalysisOpen) => set({ quickAnalysisOpen }),
+  setTutorialOpen: (tutorialOpen) => set({ tutorialOpen }),
+  requestPanel: (panelRequest) => set({ panelRequest }),
+  clearPanelRequest: () => set({ panelRequest: null }),
   // A new result invalidates the research overlays tied to the old one
   // (compare/timeline frames + the backscatter/optical reference tiles).
   setLastResult: (lastResult) =>

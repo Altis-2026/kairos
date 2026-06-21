@@ -38,6 +38,7 @@ import {
 } from "../../api/research";
 import { fetchImpact } from "../../api/impact";
 import { buildEmbedSnippet } from "../../lib/embed";
+import ResultInsight from "../Insight/ResultInsight";
 import type { ImpactResponse } from "../../types/analysis";
 import {
   downloadGeoTIFF,
@@ -298,6 +299,22 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
               {lastResult.dataDate} · {lastResult.startDate} → {lastResult.endDate}
             </div>
           </div>
+
+          <ResultInsight
+            input={{
+              analysis_type: lastResult.analysisType,
+              display_name: lastResult.displayName,
+              bbox: lastResult.bbox,
+              start_date: lastResult.startDate,
+              end_date: lastResult.endDate,
+              data_date: lastResult.dataDate,
+              confidence: lastResult.confidence,
+              headline_label: lastResult.headlineLabel,
+              headline_value: lastResult.headlineValue,
+              headline_unit: lastResult.headlineUnit,
+              stats: lastResult.stats,
+            }}
+          />
 
           <div className="space-y-2">
             <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
