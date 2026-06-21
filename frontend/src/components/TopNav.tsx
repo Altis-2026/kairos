@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { HelpCircle, Menu, Search, LogOut, MapPin, Radio } from "lucide-react";
+import { HelpCircle, Menu, Search, LogOut, MapPin, Radio, Shield } from "lucide-react";
 import { useMapStore } from "../stores/mapStore";
 import { useSidebarStore } from "../stores/sidebarStore";
 import { useAuthStore } from "../stores/authStore";
@@ -218,6 +218,17 @@ export default function TopNav() {
         >
           <Radio size={15} className="text-amber" />
           <span className="text-xs font-medium hidden sm:inline">Live Watch</span>
+        </button>
+        <button
+          onClick={() => {
+            location.hash = "guardian";
+            location.reload();
+          }}
+          title="Guardian — help spot illegal activity from space"
+          className="h-10 px-3.5 grid grid-flow-col items-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-teal transition-colors"
+        >
+          <Shield size={15} className="text-teal" />
+          <span className="text-xs font-medium hidden sm:inline">Guardian</span>
         </button>
         <button
           onClick={() => setTutorialOpen(true)}

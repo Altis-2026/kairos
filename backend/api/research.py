@@ -14,9 +14,15 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
 
-from models.requests import AnalyzeRequest, OpticalRequest, TimeSeriesRequest
+from models.requests import (
+    AnalyzeRequest,
+    OpticalRequest,
+    PopulationRequest,
+    TimeSeriesRequest,
+)
 from gee import common
 from gee.optical import optical_image
+from gee.impact import population_density_tile
 from gee.registry import ANALYSIS_REGISTRY
 
 router = APIRouter()
@@ -67,6 +73,22 @@ def optical(req: OpticalRequest):
         "cloud_percent": data["cloud_percent"],
         "label": f"Optical · Sentinel-2 · {data['data_date']}",
         "color": "#34D399",
+    }
+
+
+@router.post("/research/population")
+def population(req: PopulationRequest):
+    """Population-density heatmap (JRC GHSL) as a context overlay for the AOI."""
+    try:
+        data = population_density_tile(req.bbox)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Population layer failed: {e}")
+
+    return {
+        "kind": "population",
+        "tile_url": data["tile_url"],
+        "label": f"Population density · GHSL {data['epoch']}",
+        "color": "#E8A318",
     }
 
 

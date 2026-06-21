@@ -16,6 +16,12 @@ from gee.oil import detect_oil_spill
 from gee.deforestation import detect_deforestation
 from gee.ice import detect_sea_ice
 from gee.deformation import detect_deformation
+from gee.flood_depth import estimate_flood_depth
+from gee.damage import assess_damage
+from gee.subsidence import detect_subsidence
+from gee.urban import detect_urban_growth
+from gee.agriculture import monitor_crops
+from gee.mining import detect_land_disturbance
 
 ANALYSIS_REGISTRY = {
     "flood_extent": {
@@ -137,6 +143,121 @@ ANALYSIS_REGISTRY = {
         "color_palette": ["#C77DFF"],
         "icon": "activity",
         "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "flood_depth": {
+        "function": estimate_flood_depth,
+        "display_name": "Flood Depth Estimation",
+        "description": (
+            "Goes beyond flood extent to estimate how deep the water is. Detects "
+            "the flooded area from a >3 dB Sentinel-1 VV drop, then uses the "
+            "Copernicus GLO-30 elevation model to estimate water depth from the "
+            "shoreline elevation inward. Reports mean/max depth and water volume. "
+            "(A simplified terrain approximation, not a hydraulic model.)"
+        ),
+        "category": "Disaster Response",
+        "data_sources": ["S1", "DEM"],
+        "estimated_seconds": 30,
+        "output_type": "raster",
+        "color_palette": ["#1E6FE8"],
+        "icon": "waves",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "building_damage": {
+        "function": assess_damage,
+        "display_name": "Earthquake / Building Damage",
+        "description": (
+            "Maps likely-damaged buildings within hours of an earthquake, blast or "
+            "strike — through the dust and cloud that blind optical satellites. "
+            "Flags built-up pixels (JRC GHSL) whose Sentinel-1 VV signature changed "
+            "sharply between a pre-event and post-event window, as collapse destroys "
+            "a building's steady radar return. A rapid triage proxy for responders."
+        ),
+        "category": "Disaster Response",
+        "data_sources": ["S1", "GHSL"],
+        "estimated_seconds": 30,
+        "output_type": "raster",
+        "color_palette": ["#FF3B5C"],
+        "icon": "building",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "land_subsidence": {
+        "function": detect_subsidence,
+        "display_name": "Land Subsidence Indicator",
+        "description": (
+            "Surfaces ground undergoing slow, progressive change — sinking cities, "
+            "over-pumped aquifers, reworked land. Fits a straight-line trend to each "
+            "pixel's VV backscatter over a long window and flags steep, consistent "
+            "drifts. An amplitude-trend proxy that highlights candidate zones for a "
+            "proper InSAR study, not millimetre InSAR displacement itself."
+        ),
+        "category": "Environmental",
+        "data_sources": ["S1"],
+        "estimated_seconds": 40,
+        "output_type": "raster",
+        "color_palette": ["#1E6FE8"],
+        "icon": "trending-down",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "urban_growth": {
+        "function": detect_urban_growth,
+        "display_name": "Urban Growth Monitoring",
+        "description": (
+            "Detects new construction and built-up expansion over the past year. "
+            "Buildings and roads are bright radar corner reflectors, so new "
+            "structures show a sharp, persistent rise in Sentinel-1 VV backscatter "
+            "against a 12-month-prior baseline. Maps where the footprint of the "
+            "built environment is growing."
+        ),
+        "category": "Environmental",
+        "data_sources": ["S1"],
+        "estimated_seconds": 30,
+        "output_type": "raster",
+        "color_palette": ["#E8A318"],
+        "icon": "building-2",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "crop_monitoring": {
+        "function": monitor_crops,
+        "display_name": "Agriculture / Crop Vigour",
+        "description": (
+            "Tracks crop health and cropland continuously — even through the cloud "
+            "that blinds optical indices like NDVI for weeks. Computes the dual-pol "
+            "Radar Vegetation Index (RVI) from Sentinel-1 VV+VH: a growing canopy "
+            "scatters radar in all directions and raises VH, so the map reads "
+            "directly as crop vigour from bare soil to dense canopy."
+        ),
+        "category": "Environmental",
+        "data_sources": ["S1"],
+        "estimated_seconds": 25,
+        "output_type": "raster",
+        "color_palette": ["#7BC043"],
+        "icon": "sprout",
+        "sar_polarization": "VH",
+        "instrument_mode": "IW",
+    },
+    "land_disturbance": {
+        "function": detect_land_disturbance,
+        "display_name": "Illegal Mining / Land Disturbance",
+        "description": (
+            "Surfaces candidate illegal mining and land clearing in remote, cloud-"
+            "covered regions. Against a 12-month baseline it flags freshly cleared "
+            "ground (a collapse in the VH canopy return) and new mirror-dark "
+            "settling ponds (very low VV where there was no permanent water). Powers "
+            "Kairos Guardian, where people help vet each detection. A lead for human "
+            "review, not a verdict."
+        ),
+        "category": "Maritime and Security",
+        "data_sources": ["S1"],
+        "estimated_seconds": 35,
+        "output_type": "raster",
+        "color_palette": ["#FF6B2C"],
+        "icon": "pickaxe",
+        "sar_polarization": "VH",
         "instrument_mode": "IW",
     },
 }

@@ -1,5 +1,5 @@
 /**
- * Kairos Guide — an interactive walkthrough overlay (the ? button).
+ * Kairos Guide: an interactive walkthrough overlay (the ? button).
  *
  * A polished, full-screen guided sequence in the exact Kairos UI. Each step
  * explains one capability and, where it helps, offers a "Try it" button that
@@ -22,6 +22,7 @@ import {
   PanelRightOpen,
   Radio,
   Satellite,
+  Shield,
   Sparkles,
   X,
 } from "lucide-react";
@@ -49,6 +50,10 @@ function openLiveWatch() {
   location.hash = "watch";
   location.reload();
 }
+function openGuardian() {
+  location.hash = "guardian";
+  location.reload();
+}
 
 const STEPS: Step[] = [
   {
@@ -57,7 +62,7 @@ const STEPS: Step[] = [
     title: "Real radar, plain questions",
     body:
       "Kairos runs Sentinel-1 satellite radar analysis on demand. Radar sees " +
-      "through clouds and darkness, covering the whole Earth every ~12 days — " +
+      "through clouds and darkness, covering the whole Earth every ~12 days, " +
       "so you can ask about floods, ships, fires and more, anywhere, anytime.",
     tip: "Everything runs on free ESA satellite data. No setup needed.",
   },
@@ -78,7 +83,7 @@ const STEPS: Step[] = [
     body:
       "Open the Menu to run the six-step builder: pick a Task, define an Area, " +
       "Configure dates, Preview scenes, Run, and read the Result. Every step is " +
-      "explicit — you always know exactly what will be analysed.",
+      "explicit, so you always know exactly what will be analysed.",
     action: { label: "Open the wizard", run: openSidebar },
   },
   {
@@ -98,7 +103,7 @@ const STEPS: Step[] = [
     body:
       "Floods, ship detection, wildfire burn scars, oil spills, deforestation, " +
       "sea-ice extent, and surface change/deformation. Each uses a different radar " +
-      "signature — Kairos picks the right one, or you choose from the task list.",
+      "signature. Kairos picks the right one, or you choose from the task list.",
     action: { label: "Browse analysis types", run: openSidebar },
   },
   {
@@ -108,9 +113,9 @@ const STEPS: Step[] = [
     body:
       "Each result gives a headline number, a confidence score, and a coloured " +
       "overlay on the globe. The legend (bottom-left) labels every colour. Hit " +
-      "“Explain this result” for a plain-language read — what it shows, the " +
-      "trend, likely causes — plus an optional regional news search.",
-    tip: "Radar can be fooled (e.g. wet farmland looks like flood) — the explainer flags this.",
+      "“Explain this result” for a plain-language read: what it shows, the " +
+      "trend, likely causes, plus an optional regional news search.",
+    tip: "Radar can be fooled (e.g. wet farmland looks like flood). The explainer flags this.",
   },
   {
     icon: <FlaskConical size={20} />,
@@ -128,7 +133,7 @@ const STEPS: Step[] = [
     title: "Watch an area over time",
     body:
       "Sign in, then “Watch this area”. Kairos re-checks it on every new " +
-      "Sentinel-1 pass and flags fresh detections in your Alerts panel — ideal for " +
+      "Sentinel-1 pass and flags fresh detections in your Alerts panel, ideal for " +
       "monitoring a flood-prone region or a port.",
     action: { label: "Open alerts", run: () => openPanel("alerts") },
   },
@@ -142,12 +147,23 @@ const STEPS: Step[] = [
     action: { label: "Open batch mode", run: () => openPanel("batch") },
   },
   {
+    icon: <Shield size={20} />,
+    chip: "Take part",
+    title: "Guardian: help patrol the planet",
+    body:
+      "Open Guardian, a login-free mode that spotlights real hotspots of illegal " +
+      "mining, clearing and fishing. Scan a watch zone, see what the radar flags, " +
+      "and submit your verdict. You help vet detections from space.",
+    tip: "It's environmental transparency: candidate activity for review, never an accusation.",
+    action: { label: "Open Guardian", run: openGuardian },
+  },
+  {
     icon: <Radio size={20} />,
     chip: "Share",
     title: "Share & Live Watch",
     body:
       "Copy a reproducible link or an embeddable widget of any result. Or open the " +
-      "public Live Watch dashboard — a login-free map of active natural disasters " +
+      "public Live Watch dashboard, a login-free map of active natural disasters " +
       "worldwide. You're ready to explore.",
     action: { label: "Open Live Watch", run: openLiveWatch },
   },
@@ -165,7 +181,7 @@ export default function Tutorial() {
     try {
       localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
     } catch {
-      /* private mode — fine */
+      /* private mode, fine */
     }
     setOpen(false);
     setI(0);

@@ -6,8 +6,10 @@
  * fly to it. Degrades gracefully when the feed is unreachable.
  */
 import { useEffect, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import { Loader2, Radio, X } from "lucide-react";
 import Globe from "../Globe";
+import WatchEventDetail from "./WatchEventDetail";
 import { useMapStore } from "../../stores/mapStore";
 import { fetchHistoricalEvents, eventsToFeatureCollection } from "../../api/events";
 import type { EventMarker } from "../../types/analysis";
@@ -21,6 +23,7 @@ export default function LiveWatch() {
   const [events, setEvents] = useState<EventMarker[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [note, setNote] = useState<string | null>(null);
+  const [selected, setSelected] = useState<EventMarker | null>(null);
   const home = `${location.origin}${location.pathname}`;
 
   useEffect(() => {
@@ -59,6 +62,7 @@ export default function LiveWatch() {
 
   function flyTo(e: EventMarker) {
     useMapStore.getState().requestFlyTo([e.lon, e.lat], 5);
+    setSelected(e);
   }
 
   return (
@@ -109,7 +113,11 @@ export default function LiveWatch() {
               <li key={e.id}>
                 <button
                   onClick={() => flyTo(e)}
-                  className="w-full text-left rounded-xl bg-bg/70 ring-1 ring-line hover:ring-teal/40 p-2.5 transition"
+                  className={`w-full text-left rounded-xl bg-bg/70 ring-1 p-2.5 transition ${
+                    selected?.id === e.id
+                      ? "ring-teal/60"
+                      : "ring-line hover:ring-teal/40"
+                  }`}
                 >
                   <div className="flex items-center gap-2">
                     <span
@@ -135,6 +143,15 @@ export default function LiveWatch() {
           Open the full Kairos workspace →
         </a>
       </aside>
+
+      <AnimatePresence>
+        {selected && (
+          <WatchEventDetail
+            event={selected}
+            onClose={() => setSelected(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -4,6 +4,7 @@
  * Kairos is a single-page app, so "routes" are encoded in the URL hash (the
  * same mechanism the share links already use):
  *   #watch                      -> the public Live Watch dashboard (no login)
+ *   #guardian                   -> the citizen-science Guardian mode (no login)
  *   #embed&task=..&bbox=..&..   -> a minimal embeddable result widget
  *   #task=..&bbox=..&..         -> normal app + restore a shared analysis
  *
@@ -13,11 +14,12 @@
 import type { BBox } from "../types/map";
 import type { CaseRef } from "./share";
 
-export type Route = "watch" | "embed" | "app";
+export type Route = "watch" | "guardian" | "embed" | "app";
 
 export function getRoute(): Route {
   const hash = location.hash.replace(/^#/, "");
   if (hash === "watch") return "watch";
+  if (hash === "guardian") return "guardian";
   if (hash.startsWith("embed")) return "embed";
   return "app";
 }

@@ -4,7 +4,21 @@ from pathlib import Path
 from openai import OpenAI
 from ai.parser import ParsedQuery, parse_query_response
 
-MODEL = "anthropic/claude-3-5-haiku"
+# OpenRouter's canonical slug uses a dot ("3.5"), not a dash. The dash form is
+# an older alias that has been seen routing to a dead Bedrock-hosted snapshot
+# even with provider.ignore set — use the canonical id to avoid that path.
+MODEL = "anthropic/claude-3.5-haiku"
+# Amazon Bedrock's hosted snapshot of this model has been deprecated and 404s on
+# every call. Prefer Anthropic's own endpoint first and ignore Bedrock outright,
+# but keep allow_fallbacks on so a transient Anthropic outage doesn't take the
+# whole feature down — OpenRouter will still skip the ignored provider.
+_PROVIDER_PREFS = {
+    "provider": {
+        "order": ["anthropic"],
+        "ignore": ["amazon-bedrock"],
+        "allow_fallbacks": True,
+    }
+}
 _SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
 
 _client = None
@@ -69,6 +83,7 @@ def parse_natural_language(
         model=MODEL,
         max_tokens=1000,
         messages=messages,
+        extra_body=_PROVIDER_PREFS,
     )
     text = response.choices[0].message.content
 
@@ -90,6 +105,7 @@ def parse_natural_language(
                     ),
                 },
             ],
+            extra_body=_PROVIDER_PREFS,
         )
         return parse_query_response(retry.choices[0].message.content)
 
@@ -112,6 +128,7 @@ def narrate_result(result: dict) -> str:
             {"role": "system", "content": system},
             {"role": "user", "content": "NARRATE: " + _json.dumps(slim, default=str)},
         ],
+        extra_body=_PROVIDER_PREFS,
     )
     return response.choices[0].message.content.strip()
 
@@ -183,6 +200,7 @@ def interpret_result(
             {"role": "system", "content": _INTERPRET_SYSTEM},
             {"role": "user", "content": _result_facts(result, method_description, place_name)},
         ],
+        extra_body=_PROVIDER_PREFS,
     )
     return response.choices[0].message.content.strip()
 
@@ -209,6 +227,7 @@ def search_regional_context(result: dict, place_name: str = None) -> str:
             {"role": "system", "content": _CONTEXT_SYSTEM},
             {"role": "user", "content": prompt},
         ],
+        extra_body=_PROVIDER_PREFS,
     )
     return response.choices[0].message.content.strip()
 
