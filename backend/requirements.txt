@@ -1,0 +1,11 @@
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+earthengine-api>=0.1.390
+anthropic>=0.34.0
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+httpx>=0.26.0
+redis>=5.0.0
+rq>=1.16.0
+pystac-client>=0.7.5
+openai>=1.0.0
