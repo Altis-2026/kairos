@@ -74,6 +74,28 @@ def permanent_water_mask(occurrence_pct: int = 75) -> ee.Image:
     return ee.Image(JRC_WATER).select("occurrence").gt(occurrence_pct)
 
 
+# Reference-layer palette (distinct from the teal/amber detection palette so
+# context layers read as "background" against the analysis result on top).
+WATER_BLUE = "#3BA7FF"
+
+
+def permanent_water_tile(geometry: ee.Geometry, occurrence_pct: int = 50) -> str:
+    """
+    A standalone reference tile of historically permanent water (rivers, lakes,
+    coastline) clipped to the AOI. Rendered alongside a detection result so the
+    user can tell genuinely NEW water (e.g. flooding) from water that is always
+    there. Returns a Mapbox-compatible XYZ tile URL.
+    """
+    water = (
+        ee.Image(JRC_WATER)
+        .select("occurrence")
+        .gt(occurrence_pct)
+        .selfMask()
+        .clip(geometry)
+    )
+    return tile_url(water, {"palette": [WATER_BLUE], "min": 0, "max": 1})
+
+
 def tile_url(image: ee.Image, vis_params: dict) -> str:
     """Generate a Mapbox-compatible XYZ tile URL from a GEE image."""
     map_id = image.getMapId(vis_params)

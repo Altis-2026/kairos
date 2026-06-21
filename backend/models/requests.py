@@ -56,12 +56,29 @@ class AnalyzeRequest(BaseModel):
         return self
 
 
+class ConversationTurn(BaseModel):
+    """One prior message in the chat thread, sent so the parser has context."""
+
+    role: str            # "user" or "kairos"
+    content: str
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v):
+        if v not in ("user", "kairos"):
+            raise ValueError("role must be 'user' or 'kairos'")
+        return v
+
+
 class QueryRequest(BaseModel):
     """POST /query — natural language input"""
 
     query: str
     # Optional viewport context so "this area" resolves to what the user sees
     viewport_bbox: Optional[List[float]] = None
+    # Prior turns of the conversation so follow-ups ("now show fires there",
+    # "what about last year") resolve against earlier context. Most recent last.
+    history: Optional[List[ConversationTurn]] = None
 
     @field_validator("query")
     @classmethod
@@ -71,3 +88,11 @@ class QueryRequest(BaseModel):
         if len(v) > 2000:
             raise ValueError("query must be under 2000 characters")
         return v.strip()
+
+    @field_validator("history")
+    @classmethod
+    def cap_history(cls, v):
+        # Only the recent tail matters for follow-up resolution; keep it bounded.
+        if v and len(v) > 12:
+            return v[-12:]
+        return v

@@ -28,7 +28,7 @@ export default function LayerPanel({ onClose }: { onClose: () => void }) {
 
       {/* Base style */}
       <div className="flex gap-2">
-        {(["satellite", "dark"] as const).map((s) => (
+        {(["satellite", "dark", "terrain"] as const).map((s) => (
           <button
             key={s}
             onClick={() => setBaseStyle(s)}

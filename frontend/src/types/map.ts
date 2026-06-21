@@ -17,4 +17,8 @@ export interface PointLayer {
   visible: boolean;
 }
 
-export type DrawMode = "rectangle" | "pin" | null;
+export type DrawMode = "rectangle" | "pin" | "quickpin" | null;
+
+export type BaseStyle = "satellite" | "dark" | "terrain";
+
+export type Projection = "globe" | "mercator";

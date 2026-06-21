@@ -18,6 +18,14 @@ export interface HeadlineStat {
   unit: string;
 }
 
+export interface ContextLayer {
+  id: string;
+  name: string;
+  tile_url: string;
+  color: string;
+  kind: string;
+}
+
 export interface AnalysisResult {
   analysis_type: string;
   display_name: string;
@@ -28,6 +36,7 @@ export interface AnalysisResult {
   data_date: string;
   confidence: number;
   headline_stat: HeadlineStat;
+  context_layers?: ContextLayer[];
   stats: Record<string, unknown>;
 }
 

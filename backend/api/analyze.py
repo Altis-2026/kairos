@@ -10,6 +10,38 @@ router = APIRouter()
 # the GEE function returns goes into the `stats` dict.
 TOP_LEVEL_KEYS = {"tile_url", "data_date", "confidence", "headline_stat"}
 
+# Analyses whose whole point is distinguishing anomalous dark water from water
+# that is permanently there. For these we attach a permanent-water reference
+# layer so a single query returns the detection PLUS its context, not one
+# isolated overlay.
+WATER_CONTEXT_TYPES = {"flood_extent", "oil_spill"}
+
+
+def _context_layers(analysis_type: str, bbox: list) -> list:
+    """
+    Build optional reference layers shipped alongside the detection result.
+    Always non-fatal: if GEE hiccups building context, we return the core
+    analysis without it rather than failing the whole request.
+    """
+    layers: list = []
+    if analysis_type in WATER_CONTEXT_TYPES:
+        try:
+            from gee import common
+
+            geometry = common.bbox_geometry(bbox)
+            layers.append(
+                {
+                    "id": f"{analysis_type}-permanent-water",
+                    "name": "Permanent water (reference)",
+                    "tile_url": common.permanent_water_tile(geometry),
+                    "color": common.WATER_BLUE,
+                    "kind": "reference",
+                }
+            )
+        except Exception:
+            pass
+    return layers
+
 
 def run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: str) -> dict:
     """
@@ -39,6 +71,7 @@ def run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: str)
         "headline_stat": raw.get(
             "headline_stat", {"label": "Result", "value": 0, "unit": ""}
         ),
+        "context_layers": _context_layers(analysis_type, bbox),
         "stats": stats,
     }
 

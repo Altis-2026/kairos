@@ -4,6 +4,7 @@ import {
   Globe2,
   Layers,
   LocateFixed,
+  Map as MapIcon,
   Minus,
   Plus,
 } from "lucide-react";
@@ -39,6 +40,8 @@ function ToolButton({
 export default function RightToolbar() {
   const [openPanel, setOpenPanel] = useState<"layers" | "analytics" | null>(null);
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
+  const projection = useMapStore((s) => s.projection);
+  const toggleProjection = useMapStore((s) => s.toggleProjection);
 
   const zoomBy = (delta: number) => {
     // Globe listens to flyTo; for zoom buttons we nudge using current viewport
@@ -66,6 +69,17 @@ export default function RightToolbar() {
           onClick={() => requestFlyTo([25, 18], 2.1)}
         >
           <Globe2 size={17} />
+        </ToolButton>
+        <ToolButton
+          title={
+            projection === "globe"
+              ? "Switch to 2D flat map"
+              : "Switch to 3D globe"
+          }
+          active={projection === "mercator"}
+          onClick={toggleProjection}
+        >
+          {projection === "globe" ? <MapIcon size={17} /> : <Globe2 size={17} />}
         </ToolButton>
         <ToolButton
           title="Layers"

@@ -3,7 +3,14 @@
  * it never owns state itself, so any component can drive the map.
  */
 import { create } from "zustand";
-import type { BBox, DrawMode, PointLayer, RasterLayer } from "../types/map";
+import type {
+  BaseStyle,
+  BBox,
+  DrawMode,
+  PointLayer,
+  Projection,
+  RasterLayer,
+} from "../types/map";
 
 interface FlyToTarget {
   center: [number, number];
@@ -18,7 +25,9 @@ interface MapState {
   aoi: BBox | null;
   drawMode: DrawMode;
   flyTo: FlyToTarget | null;
-  baseStyle: "satellite" | "dark";
+  baseStyle: BaseStyle;
+  projection: Projection;
+  quickAnalysisOpen: boolean;
   viewportBbox: BBox | null;
 
   setCoords: (c: { lng: number; lat: number } | null) => void;
@@ -32,7 +41,10 @@ interface MapState {
   setAoi: (bbox: BBox | null) => void;
   setDrawMode: (mode: DrawMode) => void;
   requestFlyTo: (center: [number, number], zoom: number) => void;
-  setBaseStyle: (s: "satellite" | "dark") => void;
+  setBaseStyle: (s: BaseStyle) => void;
+  setProjection: (p: Projection) => void;
+  toggleProjection: () => void;
+  setQuickAnalysisOpen: (open: boolean) => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -43,6 +55,8 @@ export const useMapStore = create<MapState>((set) => ({
   drawMode: null,
   flyTo: null,
   baseStyle: "satellite",
+  projection: "globe",
+  quickAnalysisOpen: false,
   viewportBbox: null,
 
   setCoords: (coords) => set({ coords }),
@@ -79,6 +93,12 @@ export const useMapStore = create<MapState>((set) => ({
   requestFlyTo: (center, zoom) =>
     set({ flyTo: { center, zoom, ts: Date.now() } }),
   setBaseStyle: (baseStyle) => set({ baseStyle }),
+  setProjection: (projection) => set({ projection }),
+  toggleProjection: () =>
+    set((s) => ({
+      projection: s.projection === "globe" ? "mercator" : "globe",
+    })),
+  setQuickAnalysisOpen: (quickAnalysisOpen) => set({ quickAnalysisOpen }),
 }));
 
 /** Center + sensible zoom for a bbox — used after analyses complete. */

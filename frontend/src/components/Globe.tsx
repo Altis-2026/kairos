@@ -18,7 +18,10 @@ mapboxgl.accessToken = TOKEN;
 const STYLES = {
   satellite: "mapbox://styles/mapbox/satellite-streets-v12",
   dark: "mapbox://styles/mapbox/dark-v11",
+  terrain: "mapbox://styles/mapbox/outdoors-v12",
 };
+
+const DEM_SOURCE = "kairos-dem";
 
 const AOI_SOURCE = "kairos-aoi";
 const AOI_FILL = "kairos-aoi-fill";
@@ -53,6 +56,29 @@ function applyAtmosphere(map: mapboxgl.Map) {
     "space-color": "#070d0a",
     "star-intensity": 0.35,
   });
+}
+
+/**
+ * Real elevation shading for the Terrain base style. We add a DEM source and
+ * exaggerate it slightly so mountains and valleys read on the globe; for the
+ * flat styles we drop the terrain so they render crisp and fast. Re-applied on
+ * every style swap because setStyle clears custom sources.
+ */
+function syncTerrain(map: mapboxgl.Map) {
+  const style = useMapStore.getState().baseStyle;
+  if (style === "terrain") {
+    if (!map.getSource(DEM_SOURCE)) {
+      map.addSource(DEM_SOURCE, {
+        type: "raster-dem",
+        url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+        tileSize: 512,
+        maxzoom: 14,
+      });
+    }
+    map.setTerrain({ source: DEM_SOURCE, exaggeration: 1.4 });
+  } else {
+    map.setTerrain(null);
+  }
 }
 
 function ensureAoiLayers(map: mapboxgl.Map) {
@@ -96,6 +122,7 @@ export default function Globe() {
   const drawMode = useMapStore((s) => s.drawMode);
   const flyTo = useMapStore((s) => s.flyTo);
   const baseStyle = useMapStore((s) => s.baseStyle);
+  const projection = useMapStore((s) => s.projection);
 
   // ---------- map init (once) ----------
   useEffect(() => {
@@ -103,7 +130,7 @@ export default function Globe() {
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: STYLES.satellite,
-      projection: { name: "globe" },
+      projection: { name: useMapStore.getState().projection },
       center: [25, 18],
       zoom: 2.1,
     });
@@ -111,6 +138,7 @@ export default function Globe() {
 
     map.on("style.load", () => {
       applyAtmosphere(map);
+      syncTerrain(map);
       ensureAoiLayers(map);
       // Re-sync everything after any style swap
       syncRasterLayers(map);
@@ -267,6 +295,12 @@ export default function Globe() {
     map.setStyle(STYLES[baseStyle]); // 'style.load' handler re-syncs everything
   }, [baseStyle]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setProjection({ name: projection });
+  }, [projection]);
+
   // ---------- AOI drawing (click-drag rectangle / click pin) ----------
   useEffect(() => {
     const map = mapRef.current;
@@ -281,17 +315,19 @@ export default function Globe() {
     }
 
     const onDown = (e: mapboxgl.MapMouseEvent) => {
-      if (drawMode === "pin") {
+      if (drawMode === "pin" || drawMode === "quickpin") {
         const d = 0.25; // ~25 km half-box around the pin
-        useMapStore
-          .getState()
-          .setAoi([
-            e.lngLat.lng - d,
-            e.lngLat.lat - d,
-            e.lngLat.lng + d,
-            e.lngLat.lat + d,
-          ]);
-        useMapStore.getState().setDrawMode(null);
+        const store = useMapStore.getState();
+        store.setAoi([
+          e.lngLat.lng - d,
+          e.lngLat.lat - d,
+          e.lngLat.lng + d,
+          e.lngLat.lat + d,
+        ]);
+        store.setDrawMode(null);
+        // The quick-analysis pin opens the fast-lane panel; the plain pin just
+        // sets the AOI for the wizard.
+        if (drawMode === "quickpin") store.setQuickAnalysisOpen(true);
         return;
       }
       // rectangle: begin drag

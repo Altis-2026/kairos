@@ -1,5 +1,5 @@
-/** Left tool palette: select / draw rectangle AOI / drop pin / clear. */
-import { MousePointer2, Square, MapPin, Eraser } from "lucide-react";
+/** Left tool palette: select / draw rectangle AOI / drop pin / quick analysis / clear. */
+import { MousePointer2, Square, MapPin, Zap, Eraser } from "lucide-react";
 import { useMapStore } from "../stores/mapStore";
 
 export default function LeftToolbar() {
@@ -52,6 +52,13 @@ export default function LeftToolbar() {
         onClick={() => setDrawMode(drawMode === "pin" ? null : "pin")}
       >
         <MapPin size={17} />
+      </Item>
+      <Item
+        title="Quick analysis — drop a pin and run instantly"
+        active={drawMode === "quickpin"}
+        onClick={() => setDrawMode(drawMode === "quickpin" ? null : "quickpin")}
+      >
+        <Zap size={17} />
       </Item>
       {aoi && (
         <Item title="Clear area of interest" onClick={() => setAoi(null)}>
