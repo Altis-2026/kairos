@@ -23,6 +23,32 @@ GHSL_BUILT = "JRC/GHSL/P2023A/GHS_BUILT_S"
 _POP_EPOCH = "2020"
 _BUILT_EPOCH = "2020"
 
+# Low-to-high density ramp (people per ~100 m pixel). Empty land is masked out
+# so the layer reads as a heatmap over the basemap rather than a solid fill.
+POP_DENSITY_PALETTE = ["#13324A", "#1E6FE8", "#00BFA8", "#E8A318", "#FF3B5C"]
+
+
+def population_density_tile(bbox: list, year: str = _POP_EPOCH) -> dict:
+    """
+    A standalone population-density heatmap tile (JRC GHSL) clipped to the AOI.
+    Gives the human-impact figures a visual: where the people actually are.
+
+    Returns: {tile_url, epoch}
+    """
+    geometry = common.bbox_geometry(bbox)
+    pop = (
+        ee.ImageCollection(GHSL_POP)
+        .filterDate(f"{year}-01-01", f"{year}-12-31")
+        .mosaic()
+        .select("population_count")
+    )
+    # Mask uninhabited pixels so only populated areas paint.
+    density = pop.updateMask(pop.gt(0)).clip(geometry)
+    url = common.tile_url(
+        density, {"min": 0, "max": 200, "palette": POP_DENSITY_PALETTE}
+    )
+    return {"tile_url": url, "epoch": year}
+
 
 def _detection_mask(analysis_type: str, bbox: list, start_date: str, end_date: str):
     """Run the analysis and return (mask_image, geometry, base_result)."""

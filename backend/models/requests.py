@@ -247,6 +247,17 @@ class ImpactRequest(BaseModel):
         return self
 
 
+class PopulationRequest(BaseModel):
+    """POST /research/population — a population-density context tile for a bbox."""
+
+    bbox: List[float]
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+
 class InterpretRequest(BaseModel):
     """
     POST /interpret and /interpret/context — turn a finished result into a

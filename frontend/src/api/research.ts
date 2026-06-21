@@ -31,6 +31,15 @@ export function fetchOptical(p: {
   });
 }
 
+export function fetchPopulationDensity(p: {
+  bbox: BBox;
+}): Promise<ResearchLayerResponse> {
+  return apiFetch<ResearchLayerResponse>("/research/population", {
+    method: "POST",
+    body: JSON.stringify(p),
+  });
+}
+
 export function fetchCompare(p: AnalysisRef): Promise<CompareResponse> {
   return apiFetch<CompareResponse>("/research/compare", {
     method: "POST",

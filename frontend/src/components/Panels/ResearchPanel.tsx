@@ -24,6 +24,7 @@ import {
   Share2,
   Timer,
   Users,
+  UsersRound,
   X,
 } from "lucide-react";
 import { useMapStore } from "../../stores/mapStore";
@@ -33,6 +34,7 @@ import {
   fetchBackscatter,
   fetchCompare,
   fetchOptical,
+  fetchPopulationDensity,
   fetchTimeSeries,
   type AnalysisRef,
 } from "../../api/research";
@@ -49,6 +51,7 @@ import { buildShareUrl } from "../../lib/share";
 
 const BACKSCATTER_ID = "research-backscatter";
 const OPTICAL_ID = "research-optical";
+const POPULATION_ID = "research-population";
 
 export default function ResearchPanel({ onClose }: { onClose: () => void }) {
   const lastResult = useMapStore((s) => s.lastResult);
@@ -107,6 +110,7 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
 
   const backscatterOn = layers.some((l) => l.id === BACKSCATTER_ID);
   const opticalOn = layers.some((l) => l.id === OPTICAL_ID);
+  const populationOn = layers.some((l) => l.id === POPULATION_ID);
 
   // A new analysis invalidates the previous impact figures + watch state.
   useEffect(() => {
@@ -191,6 +195,26 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
         name: `${data.label}${cloud}`,
         tileUrl: data.tile_url,
         opacity: 1,
+        visible: true,
+        color: data.color,
+      });
+    });
+  }
+
+  async function togglePopulation() {
+    if (!ref) return;
+    const map = useMapStore.getState();
+    if (populationOn) {
+      map.removeLayer(POPULATION_ID);
+      return;
+    }
+    await guard("population", async () => {
+      const data = await fetchPopulationDensity({ bbox: ref.bbox });
+      map.addRasterLayer({
+        id: POPULATION_ID,
+        name: data.label,
+        tileUrl: data.tile_url,
+        opacity: 0.75,
         visible: true,
         color: data.color,
       });
@@ -368,6 +392,15 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
             <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
               Human impact
             </h3>
+            <ToolRow
+              icon={<UsersRound size={14} />}
+              label="Population density"
+              hint="GHSL heatmap — where the people are"
+              active={populationOn}
+              loading={busy === "population"}
+              error={errors.population}
+              onClick={togglePopulation}
+            />
             <button
               onClick={runImpact}
               disabled={busy === "impact"}
