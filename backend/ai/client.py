@@ -4,15 +4,12 @@ from pathlib import Path
 from openai import OpenAI
 from ai.parser import ParsedQuery, parse_query_response
 
-# OpenRouter's canonical slug uses a dot ("3.5"), not a dash. The dash form is
-# an older alias that has been seen routing to a dead Bedrock-hosted snapshot
-# even with provider.ignore set, so use the canonical id to avoid that path.
-MODEL = "anthropic/claude-3.5-haiku"
-# Amazon Bedrock's hosted snapshot of this model is deprecated and 404s on every
-# call. Rather than subtract Bedrock with "ignore" (which can combine with an
-# account's default ignored-providers list and accidentally exclude everything),
-# positively pin the request to Anthropic's own first-party endpoint with "only".
-_PROVIDER_PREFS = {"provider": {"only": ["anthropic"]}}
+# Claude 3.5 Haiku was retired in Feb 2026; its only remaining OpenRouter
+# provider was Amazon Bedrock's deprecated end-of-life snapshot, which 404s on
+# every call. Claude Haiku 4.5 is the current, fully-served replacement — cheap
+# ($1/$5 per Mtok) and live across providers, so no provider routing is needed.
+MODEL = "anthropic/claude-haiku-4.5"
+_PROVIDER_PREFS = None
 _SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
 
 _client = None
