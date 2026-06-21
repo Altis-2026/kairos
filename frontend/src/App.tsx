@@ -8,10 +8,14 @@ import ChatBar from "./components/Chat/ChatBar";
 import Sidebar from "./components/Sidebar/Sidebar";
 import TelemetryFooter from "./components/TelemetryFooter";
 import QuickAnalysisPanel from "./components/Panels/QuickAnalysisPanel";
+import CompareSlider from "./components/Map/CompareSlider";
+import TimelineScrubber from "./components/Map/TimelineScrubber";
 import { useMapStore } from "./stores/mapStore";
 
 export default function App() {
   const quickAnalysisOpen = useMapStore((s) => s.quickAnalysisOpen);
+  const compare = useMapStore((s) => s.compare);
+  const timeline = useMapStore((s) => s.timeline);
 
   return (
     <div className="relative h-full w-full bg-bg overflow-hidden">
@@ -24,6 +28,8 @@ export default function App() {
       <TelemetryFooter />
       <AnimatePresence>
         {quickAnalysisOpen && <QuickAnalysisPanel />}
+        {compare && <CompareSlider />}
+        {timeline && <TimelineScrubber />}
       </AnimatePresence>
     </div>
   );

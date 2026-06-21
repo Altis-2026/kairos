@@ -48,6 +48,17 @@ export function applyResultToGlobe(result: AnalysisResult) {
     });
   }
 
+  // Record it so the research tools (backscatter, optical, compare, timeline)
+  // can act on the latest result regardless of how it was produced.
+  map.setLastResult({
+    analysisType: result.analysis_type,
+    displayName: result.display_name,
+    bbox: result.bbox,
+    startDate: result.start_date,
+    endDate: result.end_date,
+    dataDate: result.data_date,
+  });
+
   const { center, zoom } = bboxCenterZoom(result.bbox);
   map.requestFlyTo(center, zoom);
 }

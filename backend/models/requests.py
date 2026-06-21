@@ -13,8 +13,25 @@ def _validate_date(value: str, field: str) -> str:
     return value
 
 
+def _validate_bbox_values(v):
+    if len(v) != 4:
+        raise ValueError(
+            "bbox must have exactly 4 values: [min_lon, min_lat, max_lon, max_lat]"
+        )
+    min_lon, min_lat, max_lon, max_lat = v
+    if min_lon >= max_lon:
+        raise ValueError("min_lon must be less than max_lon")
+    if min_lat >= max_lat:
+        raise ValueError("min_lat must be less than max_lat")
+    if not (-180 <= min_lon <= 180 and -180 <= max_lon <= 180):
+        raise ValueError("longitude values must be between -180 and 180")
+    if not (-90 <= min_lat <= 90 and -90 <= max_lat <= 90):
+        raise ValueError("latitude values must be between -90 and 90")
+    return v
+
+
 class AnalyzeRequest(BaseModel):
-    """POST /analyze"""
+    """POST /analyze (also reused for /research/backscatter and /research/compare)"""
 
     analysis_type: str
     bbox: List[float]          # [min_lon, min_lat, max_lon, max_lat]
@@ -24,20 +41,7 @@ class AnalyzeRequest(BaseModel):
     @field_validator("bbox")
     @classmethod
     def validate_bbox(cls, v):
-        if len(v) != 4:
-            raise ValueError(
-                "bbox must have exactly 4 values: [min_lon, min_lat, max_lon, max_lat]"
-            )
-        min_lon, min_lat, max_lon, max_lat = v
-        if min_lon >= max_lon:
-            raise ValueError("min_lon must be less than max_lon")
-        if min_lat >= max_lat:
-            raise ValueError("min_lat must be less than max_lat")
-        if not (-180 <= min_lon <= 180 and -180 <= max_lon <= 180):
-            raise ValueError("longitude values must be between -180 and 180")
-        if not (-90 <= min_lat <= 90 and -90 <= max_lat <= 90):
-            raise ValueError("latitude values must be between -90 and 90")
-        return v
+        return _validate_bbox_values(v)
 
     @field_validator("start_date")
     @classmethod
@@ -54,6 +58,69 @@ class AnalyzeRequest(BaseModel):
         if self.start_date >= self.end_date:
             raise ValueError("start_date must be before end_date")
         return self
+
+
+class OpticalRequest(BaseModel):
+    """POST /research/optical — Sentinel-2 true-color for a window."""
+
+    bbox: List[float]
+    start_date: str
+    end_date: str
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+    @field_validator("start_date")
+    @classmethod
+    def validate_start(cls, v):
+        return _validate_date(v, "start_date")
+
+    @field_validator("end_date")
+    @classmethod
+    def validate_end(cls, v):
+        return _validate_date(v, "end_date")
+
+    @model_validator(mode="after")
+    def validate_date_order(self):
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be before end_date")
+        return self
+
+
+class TimeSeriesRequest(BaseModel):
+    """POST /research/timeseries — run an analysis across stepped time windows."""
+
+    analysis_type: str
+    bbox: List[float]
+    end_date: str              # most recent frame ends here; frames step backward
+    steps: int = 6             # number of frames
+    interval_days: int = 12    # Sentinel-1 revisit cadence; also each frame's window
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+    @field_validator("end_date")
+    @classmethod
+    def validate_end(cls, v):
+        return _validate_date(v, "end_date")
+
+    @field_validator("steps")
+    @classmethod
+    def validate_steps(cls, v):
+        if not (2 <= v <= 8):
+            raise ValueError("steps must be between 2 and 8")
+        return v
+
+    @field_validator("interval_days")
+    @classmethod
+    def validate_interval(cls, v):
+        if not (6 <= v <= 90):
+            raise ValueError("interval_days must be between 6 and 90")
+        return v
 
 
 class ConversationTurn(BaseModel):

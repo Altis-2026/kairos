@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { useMapStore } from "../../stores/mapStore";
 
 export default function LayerPanel({ onClose }: { onClose: () => void }) {
-  const layers = useMapStore((s) => s.layers);
+  // Compare/timeline frames are managed by their own floating controls.
+  const layers = useMapStore((s) => s.layers.filter((l) => !l.group));
   const baseStyle = useMapStore((s) => s.baseStyle);
   const setBaseStyle = useMapStore((s) => s.setBaseStyle);
   const toggleLayerVisible = useMapStore((s) => s.toggleLayerVisible);

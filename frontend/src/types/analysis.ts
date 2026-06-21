@@ -48,6 +48,42 @@ export interface QueryResponse {
   explanation: string | null;
 }
 
+/** Research views (backscatter / optical / compare / time-series). */
+export interface ResearchLayerResponse {
+  kind: string;
+  tile_url: string;
+  data_date: string;
+  label: string;
+  color: string;
+  cloud_percent?: number;
+}
+
+export interface CompareComposite {
+  tile_url: string;
+  data_date: string;
+  label: string;
+}
+
+export interface CompareResponse {
+  polarization: string;
+  before: CompareComposite;
+  after: CompareComposite;
+}
+
+export interface TimeSeriesFrame {
+  date: string;
+  tile_url: string;
+  value: number;
+  label: string;
+  unit: string;
+}
+
+export interface TimeSeriesResponse {
+  frames: TimeSeriesFrame[];
+  metric: string;
+  unit: string;
+}
+
 export interface SceneInfo {
   scene_id: string;
   date: string;

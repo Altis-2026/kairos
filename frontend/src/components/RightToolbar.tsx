@@ -1,6 +1,7 @@
 /** Right-side controls: analytics, globe view, layers, zoom, locate. */
 import {
   BarChart3,
+  FlaskConical,
   Globe2,
   Layers,
   LocateFixed,
@@ -12,6 +13,7 @@ import { useState } from "react";
 import { useMapStore } from "../stores/mapStore";
 import LayerPanel from "./Panels/LayerPanel";
 import AnalyticsPanel from "./Panels/AnalyticsPanel";
+import ResearchPanel from "./Panels/ResearchPanel";
 
 function ToolButton({
   title,
@@ -38,7 +40,9 @@ function ToolButton({
 }
 
 export default function RightToolbar() {
-  const [openPanel, setOpenPanel] = useState<"layers" | "analytics" | null>(null);
+  const [openPanel, setOpenPanel] = useState<
+    "layers" | "analytics" | "research" | null
+  >(null);
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
   const projection = useMapStore((s) => s.projection);
   const toggleProjection = useMapStore((s) => s.toggleProjection);
@@ -88,6 +92,13 @@ export default function RightToolbar() {
         >
           <Layers size={17} />
         </ToolButton>
+        <ToolButton
+          title="Research tools"
+          active={openPanel === "research"}
+          onClick={() => setOpenPanel(openPanel === "research" ? null : "research")}
+        >
+          <FlaskConical size={17} />
+        </ToolButton>
         <ToolButton title="Zoom in" onClick={() => zoomBy(1)}>
           <Plus size={17} />
         </ToolButton>
@@ -107,6 +118,9 @@ export default function RightToolbar() {
       </div>
 
       {openPanel === "layers" && <LayerPanel onClose={() => setOpenPanel(null)} />}
+      {openPanel === "research" && (
+        <ResearchPanel onClose={() => setOpenPanel(null)} />
+      )}
       {openPanel === "analytics" && (
         <AnalyticsPanel onClose={() => setOpenPanel(null)} />
       )}

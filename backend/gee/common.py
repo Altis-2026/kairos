@@ -120,3 +120,46 @@ def latest_image_date(collection: ee.ImageCollection) -> str:
     """Date (YYYY-MM-DD) of the most recent image in the collection."""
     latest = collection.sort("system:time_start", False).first()
     return ee.Date(latest.get("system:time_start")).format("YYYY-MM-dd").getInfo()
+
+
+# Display range (dB) for a grayscale backscatter composite. VH returns are
+# darker than co-polarized VV/HH, so it gets a lower window to keep contrast.
+_BACKSCATTER_RANGE = {
+    "VV": (-25, 0),
+    "HH": (-25, 0),
+    "HV": (-28, -5),
+    "VH": (-28, -5),
+}
+
+
+def backscatter_tile(
+    bbox: list,
+    start_date: str,
+    end_date: str,
+    polarization: str = "VV",
+    instrument_mode: str = "IW",
+) -> dict:
+    """
+    Grayscale tile of the *raw calibrated SAR backscatter* (mean composite) for
+    a window — the underlying physics a detection is derived from, rather than
+    the binary mask. Speckle is suppressed by averaging the window's scenes.
+
+    Returns: {tile_url, data_date, polarization}
+    Raises: ValueError if no Sentinel-1 data is available for the window.
+    """
+    geometry = bbox_geometry(bbox)
+    coll = s1_collection(geometry, polarization, instrument_mode).filterDate(
+        start_date, end_date
+    )
+    require_images(coll, f"this area between {start_date} and {end_date}")
+
+    composite = coll.mean().clip(geometry)
+    vmin, vmax = _BACKSCATTER_RANGE.get(polarization, (-25, 0))
+    # No palette => Earth Engine renders the single band as grayscale.
+    url = tile_url(composite, {"min": vmin, "max": vmax})
+
+    return {
+        "tile_url": url,
+        "data_date": latest_image_date(coll),
+        "polarization": polarization,
+    }
