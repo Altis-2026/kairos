@@ -37,11 +37,31 @@ class AnalyzeRequest(BaseModel):
     bbox: List[float]          # [min_lon, min_lat, max_lon, max_lat]
     start_date: str            # YYYY-MM-DD
     end_date: str              # YYYY-MM-DD
+    # Optional free-hand polygon ring [[lon, lat], ...]; when present the
+    # analysis runs on this exact shape and bbox is just its bounding box.
+    polygon: Optional[List[List[float]]] = None
 
     @field_validator("bbox")
     @classmethod
     def validate_bbox(cls, v):
         return _validate_bbox_values(v)
+
+    @field_validator("polygon")
+    @classmethod
+    def validate_polygon(cls, v):
+        if v is None:
+            return v
+        if len(v) < 3:
+            raise ValueError("polygon needs at least 3 vertices")
+        if len(v) > 100:
+            raise ValueError("polygon must have 100 vertices or fewer")
+        for point in v:
+            if len(point) != 2:
+                raise ValueError("each polygon vertex must be [lon, lat]")
+            lon, lat = point
+            if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+                raise ValueError("polygon vertex out of range")
+        return v
 
     @field_validator("start_date")
     @classmethod

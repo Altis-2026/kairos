@@ -24,6 +24,7 @@ export default function RunAnalysis() {
   const { selectedTask, startDate, endDate, finishRun, failRun } =
     useSidebarStore();
   const aoi = useMapStore((s) => s.aoi);
+  const aoiPolygon = useMapStore((s) => s.aoiPolygon);
 
   // Advance the staged log on a cadence derived from the estimate
   useEffect(() => {
@@ -55,6 +56,7 @@ export default function RunAnalysis() {
       bbox: aoi,
       start_date: startDate,
       end_date: endDate,
+      polygon: aoiPolygon,
     })
       .then((result) => {
         applyResultToGlobe(result);

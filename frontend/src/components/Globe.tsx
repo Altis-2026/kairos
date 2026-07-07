@@ -26,24 +26,25 @@ const DEM_SOURCE = "kairos-dem";
 const AOI_SOURCE = "kairos-aoi";
 const AOI_FILL = "kairos-aoi-fill";
 const AOI_LINE = "kairos-aoi-line";
+const DRAFT_SOURCE = "kairos-aoi-draft";
+const DRAFT_LINE = "kairos-aoi-draft-line";
+const DRAFT_FILL = "kairos-aoi-draft-fill";
+const DRAFT_POINTS = "kairos-aoi-draft-points";
 
-function aoiToFeature(bbox: BBox): GeoJSON.Feature {
-  const [a, b, c, d] = bbox;
+function aoiToFeature(bbox: BBox, ring: [number, number][] | null): GeoJSON.Feature {
+  const coords = ring
+    ? [...ring, ring[0]]
+    : [
+        [bbox[0], bbox[1]],
+        [bbox[2], bbox[1]],
+        [bbox[2], bbox[3]],
+        [bbox[0], bbox[3]],
+        [bbox[0], bbox[1]],
+      ];
   return {
     type: "Feature",
     properties: {},
-    geometry: {
-      type: "Polygon",
-      coordinates: [
-        [
-          [a, b],
-          [c, b],
-          [c, d],
-          [a, d],
-          [a, b],
-        ],
-      ],
-    },
+    geometry: { type: "Polygon", coordinates: [coords] },
   };
 }
 
@@ -108,6 +109,48 @@ function ensureAoiLayers(map: mapboxgl.Map) {
       },
     });
   }
+  if (!map.getSource(DRAFT_SOURCE)) {
+    map.addSource(DRAFT_SOURCE, {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+    });
+  }
+  if (!map.getLayer(DRAFT_FILL)) {
+    map.addLayer({
+      id: DRAFT_FILL,
+      type: "fill",
+      source: DRAFT_SOURCE,
+      filter: ["==", "$type", "Polygon"],
+      paint: { "fill-color": "#E8A318", "fill-opacity": 0.06 },
+    });
+  }
+  if (!map.getLayer(DRAFT_LINE)) {
+    map.addLayer({
+      id: DRAFT_LINE,
+      type: "line",
+      source: DRAFT_SOURCE,
+      filter: ["==", "$type", "LineString"],
+      paint: {
+        "line-color": "#E8A318",
+        "line-width": 1.5,
+        "line-dasharray": [1.5, 1.5],
+      },
+    });
+  }
+  if (!map.getLayer(DRAFT_POINTS)) {
+    map.addLayer({
+      id: DRAFT_POINTS,
+      type: "circle",
+      source: DRAFT_SOURCE,
+      filter: ["==", "$type", "Point"],
+      paint: {
+        "circle-radius": 4,
+        "circle-color": "#E8A318",
+        "circle-stroke-width": 1.5,
+        "circle-stroke-color": "#0B120E",
+      },
+    });
+  }
 }
 
 export default function Globe() {
@@ -119,6 +162,7 @@ export default function Globe() {
   const layers = useMapStore((s) => s.layers);
   const pointLayers = useMapStore((s) => s.pointLayers);
   const aoi = useMapStore((s) => s.aoi);
+  const aoiPolygon = useMapStore((s) => s.aoiPolygon);
   const drawMode = useMapStore((s) => s.drawMode);
   const flyTo = useMapStore((s) => s.flyTo);
   const baseStyle = useMapStore((s) => s.baseStyle);
@@ -279,11 +323,11 @@ export default function Globe() {
 
   function syncAoi(map: mapboxgl.Map) {
     ensureAoiLayers(map);
-    const current = useMapStore.getState().aoi;
+    const { aoi: current, aoiPolygon } = useMapStore.getState();
     const source = map.getSource(AOI_SOURCE) as mapboxgl.GeoJSONSource | undefined;
     source?.setData(
       current
-        ? { type: "FeatureCollection", features: [aoiToFeature(current)] }
+        ? { type: "FeatureCollection", features: [aoiToFeature(current, aoiPolygon)] }
         : { type: "FeatureCollection", features: [] }
     );
   }
@@ -308,7 +352,7 @@ export default function Globe() {
     if (!map || !map.isStyleLoaded()) return;
     syncAoi(map);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aoi]);
+  }, [aoi, aoiPolygon]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -340,6 +384,93 @@ export default function Globe() {
     if (drawMode === null) {
       map.dragPan.enable();
       return;
+    }
+
+    if (drawMode === "polygon") {
+      map.doubleClickZoom.disable();
+      const draft: [number, number][] = [];
+
+      const renderDraft = (preview?: [number, number]) => {
+        const src = map.getSource(DRAFT_SOURCE) as mapboxgl.GeoJSONSource | undefined;
+        if (!src) return;
+        const pts = preview ? [...draft, preview] : [...draft];
+        const features: GeoJSON.Feature[] = draft.map((p) => ({
+          type: "Feature",
+          properties: {},
+          geometry: { type: "Point", coordinates: p },
+        }));
+        if (pts.length >= 2) {
+          features.push({
+            type: "Feature",
+            properties: {},
+            geometry: { type: "LineString", coordinates: pts },
+          });
+        }
+        if (pts.length >= 3) {
+          features.push({
+            type: "Feature",
+            properties: {},
+            geometry: { type: "Polygon", coordinates: [[...pts, pts[0]]] },
+          });
+        }
+        src.setData({ type: "FeatureCollection", features });
+      };
+
+      const clearDraft = () => {
+        const src = map.getSource(DRAFT_SOURCE) as mapboxgl.GeoJSONSource | undefined;
+        src?.setData({ type: "FeatureCollection", features: [] });
+      };
+
+      const finish = () => {
+        if (draft.length >= 3) {
+          useMapStore.getState().setAoiPolygon([...draft]);
+        }
+        clearDraft();
+        useMapStore.getState().setDrawMode(null);
+      };
+
+      const onClick = (e: mapboxgl.MapMouseEvent) => {
+        if (draft.length >= 3) {
+          const first = map.project(draft[0]);
+          if (Math.hypot(first.x - e.point.x, first.y - e.point.y) < 12) {
+            finish();
+            return;
+          }
+        }
+        draft.push([e.lngLat.lng, e.lngLat.lat]);
+        renderDraft();
+      };
+
+      const onDblClick = (e: mapboxgl.MapMouseEvent) => {
+        e.preventDefault();
+        finish();
+      };
+
+      const onMouseMove = (e: mapboxgl.MapMouseEvent) => {
+        if (draft.length > 0) renderDraft([e.lngLat.lng, e.lngLat.lat]);
+      };
+
+      const onKey = (ev: KeyboardEvent) => {
+        if (ev.key === "Escape") {
+          clearDraft();
+          useMapStore.getState().setDrawMode(null);
+        } else if (ev.key === "Enter") {
+          finish();
+        }
+      };
+
+      map.on("click", onClick);
+      map.on("dblclick", onDblClick);
+      map.on("mousemove", onMouseMove);
+      window.addEventListener("keydown", onKey);
+      return () => {
+        map.off("click", onClick);
+        map.off("dblclick", onDblClick);
+        map.off("mousemove", onMouseMove);
+        window.removeEventListener("keydown", onKey);
+        clearDraft();
+        map.doubleClickZoom.enable();
+      };
     }
 
     const onDown = (e: mapboxgl.MapMouseEvent) => {

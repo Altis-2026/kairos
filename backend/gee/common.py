@@ -19,9 +19,15 @@ TEAL = "#00BFA8"
 AMBER = "#E8A318"
 
 
-def bbox_geometry(bbox: list) -> ee.Geometry:
-    """Convert [min_lon, min_lat, max_lon, max_lat] into an ee.Geometry."""
-    return ee.Geometry.Rectangle(bbox)
+def bbox_geometry(aoi: list) -> ee.Geometry:
+    """
+    Convert an AOI spec into an ee.Geometry. Accepts either a bbox
+    [min_lon, min_lat, max_lon, max_lat] or a polygon ring
+    [[lon, lat], [lon, lat], ...] drawn free-hand in the frontend.
+    """
+    if aoi and isinstance(aoi[0], (list, tuple)):
+        return ee.Geometry.Polygon([[list(p) for p in aoi]])
+    return ee.Geometry.Rectangle(aoi)
 
 
 def s1_collection(

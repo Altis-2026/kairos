@@ -47,10 +47,18 @@ def _context_layers(analysis_type: str, bbox: list) -> list:
     return layers
 
 
-def run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: str) -> dict:
+def run_analysis(
+    analysis_type: str,
+    bbox: list,
+    start_date: str,
+    end_date: str,
+    polygon: list = None,
+) -> dict:
     """
     Shared analysis runner used by both /analyze and /query.
     Raises ValueError for user-facing problems (caller maps to HTTP 400).
+    A polygon (if given) becomes the exact AOI; every GEE function accepts
+    either shape through common.bbox_geometry.
     """
     if analysis_type not in ANALYSIS_REGISTRY:
         available = list(ANALYSIS_REGISTRY.keys())
@@ -58,8 +66,9 @@ def run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: str)
             f"Unknown analysis type '{analysis_type}'. Available: {available}"
         )
 
+    aoi = polygon if polygon else bbox
     config = ANALYSIS_REGISTRY[analysis_type]
-    raw = config["function"](bbox=bbox, start_date=start_date, end_date=end_date)
+    raw = config["function"](bbox=aoi, start_date=start_date, end_date=end_date)
 
     stats = {
         k: v
@@ -79,7 +88,7 @@ def run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: str)
         "headline_stat": raw.get(
             "headline_stat", {"label": "Result", "value": 0, "unit": ""}
         ),
-        "context_layers": _context_layers(analysis_type, bbox),
+        "context_layers": _context_layers(analysis_type, aoi),
         "stats": stats,
     }
 
@@ -97,6 +106,7 @@ def analyze(request: AnalyzeRequest):
             bbox=request.bbox,
             start_date=request.start_date,
             end_date=request.end_date,
+            polygon=request.polygon,
         )
     except ValueError as e:
         # User-facing: no data available, unknown type, bad parameters

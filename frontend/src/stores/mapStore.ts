@@ -14,6 +14,7 @@ import type {
   ResultRef,
   TimelineControl,
 } from "../types/map";
+import { polygonBBox } from "../lib/geo";
 
 interface FlyToTarget {
   center: [number, number];
@@ -26,6 +27,7 @@ interface MapState {
   layers: RasterLayer[];
   pointLayers: PointLayer[];
   aoi: BBox | null;
+  aoiPolygon: [number, number][] | null;
   drawMode: DrawMode;
   flyTo: FlyToTarget | null;
   baseStyle: BaseStyle;
@@ -55,6 +57,7 @@ interface MapState {
   setLayerVisible: (id: string, visible: boolean) => void;
   clearLayers: () => void;
   setAoi: (bbox: BBox | null) => void;
+  setAoiPolygon: (ring: [number, number][]) => void;
   setDrawMode: (mode: DrawMode) => void;
   requestFlyTo: (center: [number, number], zoom: number) => void;
   setBaseStyle: (s: BaseStyle) => void;
@@ -75,6 +78,7 @@ export const useMapStore = create<MapState>((set) => ({
   layers: [],
   pointLayers: [],
   aoi: null,
+  aoiPolygon: null,
   drawMode: null,
   flyTo: null,
   baseStyle: "satellite",
@@ -126,7 +130,8 @@ export const useMapStore = create<MapState>((set) => ({
       ),
     })),
   clearLayers: () => set({ layers: [], pointLayers: [] }),
-  setAoi: (aoi) => set({ aoi }),
+  setAoi: (aoi) => set({ aoi, aoiPolygon: null }),
+  setAoiPolygon: (ring) => set({ aoiPolygon: ring, aoi: polygonBBox(ring) }),
   setDrawMode: (drawMode) => set({ drawMode }),
   requestFlyTo: (center, zoom) =>
     set({ flyTo: { center, zoom, ts: Date.now() } }),
