@@ -52,9 +52,10 @@ export default function ChatBar() {
         });
         return;
       }
-      if (res.result) {
-        applyResultToGlobe(res.result);
-      }
+      // Extra layers first, primary last, so research tools track the primary.
+      const all = res.results?.length ? res.results : res.result ? [res.result] : [];
+      for (const r of all.slice(1).reverse()) applyResultToGlobe(r);
+      if (all[0]) applyResultToGlobe(all[0]);
       updateMessage(pendingId, {
         text:
           res.explanation ??
@@ -85,6 +86,7 @@ export default function ChatBar() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send(input)}
             placeholder="Ask about this area…"
+            aria-label="Ask Kairos a question about anywhere on Earth"
             disabled={loading}
             className="w-full h-14 pl-6 pr-16 rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line text-[15px] text-ink placeholder-dim outline-none focus:ring-amber/60 shadow-panel transition-shadow disabled:opacity-70"
           />

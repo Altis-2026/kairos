@@ -13,6 +13,30 @@ body,
   overflow: hidden;
 }
 
+/* Keyboard focus is always visible; mouse clicks stay clean */
+:focus-visible {
+  outline: 2px solid #e8a318;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* High-contrast mode (toggle in the right toolbar, persisted per device) */
+.hc .text-dim {
+  color: #bacbbb !important;
+}
+.hc .text-ink {
+  color: #ffffff !important;
+}
+.hc .ring-line {
+  --tw-ring-color: #55695a !important;
+}
+.hc .placeholder-dim::placeholder {
+  color: #a9bbaa !important;
+}
+.hc .divide-line > * + * {
+  border-color: #55695a !important;
+}
+
 /* Thin dark scrollbars to match the space theme */
 * {
   scrollbar-width: thin;

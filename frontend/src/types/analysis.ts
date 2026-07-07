@@ -45,6 +45,7 @@ export interface QueryResponse {
   clarification: string | null;
   parameters: Record<string, unknown> | null;
   result: AnalysisResult | null;
+  results: AnalysisResult[] | null;
   explanation: string | null;
 }
 

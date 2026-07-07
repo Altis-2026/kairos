@@ -2,6 +2,7 @@
 import {
   BarChart3,
   Bell,
+  Contrast,
   FileSpreadsheet,
   FlaskConical,
   Globe2,
@@ -35,6 +36,7 @@ function ToolButton({
   return (
     <button
       title={title}
+      aria-label={title}
       onClick={onClick}
       className={`h-10 w-10 grid place-items-center transition-colors ${
         active ? "text-teal" : "text-dim hover:text-ink"
@@ -45,10 +47,26 @@ function ToolButton({
   );
 }
 
+const CONTRAST_KEY = "kairos_high_contrast";
+
 export default function RightToolbar() {
   const [openPanel, setOpenPanel] = useState<
     "layers" | "analytics" | "research" | "history" | "batch" | "alerts" | null
   >(null);
+  const [highContrast, setHighContrast] = useState(
+    () => document.documentElement.classList.contains("hc")
+  );
+
+  function toggleContrast() {
+    const next = !highContrast;
+    setHighContrast(next);
+    document.documentElement.classList.toggle("hc", next);
+    try {
+      localStorage.setItem(CONTRAST_KEY, next ? "1" : "0");
+    } catch {
+      /* private browsing */
+    }
+  }
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
   const projection = useMapStore((s) => s.projection);
   const toggleProjection = useMapStore((s) => s.toggleProjection);
@@ -137,6 +155,13 @@ export default function RightToolbar() {
           onClick={() => setOpenPanel(openPanel === "alerts" ? null : "alerts")}
         >
           <Bell size={17} />
+        </ToolButton>
+        <ToolButton
+          title="High contrast mode"
+          active={highContrast}
+          onClick={toggleContrast}
+        >
+          <Contrast size={17} />
         </ToolButton>
         <ToolButton title="Zoom in" onClick={() => zoomBy(1)}>
           <Plus size={17} />

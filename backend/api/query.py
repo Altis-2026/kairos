@@ -68,10 +68,32 @@ def query(request: QueryRequest):
             "clarification": None,
             "parameters": parsed.model_dump(),
             "result": None,
+            "results": None,
             "explanation": str(e),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
+
+    # 3b. Compound questions can carry up to two extra analyses. Each one is
+    # best-effort: a failure just drops that layer, never the whole answer.
+    results = [result]
+    extra_notes = []
+    for extra in parsed.extra_analyses or []:
+        try:
+            extra_result = run_analysis(
+                analysis_type=extra.analysis_type,
+                bbox=extra.bbox or parsed.bbox,
+                start_date=extra.start_date or parsed.start_date,
+                end_date=extra.end_date or parsed.end_date,
+            )
+            results.append(extra_result)
+            hs = extra_result["headline_stat"]
+            extra_notes.append(
+                f"{extra_result['display_name']}: {hs['label']} "
+                f"{hs['value']} {hs['unit']}"
+            )
+        except Exception:
+            continue
 
     # 4. Narrate (non-fatal if it fails — the numbers still go back)
     try:
@@ -83,11 +105,14 @@ def query(request: QueryRequest):
             f"{hs['value']} {hs['unit']} based on Sentinel-1 data "
             f"from {result['data_date']}."
         )
+    if extra_notes:
+        explanation += " Also added: " + "; ".join(extra_notes) + "."
 
     return {
         "understood": True,
         "clarification": None,
         "parameters": parsed.model_dump(),
         "result": result,
+        "results": results,
         "explanation": explanation,
     }

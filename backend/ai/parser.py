@@ -6,6 +6,35 @@ from typing import List, Optional
 from pydantic import BaseModel, field_validator
 
 
+def _check_bbox(v):
+    if v is None:
+        return v
+    if len(v) != 4:
+        raise ValueError("bbox must have 4 values")
+    min_lon, min_lat, max_lon, max_lat = v
+    if min_lon >= max_lon or min_lat >= max_lat:
+        raise ValueError("bbox ordering invalid")
+    if not (-180 <= min_lon <= 180 and -180 <= max_lon <= 180):
+        raise ValueError("longitude out of range")
+    if not (-90 <= min_lat <= 90 and -90 <= max_lat <= 90):
+        raise ValueError("latitude out of range")
+    return v
+
+
+class ExtraAnalysis(BaseModel):
+    """An additional analysis requested in the same question."""
+
+    analysis_type: str
+    bbox: Optional[List[float]] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _check_bbox(v)
+
+
 class ParsedQuery(BaseModel):
     """The structured parameters Claude extracts from natural language."""
 
@@ -15,23 +44,20 @@ class ParsedQuery(BaseModel):
     bbox: Optional[List[float]] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
+    extra_analyses: Optional[List[ExtraAnalysis]] = None
     clarification: Optional[str] = None
     reasoning: Optional[str] = None
 
     @field_validator("bbox")
     @classmethod
     def validate_bbox(cls, v):
-        if v is None:
-            return v
-        if len(v) != 4:
-            raise ValueError("bbox must have 4 values")
-        min_lon, min_lat, max_lon, max_lat = v
-        if min_lon >= max_lon or min_lat >= max_lat:
-            raise ValueError("bbox ordering invalid")
-        if not (-180 <= min_lon <= 180 and -180 <= max_lon <= 180):
-            raise ValueError("longitude out of range")
-        if not (-90 <= min_lat <= 90 and -90 <= max_lat <= 90):
-            raise ValueError("latitude out of range")
+        return _check_bbox(v)
+
+    @field_validator("extra_analyses")
+    @classmethod
+    def cap_extras(cls, v):
+        if v and len(v) > 2:
+            return v[:2]
         return v
 
 

@@ -22,6 +22,14 @@ const queryClient = new QueryClient({
 
 initAuthListener();
 
+try {
+  if (localStorage.getItem("kairos_high_contrast") === "1") {
+    document.documentElement.classList.add("hc");
+  }
+} catch {
+  /* private browsing */
+}
+
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
