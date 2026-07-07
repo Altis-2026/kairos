@@ -111,6 +111,20 @@ body,
 .radar-blip {
   animation: radar-blip 5s ease-out infinite;
 }
+@keyframes caret-blink {
+  0%, 45% { opacity: 1; }
+  55%, 100% { opacity: 0; }
+}
+.typing-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: #00bfa8;
+  animation: caret-blink 1s steps(1) infinite;
+}
+
 @keyframes star-twinkle {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }

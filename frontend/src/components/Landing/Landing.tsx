@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { MotionConfig, motion } from "framer-motion";
 import {
   ArrowDown,
   ArrowRight,
@@ -13,6 +14,64 @@ import {
   Trees,
   Waves,
 } from "lucide-react";
+
+const EXAMPLE_QUESTIONS = [
+  "is there flooding near Dhaka right now?",
+  "how many ships are in the Strait of Hormuz today?",
+  "how much of Rondônia was cleared this year?",
+  "did the burn scar grow overnight?",
+  "how deep is the water in the flooded district?",
+];
+
+function useTypewriter(lines: string[]): string {
+  const [text, setText] = useState("");
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setText(lines[0]);
+      return;
+    }
+    let line = 0;
+    let char = 0;
+    let deleting = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const tick = () => {
+      const current = lines[line];
+      if (!deleting) {
+        char++;
+        setText(current.slice(0, char));
+        if (char === current.length) {
+          deleting = true;
+          timer = setTimeout(tick, 1800);
+        } else {
+          timer = setTimeout(tick, 42);
+        }
+      } else {
+        char--;
+        setText(current.slice(0, char));
+        if (char === 0) {
+          deleting = false;
+          line = (line + 1) % lines.length;
+          timer = setTimeout(tick, 350);
+        } else {
+          timer = setTimeout(tick, 18);
+        }
+      }
+    };
+    timer = setTimeout(tick, 700);
+    return () => clearTimeout(timer);
+  }, [lines]);
+
+  return text;
+}
+
+const reveal = {
+  initial: { opacity: 0, y: 26 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-60px" },
+  transition: { duration: 0.55, ease: "easeOut" as const },
+};
 
 const CAPABILITIES = [
   { icon: Waves, name: "Flood mapping", blurb: "New water where there was land yesterday" },
@@ -99,6 +158,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
   const starsSmall = useMemo(() => starField(90, 1337), []);
   const starsBright = useMemo(() => starField(30, 4242), []);
+  const typed = useTypewriter(EXAMPLE_QUESTIONS);
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
@@ -115,12 +175,21 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="h-full overflow-y-auto overflow-x-hidden bg-bg text-ink">
       <section className="relative flex min-h-[100dvh] flex-col px-6 sm:px-10">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
           <div
             className="absolute inset-0 bg-cover bg-center opacity-40"
             style={{ backgroundImage: "url(/hero-orbital.webp)" }}
+          />
+          <video
+            className="absolute inset-0 h-full w-full object-cover opacity-40 motion-reduce:hidden"
+            src="/hero-orbital.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
           />
           <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-bg/20" />
           <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/40" />
@@ -155,10 +224,16 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
               <br />
               <span className="text-teal">Get a radar answer.</span>
             </h1>
-            <p className="mx-auto mt-5 max-w-lg text-[15px] leading-relaxed text-dim lg:mx-0">
-              Kairos turns a plain question like &ldquo;is there flooding near
-              Dhaka right now?&rdquo; into a real satellite radar analysis and
-              draws the answer on a 3D globe, with the numbers to back it up.
+            <div className="mx-auto mt-6 flex h-12 max-w-lg items-center gap-3 rounded-2xl bg-surface/80 px-5 ring-1 ring-line backdrop-blur lg:mx-0">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-teal animate-pulse-soft" />
+              <span className="min-w-0 truncate text-left text-sm text-ink">
+                {typed}
+                <span className="typing-caret" aria-hidden="true" />
+              </span>
+            </div>
+            <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-dim lg:mx-0">
+              Questions like these become real satellite radar analyses,
+              drawn on a 3D globe with the numbers to back them up.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
@@ -216,9 +291,11 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
           ones people reach for first.
         </p>
         <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {CAPABILITIES.map((c) => (
-            <div
+          {CAPABILITIES.map((c, i) => (
+            <motion.div
               key={c.name}
+              {...reveal}
+              transition={{ ...reveal.transition, delay: (i % 4) * 0.07 }}
               className="rounded-2xl bg-surface p-4 ring-1 ring-line transition-colors hover:ring-teal/40"
             >
               <c.icon size={18} className="text-teal" />
@@ -226,7 +303,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
               <div className="mt-1 text-xs leading-relaxed text-dim">
                 {c.blurb}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </section>
@@ -237,7 +314,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
             Why radar and not photos?
           </h2>
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl bg-bg p-5 ring-1 ring-line">
+            <motion.div {...reveal} className="rounded-2xl bg-bg p-5 ring-1 ring-line">
               <div className="font-mono text-[10px] tracking-[0.25em] text-teal">
                 CLOUDS
               </div>
@@ -247,8 +324,12 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
                 come with storms and fires come with smoke. Microwaves pass
                 straight through both.
               </p>
-            </div>
-            <div className="rounded-2xl bg-bg p-5 ring-1 ring-line">
+            </motion.div>
+            <motion.div
+              {...reveal}
+              transition={{ ...reveal.transition, delay: 0.08 }}
+              className="rounded-2xl bg-bg p-5 ring-1 ring-line"
+            >
               <div className="font-mono text-[10px] tracking-[0.25em] text-teal">
                 DARKNESS
               </div>
@@ -258,8 +339,12 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
                 and measures the echo, so midnight over the ocean looks the
                 same as noon.
               </p>
-            </div>
-            <div className="rounded-2xl bg-bg p-5 ring-1 ring-line">
+            </motion.div>
+            <motion.div
+              {...reveal}
+              transition={{ ...reveal.transition, delay: 0.16 }}
+              className="rounded-2xl bg-bg p-5 ring-1 ring-line"
+            >
               <div className="font-mono text-[10px] tracking-[0.25em] text-teal">
                 ACCESS
               </div>
@@ -268,7 +353,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
                 Sentinel-1 data from the European Space Agency is open. Kairos
                 just makes it usable without a remote-sensing degree.
               </p>
-            </div>
+            </motion.div>
           </div>
 
           <p className="mt-8 max-w-3xl text-sm leading-relaxed text-dim">
@@ -289,7 +374,12 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
         </h2>
         <ol className="mt-8 space-y-4">
           {STEPS.map((s, i) => (
-            <li key={s.title} className="flex gap-4 rounded-2xl bg-surface p-5 ring-1 ring-line">
+            <motion.li
+              {...reveal}
+              transition={{ ...reveal.transition, delay: i * 0.06 }}
+              key={s.title}
+              className="flex gap-4 rounded-2xl bg-surface p-5 ring-1 ring-line"
+            >
               <span className="font-display text-2xl font-bold text-teal/80">
                 {i + 1}
               </span>
@@ -299,7 +389,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
                   {s.body}
                 </p>
               </div>
-            </li>
+            </motion.li>
           ))}
         </ol>
 
@@ -327,5 +417,6 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
         </div>
       </footer>
     </div>
+    </MotionConfig>
   );
 }
