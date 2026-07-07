@@ -181,7 +181,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
           <div
             className="absolute inset-0 bg-cover bg-center opacity-40"
-            style={{ backgroundImage: "url(/hero-orbital.webp)" }}
+            style={{ backgroundImage: "url(/hero-orbital.png)" }}
           />
           <video
             className="absolute inset-0 h-full w-full object-cover opacity-40 motion-reduce:hidden"
