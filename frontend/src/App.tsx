@@ -35,6 +35,15 @@ export default function App() {
   });
 
   useEffect(() => {
+    const onHashChange = () => {
+      const r = getRoute();
+      if (r === "landing" || r === "app") setRoute(r);
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  useEffect(() => {
     if (route === "app") void restoreFromHash();
   }, [route]);
 
