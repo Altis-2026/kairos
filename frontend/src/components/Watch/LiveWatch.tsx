@@ -12,6 +12,7 @@ import Globe from "../Globe";
 import WatchEventDetail from "./WatchEventDetail";
 import { useMapStore } from "../../stores/mapStore";
 import { fetchHistoricalEvents, eventsToFeatureCollection } from "../../api/events";
+import { goToApp } from "../../lib/embed";
 import type { EventMarker } from "../../types/analysis";
 
 const WATCH_LAYER = "livewatch-events";
@@ -24,7 +25,7 @@ export default function LiveWatch() {
   const [status, setStatus] = useState<Status>("loading");
   const [note, setNote] = useState<string | null>(null);
   const [selected, setSelected] = useState<EventMarker | null>(null);
-  const home = `${location.origin}${location.pathname}`;
+  const home = `${location.origin}${location.pathname}#app`;
 
   useEffect(() => {
     let cancelled = false;
@@ -88,7 +89,7 @@ export default function LiveWatch() {
           <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
             {status === "ok" ? `${events.length} ACTIVE EVENTS` : "LIVE WATCH"}
           </span>
-          <a href={home} className="text-dim hover:text-ink" title="Exit Live Watch">
+          <a href={home} onClick={goToApp} className="text-dim hover:text-ink" title="Exit Live Watch">
             <X size={15} />
           </a>
         </div>
@@ -138,6 +139,7 @@ export default function LiveWatch() {
 
         <a
           href={home}
+          onClick={goToApp}
           className="mt-auto block text-center h-9 rounded-xl text-xs ring-1 ring-line text-dim hover:text-teal hover:ring-teal/40 transition leading-9"
         >
           Open the full Kairos workspace →

@@ -191,7 +191,7 @@ def _build_report_markdown(req: ReportRequest) -> str:
     return f"""# Kairos Methodology Report — {req.display_name}
 
 **Generated:** {generated}
-**Platform:** Kairos SAR Analysis Platform (Altis)
+**Platform:** Kairos SAR Analysis Platform
 
 ---
 
@@ -249,7 +249,7 @@ and seasonal vegetation; treat results as decision-support, not ground truth.
 ## 8. Citation
 
 Contains modified Copernicus Sentinel data ({req.data_date}), processed by the
-European Space Agency and analysed on Google Earth Engine via Kairos (Altis).
+European Space Agency and analysed on Google Earth Engine via Kairos.
 """
 
 

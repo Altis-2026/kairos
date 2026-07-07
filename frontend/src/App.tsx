@@ -1,5 +1,5 @@
 /** Kairos — layout composition. The globe is the page; everything floats. */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import Globe from "./components/Globe";
 import TopNav from "./components/TopNav";
@@ -15,6 +15,7 @@ import MapLegend from "./components/Map/MapLegend";
 import LiveWatch from "./components/Watch/LiveWatch";
 import Guardian from "./components/Guardian/Guardian";
 import EmbedView from "./components/Embed/EmbedView";
+import Landing from "./components/Landing/Landing";
 import Tutorial, { TUTORIAL_SEEN_KEY } from "./components/Tutorial/Tutorial";
 import { useMapStore } from "./stores/mapStore";
 import { restoreFromHash } from "./lib/share";
@@ -27,7 +28,14 @@ export default function App() {
   const setTutorialOpen = useMapStore((s) => s.setTutorialOpen);
 
   // Hash routes for the public/embed entry points are evaluated once at load.
-  const route = getRoute();
+  // An installed PWA launches straight into the app, skipping the landing page.
+  const [route, setRoute] = useState(() => {
+    const r = getRoute();
+    if (r === "landing" && window.matchMedia("(display-mode: standalone)").matches) {
+      return "app";
+    }
+    return r;
+  });
 
   // A shared link (#task=...&bbox=...) re-runs its analysis onto the globe.
   useEffect(() => {
@@ -49,6 +57,16 @@ export default function App() {
   if (route === "watch") return <LiveWatch />;
   if (route === "guardian") return <Guardian />;
   if (route === "embed") return <EmbedView />;
+  if (route === "landing") {
+    return (
+      <Landing
+        onLaunch={() => {
+          location.hash = "app";
+          setRoute("app");
+        }}
+      />
+    );
+  }
 
   return (
     <div className="relative h-full w-full bg-bg overflow-hidden">

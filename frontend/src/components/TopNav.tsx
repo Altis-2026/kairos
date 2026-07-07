@@ -131,20 +131,14 @@ export default function TopNav() {
 
   return (
     <header className="absolute top-0 inset-x-0 z-30 flex items-center gap-4 px-5 h-16 pointer-events-none">
-      {/* Brand */}
       <div className="flex items-center gap-3 pointer-events-auto">
         <img
-          src="/altis-logo.png"
-          alt="Altis"
+          src="/kairos-icon.png"
+          alt="Kairos"
           className="h-9 w-9 rounded-xl ring-1 ring-line"
         />
-        <div className="leading-tight">
-          <div className="font-display font-semibold text-lg text-ink tracking-tight">
-            Altis
-          </div>
-          <div className="font-mono text-[9px] tracking-[0.22em] text-dim">
-            KAIROS · SAR PLATFORM
-          </div>
+        <div className="font-display font-semibold text-lg text-ink tracking-tight">
+          Kairos
         </div>
       </div>
 

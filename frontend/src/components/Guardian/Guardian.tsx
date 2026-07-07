@@ -28,6 +28,7 @@ import { useMapStore } from "../../stores/mapStore";
 import { runAnalyze } from "../../api/analyze";
 import { applyResultToGlobe } from "../../lib/applyResult";
 import { GUARDIAN_ZONES, type GuardianZone } from "../../lib/guardianZones";
+import { goToApp } from "../../lib/embed";
 import {
   loadFindings,
   patrolStats,
@@ -53,7 +54,7 @@ function recentWindow(): { start_date: string; end_date: string } {
 }
 
 export default function Guardian() {
-  const home = `${location.origin}${location.pathname}`;
+  const home = `${location.origin}${location.pathname}#app`;
   const [selected, setSelected] = useState<GuardianZone | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -146,7 +147,7 @@ export default function Guardian() {
           <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
             WATCH ZONES
           </span>
-          <a href={home} className="text-dim hover:text-ink" title="Exit Guardian">
+          <a href={home} onClick={goToApp} className="text-dim hover:text-ink" title="Exit Guardian">
             <X size={15} />
           </a>
         </div>
@@ -210,6 +211,7 @@ export default function Guardian() {
 
         <a
           href={home}
+          onClick={goToApp}
           className="mt-auto block text-center h-9 rounded-xl text-xs ring-1 ring-line text-dim hover:text-teal hover:ring-teal/40 transition leading-9"
         >
           Open the full Kairos workspace →

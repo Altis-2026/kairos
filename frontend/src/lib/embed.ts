@@ -14,13 +14,21 @@
 import type { BBox } from "../types/map";
 import type { CaseRef } from "./share";
 
-export type Route = "watch" | "guardian" | "embed" | "app";
+export type Route = "watch" | "guardian" | "embed" | "app" | "landing";
+
+/** Full-page navigation into the main app from a public view. */
+export function goToApp(e?: { preventDefault: () => void }) {
+  e?.preventDefault();
+  location.hash = "app";
+  location.reload();
+}
 
 export function getRoute(): Route {
   const hash = location.hash.replace(/^#/, "");
   if (hash === "watch") return "watch";
   if (hash === "guardian") return "guardian";
   if (hash.startsWith("embed")) return "embed";
+  if (!hash) return "landing";
   return "app";
 }
 
