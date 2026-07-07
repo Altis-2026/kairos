@@ -118,6 +118,12 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
     <div className="h-full overflow-y-auto overflow-x-hidden bg-bg text-ink">
       <section className="relative flex min-h-[100dvh] flex-col px-6 sm:px-10">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-40"
+            style={{ backgroundImage: "url(/hero-orbital.webp)" }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/60 to-bg/20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-bg/40" />
           <span
             className="absolute h-px w-px rounded-full"
             style={{ boxShadow: starsSmall }}
