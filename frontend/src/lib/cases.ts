@@ -1,10 +1,3 @@
-/**
- * Saved analyses ("cases") persisted per signed-in user in Firestore.
- *
- * Everything degrades gracefully: with no Firebase config, no signed-in user,
- * or Firestore not yet enabled in the console, these become safe no-ops so the
- * app never breaks — saving is a bonus for signed-in users, not a requirement.
- */
 import {
   addDoc,
   collection,
@@ -21,10 +14,8 @@ import type { AnalysisResult } from "../types/analysis";
 
 const COLLECTION = "cases";
 
-/** Whether persistence is wired (Firebase configured). */
 export const casesAvailable = () => Boolean(db);
 
-/** Fire-and-forget save of a finished analysis for the current user. */
 export async function saveCase(result: AnalysisResult): Promise<void> {
   const user = useAuthStore.getState().user;
   if (!db || !user) return;
@@ -45,12 +36,11 @@ export async function saveCase(result: AnalysisResult): Promise<void> {
     const ref = await addDoc(collection(db, COLLECTION), payload);
     useCasesStore.getState().addCase({ id: ref.id, ...payload });
   } catch (e) {
-    // Firestore not enabled / rules / offline — non-fatal.
+
     console.warn("[kairos] saveCase skipped:", e);
   }
 }
 
-/** Load the signed-in user's saved cases into the store (newest first). */
 export async function loadCases(): Promise<void> {
   const user = useAuthStore.getState().user;
   const store = useCasesStore.getState();
@@ -61,7 +51,7 @@ export async function loadCases(): Promise<void> {
   store.setLoading(true);
   store.setError(null);
   try {
-    // Query by user only and sort client-side — avoids a composite index.
+
     const q = query(collection(db, COLLECTION), where("userId", "==", user.uid));
     const snap = await getDocs(q);
     const cases = snap.docs

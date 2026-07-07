@@ -1,13 +1,3 @@
-"""
-Export & research-rigor endpoints:
-
-  POST /export/geotiff  — a GeoTIFF download URL of the computed result image
-  POST /export/report   — a citation-ready methodology report (markdown)
-
-GeoTIFF exports the *analysis result* (the detection raster), computed on Earth
-Engine — never raw satellite data, in line with the platform rules.
-"""
-
 import math
 from datetime import datetime, timezone
 
@@ -19,8 +9,6 @@ from gee.registry import ANALYSIS_REGISTRY
 
 router = APIRouter()
 
-# Base native resolution per analysis (m). Adaptive scaling bumps this up for
-# large AOIs so the GeoTIFF stays within Earth Engine's direct-download limits.
 _BASE_SCALE = {
     "flood_extent": 30,
     "ship_detection": 50,
@@ -31,7 +19,6 @@ _BASE_SCALE = {
     "surface_deformation": 30,
 }
 
-# Quantitative method detail for the methodology report, keyed by analysis type.
 _METHOD = {
     "flood_extent": {
         "collection": "COPERNICUS/S1_GRD",
@@ -103,7 +90,6 @@ _METHOD = {
 
 
 def _export_scale(bbox: list, base_scale: int, max_px: int = 2048) -> int:
-    """Pick a scale (m) that keeps the long side of the export under max_px."""
     min_lon, min_lat, max_lon, max_lat = bbox
     mid_lat = (min_lat + max_lat) / 2
     width_m = (max_lon - min_lon) * 111320 * math.cos(math.radians(mid_lat))
@@ -114,7 +100,6 @@ def _export_scale(bbox: list, base_scale: int, max_px: int = 2048) -> int:
 
 @router.post("/export/geotiff")
 def export_geotiff(req: AnalyzeRequest):
-    """Return a direct GeoTIFF download URL for the analysis result raster."""
     if req.analysis_type not in ANALYSIS_REGISTRY:
         raise HTTPException(
             status_code=400, detail=f"Unknown analysis type '{req.analysis_type}'."
@@ -140,7 +125,6 @@ def export_geotiff(req: AnalyzeRequest):
     name = f"kairos_{req.analysis_type}_{raw.get('data_date', 'result')}"
 
     try:
-        # unmask(0) -> a clean 0/1 byte raster covering the AOI (GIS-friendly).
         url = image.unmask(0).toByte().getDownloadURL(
             {
                 "name": name,
@@ -153,7 +137,7 @@ def export_geotiff(req: AnalyzeRequest):
         raise HTTPException(
             status_code=400,
             detail=(
-                "Could not build the GeoTIFF — the area may be too large for a "
+                "Could not build the GeoTIFF. The area may be too large for a "
                 f"direct download. Try a smaller AOI. ({e})"
             ),
         )
@@ -188,7 +172,7 @@ def _build_report_markdown(req: ReportRequest) -> str:
             for k in image_keys
         )
 
-    return f"""# Kairos Methodology Report — {req.display_name}
+    return f"""# Kairos Methodology Report: {req.display_name}
 
 **Generated:** {generated}
 **Platform:** Kairos SAR Analysis Platform
@@ -220,23 +204,23 @@ Bounding box (min_lon, min_lat, max_lon, max_lat): `{bbox[0]}, {bbox[1]}, {bbox[
 ## 4. Data Source
 
 - **Sensor:** {m.get("collection", "COPERNICUS/S1_GRD")} (Sentinel-1 C-band SAR)
-- **Polarization / mode:** {m.get("band", "—")} / {m.get("mode", "—")}
-- **Native resolution:** {m.get("resolution", "—")}
-- **Category:** {cfg.get("category", "—")}
+- **Polarization / mode:** {m.get("band", "n/a")} / {m.get("mode", "n/a")}
+- **Native resolution:** {m.get("resolution", "n/a")}
+- **Category:** {cfg.get("category", "n/a")}
 
 Sentinel-1 acquires day and night and penetrates cloud, smoke and haze, giving
 consistent ~12-day revisit independent of weather.
 
 ## 5. Method
 
-- **Detection rule:** {m.get("threshold", "—")}
-- **Baseline / reference:** {m.get("baseline", "—")}
-- **Masking:** {m.get("masking", "—")}
+- **Detection rule:** {m.get("threshold", "n/a")}
+- **Baseline / reference:** {m.get("baseline", "n/a")}
+- **Masking:** {m.get("masking", "n/a")}
 {scenes}
 
 ## 6. Confidence & Caveats
 
-The {conf_pct}% confidence reflects acquisition density and method robustness for
+The {conf_pct}% confidence reflects how many radar passes were available and how reliable this method is for
 this run. SAR detections can be affected by terrain, very low wind (over water),
 and seasonal vegetation; treat results as decision-support, not ground truth.
 
@@ -255,7 +239,6 @@ European Space Agency and analysed on Google Earth Engine via Kairos.
 
 @router.post("/export/report")
 def export_report(req: ReportRequest):
-    """Return a citation-ready methodology report as markdown."""
     if req.analysis_type not in ANALYSIS_REGISTRY:
         raise HTTPException(
             status_code=400, detail=f"Unknown analysis type '{req.analysis_type}'."

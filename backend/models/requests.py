@@ -1,5 +1,3 @@
-"""Pydantic request models for every Kairos API endpoint."""
-
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, field_validator, model_validator
@@ -31,14 +29,11 @@ def _validate_bbox_values(v):
 
 
 class AnalyzeRequest(BaseModel):
-    """POST /analyze (also reused for /research/backscatter and /research/compare)"""
 
     analysis_type: str
-    bbox: List[float]          # [min_lon, min_lat, max_lon, max_lat]
-    start_date: str            # YYYY-MM-DD
-    end_date: str              # YYYY-MM-DD
-    # Optional free-hand polygon ring [[lon, lat], ...]; when present the
-    # analysis runs on this exact shape and bbox is just its bounding box.
+    bbox: List[float]
+    start_date: str
+    end_date: str
     polygon: Optional[List[List[float]]] = None
 
     @field_validator("bbox")
@@ -81,7 +76,6 @@ class AnalyzeRequest(BaseModel):
 
 
 class OpticalRequest(BaseModel):
-    """POST /research/optical — Sentinel-2 true-color for a window."""
 
     bbox: List[float]
     start_date: str
@@ -110,7 +104,6 @@ class OpticalRequest(BaseModel):
 
 
 class ReportRequest(BaseModel):
-    """POST /export/report — build a methodology report from a finished result."""
 
     analysis_type: str
     display_name: str
@@ -141,13 +134,12 @@ class ReportRequest(BaseModel):
 
 
 class TimeSeriesRequest(BaseModel):
-    """POST /research/timeseries — run an analysis across stepped time windows."""
 
     analysis_type: str
     bbox: List[float]
-    end_date: str              # most recent frame ends here; frames step backward
-    steps: int = 6             # number of frames
-    interval_days: int = 12    # Sentinel-1 revisit cadence; also each frame's window
+    end_date: str
+    steps: int = 6
+    interval_days: int = 12
 
     @field_validator("bbox")
     @classmethod
@@ -175,16 +167,12 @@ class TimeSeriesRequest(BaseModel):
 
 
 class AlertCheckRequest(BaseModel):
-    """
-    POST /alerts/check — has a new Sentinel-1 pass produced a fresh detection
-    for a watched area since we last looked? Drives "alert mode".
-    """
 
     analysis_type: str
     bbox: List[float]
-    since_date: Optional[str] = None   # latest data_date already seen/notified
-    end_date: Optional[str] = None     # window end; defaults to today (UTC)
-    lookback_days: int = 24            # ~2 Sentinel-1 revisit cycles
+    since_date: Optional[str] = None
+    end_date: Optional[str] = None
+    lookback_days: int = 24
 
     @field_validator("bbox")
     @classmethod
@@ -210,12 +198,11 @@ class AlertCheckRequest(BaseModel):
 
 
 class EventsRequest(BaseModel):
-    """POST /events/historical — past natural disasters near an area (NASA EONET)."""
 
     bbox: List[float]
-    days: int = 3650           # how far back to look (default ~10 years)
-    category: Optional[str] = None  # EONET category id (e.g. 'floods', 'wildfires')
-    status: str = "all"        # 'open' (active), 'closed', or 'all'
+    days: int = 3650
+    category: Optional[str] = None
+    status: str = "all"
 
     @field_validator("bbox")
     @classmethod
@@ -225,7 +212,7 @@ class EventsRequest(BaseModel):
     @field_validator("days")
     @classmethod
     def validate_days(cls, v):
-        if not (1 <= v <= 7300):  # cap at ~20 years
+        if not (1 <= v <= 7300):
             raise ValueError("days must be between 1 and 7300")
         return v
 
@@ -238,7 +225,6 @@ class EventsRequest(BaseModel):
 
 
 class ImpactRequest(BaseModel):
-    """POST /impact/population — people & buildings within a detection footprint."""
 
     analysis_type: str
     bbox: List[float]
@@ -268,7 +254,6 @@ class ImpactRequest(BaseModel):
 
 
 class PopulationRequest(BaseModel):
-    """POST /research/population — a population-density context tile for a bbox."""
 
     bbox: List[float]
 
@@ -279,11 +264,6 @@ class PopulationRequest(BaseModel):
 
 
 class InterpretRequest(BaseModel):
-    """
-    POST /interpret and /interpret/context — turn a finished result into a
-    plain-language explanation (and optionally live regional context).
-    Carries the headline figures so the AI is grounded in real numbers.
-    """
 
     analysis_type: str
     bbox: List[float]
@@ -315,9 +295,8 @@ class InterpretRequest(BaseModel):
 
 
 class ConversationTurn(BaseModel):
-    """One prior message in the chat thread, sent so the parser has context."""
 
-    role: str            # "user" or "kairos"
+    role: str
     content: str
 
     @field_validator("role")
@@ -329,13 +308,9 @@ class ConversationTurn(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    """POST /query — natural language input"""
 
     query: str
-    # Optional viewport context so "this area" resolves to what the user sees
     viewport_bbox: Optional[List[float]] = None
-    # Prior turns of the conversation so follow-ups ("now show fires there",
-    # "what about last year") resolve against earlier context. Most recent last.
     history: Optional[List[ConversationTurn]] = None
 
     @field_validator("query")
@@ -350,7 +325,6 @@ class QueryRequest(BaseModel):
     @field_validator("history")
     @classmethod
     def cap_history(cls, v):
-        # Only the recent tail matters for follow-up resolution; keep it bounded.
         if v and len(v) > 12:
             return v[-12:]
         return v

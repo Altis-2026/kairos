@@ -13,14 +13,12 @@ body,
   overflow: hidden;
 }
 
-/* Keyboard focus is always visible; mouse clicks stay clean */
 :focus-visible {
   outline: 2px solid #e8a318;
   outline-offset: 2px;
   border-radius: 4px;
 }
 
-/* High-contrast mode (toggle in the right toolbar, persisted per device) */
 .hc .text-dim {
   color: #bacbbb !important;
 }
@@ -37,7 +35,6 @@ body,
   border-color: #55695a !important;
 }
 
-/* Thin dark scrollbars to match the space theme */
 * {
   scrollbar-width: thin;
   scrollbar-color: #243027 transparent;
@@ -54,7 +51,6 @@ body,
   background: transparent;
 }
 
-/* Mapbox chrome adjustments */
 .mapboxgl-ctrl-logo {
   opacity: 0.4;
 }
@@ -70,12 +66,10 @@ body,
   outline: none;
 }
 
-/* Crosshair cursor while drawing an AOI */
 .draw-crosshair .mapboxgl-canvas-container {
   cursor: crosshair !important;
 }
 
-/* Soft pulse for the live telemetry dot */
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
@@ -84,7 +78,6 @@ body,
   animation: pulse-soft 2.4s ease-in-out infinite;
 }
 
-/* Scanning line for the processing log — the radar signature motif */
 @keyframes scanline {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
@@ -98,7 +91,6 @@ body,
   animation: scanline 1.8s linear infinite;
 }
 
-/* Landing page: rotating radar sweep + twinkling stars */
 @keyframes radar-spin {
   to { transform: rotate(360deg); }
 }

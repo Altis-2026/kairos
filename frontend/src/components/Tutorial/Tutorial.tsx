@@ -1,13 +1,3 @@
-/**
- * Kairos Guide: an interactive walkthrough overlay (the ? button).
- *
- * A polished, full-screen guided sequence in the exact Kairos UI. Each step
- * explains one capability and, where it helps, offers a "Try it" button that
- * closes the guide and opens that tool live. Arrow keys / Esc work too.
- *
- * Opens on first visit (once, remembered in localStorage) and any time the
- * user clicks the ? in the top nav.
- */
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -99,11 +89,12 @@ const STEPS: Step[] = [
   {
     icon: <Layers size={20} />,
     chip: "Analysis",
-    title: "Seven ways to read the planet",
+    title: "Thirteen ways to read the planet",
     body:
-      "Floods, ship detection, wildfire burn scars, oil spills, deforestation, " +
-      "sea-ice extent, and surface change/deformation. Each uses a different radar " +
-      "signature. Kairos picks the right one, or you choose from the task list.",
+      "Floods and flood depth, ships, burn scars, oil spills, deforestation, " +
+      "sea ice, ground change, quake damage, subsidence, urban growth, crops, " +
+      "and land disturbance. Each uses a different radar signature. Kairos picks " +
+      "the right one, or you choose from the task list.",
     action: { label: "Browse analysis types", run: openSidebar },
   },
   {
@@ -181,7 +172,7 @@ export default function Tutorial() {
     try {
       localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
     } catch {
-      /* private mode, fine */
+
     }
     setOpen(false);
     setI(0);
@@ -195,7 +186,6 @@ export default function Tutorial() {
     close();
   }
 
-  // Keyboard navigation while the guide is open.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -205,7 +195,7 @@ export default function Tutorial() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [open, i]);
 
   return (
@@ -226,7 +216,7 @@ export default function Tutorial() {
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-lg rounded-3xl bg-surface ring-1 ring-line shadow-panel overflow-hidden"
           >
-            {/* Header */}
+
             <div className="flex items-center justify-between px-6 pt-5">
               <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.22em] text-dim">
                 <Radio size={13} className="text-amber" />
@@ -241,7 +231,6 @@ export default function Tutorial() {
               </button>
             </div>
 
-            {/* Body */}
             <div className="px-6 pb-2 pt-4">
               <div className="flex items-center gap-3">
                 <div className="h-11 w-11 grid place-items-center rounded-2xl bg-raised ring-1 ring-teal/30 text-teal">
@@ -286,7 +275,6 @@ export default function Tutorial() {
               )}
             </div>
 
-            {/* Footer: progress + nav */}
             <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-line mt-2">
               <div className="flex items-center gap-1.5">
                 {STEPS.map((_, idx) => (

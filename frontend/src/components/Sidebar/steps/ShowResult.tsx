@@ -1,4 +1,3 @@
-/** Step 6 — the result: headline, confidence, exports, next actions. */
 import { useState } from "react";
 import {
   Check,
@@ -30,7 +29,7 @@ export default function ShowResult() {
   if (!result) {
     return (
       <p className="text-xs text-dim">
-        No result to show — run an analysis first.
+        No result to show. Run an analysis first.
       </p>
     );
   }
@@ -130,7 +129,7 @@ export default function ShowResult() {
 
       {result.headline_stat.value === 0 && (
         <p className="text-[11px] text-dim leading-relaxed">
-          No change detected in this window. That can be the real answer — or
+          No change detected in this window. That can be the real answer, or
           try different dates or a larger area.
         </p>
       )}

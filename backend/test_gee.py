@@ -1,8 +1,3 @@
-"""
-Week 1 Proof Script.
-If this prints a number, your Google Earth Engine setup is working.
-Run:  python test_gee.py
-"""
 import os
 import ee
 from dotenv import load_dotenv
@@ -20,4 +15,4 @@ count = (
     .size()
     .getInfo()
 )
-print(f"Found {count} Sentinel-1 images over Bangladesh — GEE is working.")
+print(f"Found {count} Sentinel-1 images over Bangladesh. GEE is working.")

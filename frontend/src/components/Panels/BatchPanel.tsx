@@ -1,10 +1,3 @@
-/**
- * Bulk / CSV batch mode — run many sites at once.
- *
- * Paste or upload a CSV of locations + date windows, run them all through the
- * normal analysis pipeline with live progress, then export the results table.
- * Click any finished row to drop its result on the globe.
- */
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";

@@ -1,7 +1,3 @@
-/**
- * Top navigation: Altis brand (left), menu + location search (center),
- * help + sign-in (right). Cmd/Ctrl+K focuses the search.
- */
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
@@ -37,7 +33,7 @@ export default function TopNav() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  // Set right after a pick so the debounce effect doesn't re-open the dropdown.
+
   const justPickedRef = useRef(false);
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
   const setTutorialOpen = useMapStore((s) => s.setTutorialOpen);
@@ -55,7 +51,6 @@ export default function TopNav() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Debounced live autocomplete: fetch suggestions as the user types.
   useEffect(() => {
     if (justPickedRef.current) {
       justPickedRef.current = false;
@@ -90,7 +85,7 @@ export default function TopNav() {
         setActiveIndex(-1);
         setOpen(next.length > 0);
       } catch {
-        /* aborted or network error — leave prior suggestions */
+
       } finally {
         setSearching(false);
       }
@@ -152,7 +147,6 @@ export default function TopNav() {
         </div>
       </div>
 
-      {/* Menu + Search */}
       <div className="flex-1 flex items-center justify-center gap-2 sm:gap-3 pointer-events-auto min-w-0">
         <button
           onClick={toggleSidebar}
@@ -189,7 +183,7 @@ export default function TopNav() {
               {suggestions.map((s, i) => (
                 <li key={s.id}>
                   <button
-                    // onMouseDown (not onClick) so it fires before input blur
+
                     onMouseDown={(e) => {
                       e.preventDefault();
                       pick(s);
@@ -211,7 +205,6 @@ export default function TopNav() {
         </div>
       </div>
 
-      {/* Help + Auth */}
       <div className="flex items-center gap-2 sm:gap-3 pointer-events-auto">
         <button
           onClick={() => {

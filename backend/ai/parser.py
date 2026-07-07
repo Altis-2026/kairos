@@ -1,5 +1,3 @@
-"""Parse and validate Claude's structured JSON response for /query."""
-
 import json
 import re
 from typing import List, Optional
@@ -22,7 +20,6 @@ def _check_bbox(v):
 
 
 class ExtraAnalysis(BaseModel):
-    """An additional analysis requested in the same question."""
 
     analysis_type: str
     bbox: Optional[List[float]] = None
@@ -36,7 +33,6 @@ class ExtraAnalysis(BaseModel):
 
 
 class ParsedQuery(BaseModel):
-    """The structured parameters Claude extracts from natural language."""
 
     understood: bool
     analysis_type: Optional[str] = None
@@ -62,20 +58,14 @@ class ParsedQuery(BaseModel):
 
 
 def extract_json(text: str) -> dict:
-    """
-    Pull a JSON object out of Claude's response, tolerating accidental
-    markdown fences or surrounding prose.
-    """
     cleaned = text.strip()
 
-    # Strip markdown fences if present
     cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
     cleaned = re.sub(r"\s*```$", "", cleaned)
 
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
-        # Last resort: find the outermost braces
         start = cleaned.find("{")
         end = cleaned.rfind("}")
         if start == -1 or end == -1 or end <= start:
@@ -84,6 +74,5 @@ def extract_json(text: str) -> dict:
 
 
 def parse_query_response(text: str) -> ParsedQuery:
-    """Extract + validate. Raises ValueError on any problem (caller retries)."""
     data = extract_json(text)
     return ParsedQuery(**data)

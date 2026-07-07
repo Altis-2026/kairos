@@ -1,4 +1,3 @@
-/** Step 3 — dates, baseline, data source. */
 import { useSidebarStore } from "../../../stores/sidebarStore";
 
 export default function Configure() {
@@ -58,8 +57,8 @@ export default function Configure() {
         {(
           [
             ["recent_12m", "Recent history", "30–365 days before the start date (recommended)"],
-            ["5y_average", "5-year average", "Same season averaged over five years — Phase 2"],
-            ["custom", "Custom period", "Pick exact baseline dates — Phase 2"],
+            ["5y_average", "5-year average", "Same season averaged over five years (coming later)"],
+            ["custom", "Custom period", "Pick exact baseline dates (coming later)"],
           ] as const
         ).map(([value, label, hint]) => {
           const disabled = value !== "recent_12m";
@@ -126,7 +125,7 @@ export default function Configure() {
 
       {selectedTask?.id === "sea_ice" && (
         <p className="text-[11px] text-amber leading-relaxed">
-          Sea ice mapping uses polar EW-mode acquisitions — it only returns
+          Sea ice mapping uses polar EW-mode acquisitions, so it only returns
           data above roughly 55° latitude.
         </p>
       )}

@@ -1,7 +1,3 @@
-/**
- * Client-side helpers that turn a finished analysis into downloadable
- * deliverables: a GeoTIFF of the result raster and a methodology report.
- */
 import { fetchGeoTIFF, fetchReport } from "../api/exports";
 import type { BBox } from "../types/map";
 
@@ -29,7 +25,6 @@ function triggerDownload(filename: string, content: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
-/** Opens the Earth Engine GeoTIFF download URL (browser saves the .tif). */
 export async function downloadGeoTIFF(src: ExportSource): Promise<void> {
   const res = await fetchGeoTIFF({
     analysis_type: src.analysis_type,
@@ -40,7 +35,6 @@ export async function downloadGeoTIFF(src: ExportSource): Promise<void> {
   window.open(res.download_url, "_blank", "noopener");
 }
 
-/** Fetches the markdown methodology report and saves it locally. */
 export async function downloadReport(src: ExportSource): Promise<void> {
   const res = await fetchReport({
     analysis_type: src.analysis_type,

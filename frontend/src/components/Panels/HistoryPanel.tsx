@@ -1,8 +1,3 @@
-/**
- * My Analyses — saved cases for the signed-in user (Firestore-backed).
- * Restore re-runs a saved analysis; share copies a reproducible link; the
- * trash removes it. Degrades to a sign-in / setup prompt when unavailable.
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Clock, Loader2, RotateCcw, Share2, Trash2, X, Check } from "lucide-react";
@@ -36,7 +31,7 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
       applyResultToGlobe(result);
       onClose();
     } catch {
-      /* surfaced by the globe staying put; keep panel open */
+
     } finally {
       setRestoringId(null);
     }

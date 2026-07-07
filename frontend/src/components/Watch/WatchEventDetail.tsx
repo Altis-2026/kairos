@@ -1,16 +1,3 @@
-/**
- * Live Watch — event detail panel.
- *
- * Clicking a disaster opens this. It turns a passive marker into action:
- *   • a one-line pitch for what Kairos can reveal here,
- *   • "Analyze with Kairos" — runs the matched SAR analysis on the event
- *     footprint and lands the result on the globe,
- *   • a plain-language read of the result (works with or without the AI key),
- *   • a true-colour optical overlay,
- *   • a deep link into the full workspace.
- *
- * Login-free, like the rest of Live Watch.
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -52,7 +39,6 @@ export default function WatchEventDetail({
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
 
-  // Reset everything when a different event is selected.
   useEffect(() => {
     setBusy(null);
     setError(null);
@@ -73,7 +59,7 @@ export default function WatchEventDetail({
       });
       setResult(res);
       applyResultToGlobe(res);
-      // Follow up with a grounded plain-language read (non-fatal).
+
       setBusy("explain");
       try {
         const ix = await fetchInterpretation({
@@ -91,7 +77,7 @@ export default function WatchEventDetail({
         });
         if (ix.available && ix.text) setExplanation(ix.text);
       } catch {
-        /* explanation is a bonus — ignore failures */
+
       }
     } catch (e) {
       setError(
@@ -140,8 +126,6 @@ export default function WatchEventDetail({
     window.location.href = url;
   }
 
-  // Render the simple markdown the interpreter returns (### headers + paras),
-  // matching the lightweight renderer used elsewhere.
   const blocks = (explanation ?? "")
     .split("\n")
     .map((l) => l.trim())
@@ -177,7 +161,6 @@ export default function WatchEventDetail({
         {plan.pitch}
       </p>
 
-      {/* Headline result, once analysed */}
       {result && (
         <div className="rounded-xl bg-bg/70 ring-1 ring-teal/30 p-3">
           <div className="font-mono text-[9px] tracking-[0.15em] text-dim uppercase">
@@ -196,7 +179,6 @@ export default function WatchEventDetail({
         </div>
       )}
 
-      {/* AI / template explanation */}
       {(busy === "explain" || blocks.length > 0) && (
         <div className="rounded-xl bg-bg/60 ring-1 ring-line p-3 space-y-1.5">
           {busy === "explain" ? (
@@ -226,7 +208,6 @@ export default function WatchEventDetail({
         <p className="text-[10px] text-amber leading-snug px-1">{error}</p>
       )}
 
-      {/* Actions */}
       <div className="space-y-2">
         <button
           onClick={analyze}

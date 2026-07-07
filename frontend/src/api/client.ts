@@ -1,5 +1,3 @@
-/** Tiny typed fetch wrapper for the Kairos API. */
-
 export const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -26,7 +24,7 @@ export async function apiFetch<T>(
       if (typeof body.detail === "string") detail = body.detail;
       else if (body.detail) detail = JSON.stringify(body.detail);
     } catch {
-      /* non-JSON error body */
+
     }
     throw new ApiError(res.status, detail);
   }

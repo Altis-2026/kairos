@@ -1,11 +1,3 @@
-/**
- * Shared logic for putting an analysis result onto the globe.
- *
- * A single result can render as several stacked layers: any reference/context
- * layers first (drawn underneath), then the detection raster on top, then point
- * features (e.g. detected vessels). Used by both the chat flow and the
- * pin-drop quick-analysis panel so they behave identically.
- */
 import { bboxCenterZoom, useMapStore } from "../stores/mapStore";
 import { saveCase } from "./cases";
 import type { AnalysisResult } from "../types/analysis";
@@ -15,7 +7,6 @@ export function applyResultToGlobe(result: AnalysisResult) {
   const stamp = Date.now();
   const layerId = `${result.analysis_type}-${stamp}`;
 
-  // Context/reference layers go down first so the detection draws on top.
   for (const ctx of result.context_layers ?? []) {
     map.addRasterLayer({
       id: `${ctx.id}-${stamp}`,
@@ -49,8 +40,6 @@ export function applyResultToGlobe(result: AnalysisResult) {
     });
   }
 
-  // Record it so the research/export tools can act on the latest result
-  // regardless of how it was produced.
   map.setLastResult({
     analysisType: result.analysis_type,
     displayName: result.display_name,
@@ -65,7 +54,6 @@ export function applyResultToGlobe(result: AnalysisResult) {
     stats: result.stats,
   });
 
-  // Persist for signed-in users (no-op otherwise) — fire and forget.
   void saveCase(result);
 
   const { center, zoom } = bboxCenterZoom(result.bbox);

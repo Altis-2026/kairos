@@ -1,7 +1,3 @@
-/**
- * The sidebar wizard — renders exactly one step of the FSM at a time.
- * Slides in from the left under the Menu button.
- */
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, X } from "lucide-react";
 import { STEP_ORDER, useSidebarStore } from "../../stores/sidebarStore";

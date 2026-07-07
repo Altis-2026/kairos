@@ -1,7 +1,3 @@
-/**
- * Global map state. The Globe component is a pure renderer of this store:
- * it never owns state itself, so any component can drive the map.
- */
 import { create } from "zustand";
 import type {
   BaseStyle,
@@ -19,7 +15,7 @@ import { polygonBBox } from "../lib/geo";
 interface FlyToTarget {
   center: [number, number];
   zoom: number;
-  ts: number; // changes on every request so Globe's effect re-fires
+  ts: number;
 }
 
 interface MapState {
@@ -35,12 +31,9 @@ interface MapState {
   quickAnalysisOpen: boolean;
   viewportBbox: BBox | null;
 
-  // Interactive tutorial overlay + a one-shot request to open a toolbar panel
-  // (used by the tutorial's "Try it" buttons, which live outside the toolbar).
   tutorialOpen: boolean;
   panelRequest: string | null;
 
-  // Research tools operate on the most recent analysis result.
   lastResult: ResultRef | null;
   compare: CompareControl | null;
   timeline: TimelineControl | null;
@@ -145,8 +138,7 @@ export const useMapStore = create<MapState>((set) => ({
   setTutorialOpen: (tutorialOpen) => set({ tutorialOpen }),
   requestPanel: (panelRequest) => set({ panelRequest }),
   clearPanelRequest: () => set({ panelRequest: null }),
-  // A new result invalidates the research overlays tied to the old one
-  // (compare/timeline frames + the backscatter/optical reference tiles).
+
   setLastResult: (lastResult) =>
     set((s) => ({
       lastResult,
@@ -166,7 +158,6 @@ export const useMapStore = create<MapState>((set) => ({
   setTimelineIndex: (timelineIndex) => set({ timelineIndex }),
 }));
 
-/** Center + sensible zoom for a bbox — used after analyses complete. */
 export function bboxCenterZoom(bbox: BBox): { center: [number, number]; zoom: number } {
   const [minLon, minLat, maxLon, maxLat] = bbox;
   const center: [number, number] = [

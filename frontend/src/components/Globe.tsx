@@ -1,11 +1,3 @@
-/**
- * The Globe — a pure renderer of mapStore.
- *
- * It reads state and renders it; it never owns analysis or UI state.
- * Responsibilities: Mapbox globe projection with the dark-space atmosphere,
- * slow ambient rotation until first interaction, raster/point layer syncing,
- * AOI rectangle drawing, pin drops, coordinate readout, and flyTo requests.
- */
 import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -48,7 +40,6 @@ function aoiToFeature(bbox: BBox, ring: [number, number][] | null): GeoJSON.Feat
   };
 }
 
-/** Space-theme atmosphere per the Kairos design spec. */
 function applyAtmosphere(map: mapboxgl.Map) {
   map.setFog({
     color: "rgba(11, 18, 14, 0.9)",
@@ -59,12 +50,6 @@ function applyAtmosphere(map: mapboxgl.Map) {
   });
 }
 
-/**
- * Real elevation shading for the Terrain base style. We add a DEM source and
- * exaggerate it slightly so mountains and valleys read on the globe; for the
- * flat styles we drop the terrain so they render crisp and fast. Re-applied on
- * every style swap because setStyle clears custom sources.
- */
 function syncTerrain(map: mapboxgl.Map) {
   const style = useMapStore.getState().baseStyle;
   if (style === "terrain") {
@@ -168,7 +153,6 @@ export default function Globe() {
   const baseStyle = useMapStore((s) => s.baseStyle);
   const projection = useMapStore((s) => s.projection);
 
-  // ---------- map init (once) ----------
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = new mapboxgl.Map({
@@ -184,13 +168,12 @@ export default function Globe() {
       applyAtmosphere(map);
       syncTerrain(map);
       ensureAoiLayers(map);
-      // Re-sync everything after any style swap
+
       syncRasterLayers(map);
       syncPointLayers(map);
       syncAoi(map);
     });
 
-    // Ambient rotation until the user touches the globe
     const spin = () => {
       if (!spinningRef.current || !mapRef.current) return;
       const m = mapRef.current;
@@ -211,7 +194,6 @@ export default function Globe() {
     map.on("touchstart", stopSpin);
     map.on("load", spin);
 
-    // Popup for point features that carry metadata (historical event markers).
     map.on("click", (e) => {
       const ptLayerIds = (map.getStyle()?.layers ?? [])
         .map((l) => l.id)
@@ -237,7 +219,6 @@ export default function Globe() {
         .addTo(map);
     });
 
-    // Coordinate readout + viewport tracking
     map.on("mousemove", (e) => {
       useMapStore.getState().setCoords({ lng: e.lngLat.lng, lat: e.lngLat.lat });
     });
@@ -254,10 +235,9 @@ export default function Globe() {
       map.remove();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, []);
 
-  // ---------- layer sync helpers (read latest store inside) ----------
   function syncRasterLayers(map: mapboxgl.Map) {
     const current = useMapStore.getState().layers;
     for (const layer of current) {
@@ -275,7 +255,7 @@ export default function Globe() {
       }
       map.setPaintProperty(lyrId, "raster-opacity", layer.visible ? layer.opacity : 0);
     }
-    // Remove layers deleted from the store
+
     const wanted = new Set(current.map((l) => `kairos-lyr-${l.id}`));
     for (const l of map.getStyle()?.layers ?? []) {
       if (l.id.startsWith("kairos-lyr-") && !wanted.has(l.id)) {
@@ -300,9 +280,9 @@ export default function Globe() {
           type: "circle",
           source: srcId,
           paint: {
-            // Event markers carry a per-feature title => render them larger.
+
             "circle-radius": ["case", ["has", "title"], 6, 4],
-            // Per-feature colour (historical events) falls back to the layer colour.
+
             "circle-color": ["coalesce", ["get", "color"], layer.color],
             "circle-stroke-width": 1,
             "circle-stroke-color": "#0B120E",
@@ -332,26 +312,25 @@ export default function Globe() {
     );
   }
 
-  // ---------- react to store changes ----------
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
     syncRasterLayers(map);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [layers]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
     syncPointLayers(map);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [pointLayers]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
     syncAoi(map);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [aoi, aoiPolygon]);
 
   useEffect(() => {
@@ -364,7 +343,7 @@ export default function Globe() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.setStyle(STYLES[baseStyle]); // 'style.load' handler re-syncs everything
+    map.setStyle(STYLES[baseStyle]);
   }, [baseStyle]);
 
   useEffect(() => {
@@ -373,7 +352,6 @@ export default function Globe() {
     map.setProjection({ name: projection });
   }, [projection]);
 
-  // ---------- AOI drawing (click-drag rectangle / click pin) ----------
   useEffect(() => {
     const map = mapRef.current;
     const container = containerRef.current;
@@ -475,7 +453,7 @@ export default function Globe() {
 
     const onDown = (e: mapboxgl.MapMouseEvent) => {
       if (drawMode === "pin" || drawMode === "quickpin") {
-        const d = 0.25; // ~25 km half-box around the pin
+        const d = 0.25;
         const store = useMapStore.getState();
         store.setAoi([
           e.lngLat.lng - d,
@@ -484,12 +462,11 @@ export default function Globe() {
           e.lngLat.lat + d,
         ]);
         store.setDrawMode(null);
-        // The quick-analysis pin opens the fast-lane panel; the plain pin just
-        // sets the AOI for the wizard.
+
         if (drawMode === "quickpin") store.setQuickAnalysisOpen(true);
         return;
       }
-      // rectangle: begin drag
+
       map.dragPan.disable();
       drawingRef.current = { start: [e.lngLat.lng, e.lngLat.lat] };
     };

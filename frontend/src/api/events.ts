@@ -14,7 +14,6 @@ export function fetchHistoricalEvents(p: {
   });
 }
 
-/** EONET markers -> a GeoJSON FeatureCollection for a map point layer. */
 export function eventsToFeatureCollection(
   events: EventMarker[]
 ): GeoJSON.FeatureCollection {

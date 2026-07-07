@@ -1,7 +1,3 @@
-/**
- * Bottom-left telemetry readout — the radar signature motif.
- * Live cursor coordinates in mono + API connection status.
- */
 import { useEffect, useState } from "react";
 import { API_BASE } from "../api/client";
 import { useMapStore } from "../stores/mapStore";

@@ -1,13 +1,3 @@
-/**
- * "Explain this result" — turns a finished analysis into plain language.
- *
- * Two on-demand steps, matching the Kairos UI exactly:
- *   1. Explain        instant, grounded only in the computed numbers.
- *   2. Regional context  pulls live news / trends / concerns via web search.
- *
- * Reusable across the sidebar result step and the research panel. Degrades
- * gracefully when the AI provider or web search is unavailable.
- */
 import { useEffect, useState } from "react";
 import { Loader2, Search, Sparkles } from "lucide-react";
 import {
@@ -17,7 +7,6 @@ import {
 } from "../../api/interpret";
 import { reverseGeocodeBbox } from "../../lib/geocode";
 
-/** Minimal markdown: `### Header` lines become headers, blanks split paragraphs. */
 function renderInsight(text: string) {
   const blocks: React.ReactNode[] = [];
   const lines = text.split("\n");
@@ -47,7 +36,7 @@ function renderInsight(text: string) {
     } else if (!line) {
       flush(`p${i}`);
     } else {
-      // strip bold/italic markers — we render plain, styled text
+
       para.push(line.replace(/\*\*/g, "").replace(/(^|\s)_([^_]+)_/g, "$1$2"));
     }
   });
@@ -62,7 +51,6 @@ export default function ResultInsight({ input }: { input: InterpretInput }) {
   const [err, setErr] = useState<string | null>(null);
   const [contextNote, setContextNote] = useState<string | null>(null);
 
-  // A different result invalidates any cached explanation.
   const sig = `${input.analysis_type}|${input.start_date}|${input.end_date}|${input.bbox.join(",")}`;
   useEffect(() => {
     setText(null);

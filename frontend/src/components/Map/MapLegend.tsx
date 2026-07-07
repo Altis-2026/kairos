@@ -1,8 +1,3 @@
-/**
- * On-globe legend — a small key so the colored overlays are self-explanatory.
- * Reads visible raster + point layers from mapStore and labels each by colour,
- * so users immediately know what the teal/amber pixels on the map mean.
- */
 import { AnimatePresence, motion } from "framer-motion";
 import { useMapStore } from "../../stores/mapStore";
 

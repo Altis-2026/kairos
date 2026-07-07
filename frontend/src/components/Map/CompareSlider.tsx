@@ -1,8 +1,3 @@
-/**
- * Before/After comparison — a cross-fade slider over two grayscale composites.
- * The 'before' layer sits underneath at full opacity; this slider drives the
- * 'after' layer's opacity from 0 (all before) to 1 (all after).
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";

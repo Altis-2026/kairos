@@ -1,10 +1,3 @@
-/**
- * Embeddable widget view (#embed&task=..&bbox=..&start=..&end=..).
- *
- * Renders a single analysis on a bare globe with a headline badge and a credit
- * link back to Kairos — designed to be dropped into an <iframe> on another site.
- * No toolbars, no chat, no sidebar.
- */
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, ExternalLink } from "lucide-react";
 import Globe from "../Globe";
@@ -43,7 +36,6 @@ export default function EmbedView() {
     <div className="relative h-full w-full bg-bg overflow-hidden">
       <Globe />
 
-      {/* Headline badge */}
       <div className="absolute left-3 top-3 z-30 rounded-xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel px-3.5 py-2.5 max-w-[70%]">
         {error ? (
           <p className="text-[11px] text-amber leading-snug">{error}</p>
@@ -69,7 +61,6 @@ export default function EmbedView() {
         )}
       </div>
 
-      {/* Credit badge */}
       <a
         href={home}
         target="_blank"

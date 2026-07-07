@@ -1,14 +1,3 @@
-/**
- * Bulk / CSV batch mode.
- *
- * Parse a spreadsheet of sites + date windows, run them all through the normal
- * /analyze endpoint with bounded concurrency and live per-row progress, then
- * let the user export the results table back out as CSV. Each row is an
- * ordinary analysis, so anything that works in the wizard works in a batch.
- *
- * Expected CSV columns (header row, order-independent; label optional):
- *   label, analysis_type, min_lon, min_lat, max_lon, max_lat, start_date, end_date
- */
 import { runAnalyze } from "../api/analyze";
 import type { BBox } from "../types/map";
 
@@ -35,7 +24,6 @@ export interface BatchRow {
   error?: string;
 }
 
-/** Minimal CSV line splitter that respects double-quoted fields. */
 function splitCsvLine(line: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -79,7 +67,6 @@ const REQUIRED = [
   "end_date",
 ];
 
-/** Parse CSV text into validated batch inputs, collecting per-row errors. */
 export function parseBatchCsv(text: string): ParseResult {
   const errors: string[] = [];
   const lines = text
@@ -133,7 +120,6 @@ export function parseBatchCsv(text: string): ParseResult {
   return { inputs, errors };
 }
 
-/** Run rows with bounded concurrency, calling onUpdate after each transition. */
 export async function runBatch(
   rows: BatchRow[],
   onUpdate: (rows: BatchRow[]) => void,
@@ -164,7 +150,7 @@ export async function runBatch(
         row.tileUrl = res.tile_url;
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed";
-        // The backend returns 400 with a "No Sentinel-1 data" message for empties.
+
         row.status = /no .*data|not enough data/i.test(msg) ? "no_data" : "error";
         row.error = msg;
       }
@@ -178,7 +164,6 @@ export async function runBatch(
   await Promise.all(workers);
 }
 
-/** Serialize completed rows back to a CSV string for download. */
 export function batchResultsToCsv(rows: BatchRow[]): string {
   const header = [
     "label",
@@ -225,7 +210,6 @@ export function batchResultsToCsv(rows: BatchRow[]): string {
   return [header.join(","), ...lines].join("\n");
 }
 
-/** A ready-to-edit example so users see the exact expected format. */
 export const BATCH_TEMPLATE = `label,analysis_type,min_lon,min_lat,max_lon,max_lat,start_date,end_date
 Dhaka,flood_extent,90.0,23.5,90.6,24.0,2024-07-01,2024-07-31
 Sundarbans,deforestation,89.0,21.6,89.6,22.2,2024-01-01,2024-03-31`;

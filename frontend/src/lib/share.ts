@@ -1,11 +1,3 @@
-/**
- * Shareable, reproducible case links.
- *
- * A link encodes the exact analysis type, bounding box and date window in the
- * URL hash — no database needed. Opening the link re-runs the same analysis, so
- * a colleague sees the identical result. This is intentionally stateless so
- * shares work for anyone, signed in or not.
- */
 import type { BBox } from "../types/map";
 import { runAnalyze } from "../api/analyze";
 import { applyResultToGlobe } from "./applyResult";
@@ -49,13 +41,12 @@ export function parseShareHash(): CaseRef | null {
 
 let restored = false;
 
-/** On load, if the URL carries a shared case, re-run it onto the globe. */
 export async function restoreFromHash(): Promise<void> {
   if (restored) return;
   const ref = parseShareHash();
   if (!ref) return;
   restored = true;
-  // Clear the hash so a refresh doesn't keep re-triggering the run.
+
   history.replaceState(null, "", location.pathname + location.search);
 
   const chat = useChatStore.getState();

@@ -4,10 +4,6 @@ from pathlib import Path
 from openai import OpenAI
 from ai.parser import ParsedQuery, parse_query_response
 
-# Claude 3.5 Haiku was retired in Feb 2026; its only remaining OpenRouter
-# provider was Amazon Bedrock's deprecated end-of-life snapshot, which 404s on
-# every call. Claude Haiku 4.5 is the current, fully-served replacement — cheap
-# ($1/$5 per Mtok) and live across providers, so no provider routing is needed.
 MODEL = "anthropic/claude-haiku-4.5"
 _PROVIDER_PREFS = None
 _SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
@@ -37,12 +33,6 @@ def _get_system_prompt() -> str:
     return _system_prompt
 
 def _history_messages(history: list = None) -> list:
-    """
-    Convert prior chat turns into OpenAI-style messages so the parser can
-    resolve follow-ups ("now show fires there"). Kairos turns become assistant
-    messages; we drop the current (latest) user turn — it's sent separately as
-    the structured user_message — to avoid duplicating it.
-    """
     if not history:
         return []
     messages = []
@@ -124,16 +114,6 @@ def narrate_result(result: dict) -> str:
     return response.choices[0].message.content.strip()
 
 
-# ---------------------------------------------------------------------------
-# Result interpretation — plain-language "what does this actually mean?"
-#
-# Two levels:
-#   interpret_result()        instant, grounded only in the computed numbers.
-#   search_regional_context() on-demand, uses OpenRouter web search (:online)
-#                             to pull recent regional news / trends / concerns.
-# Both degrade gracefully — fallback_interpretation() works with no API key.
-# ---------------------------------------------------------------------------
-
 _INTERPRET_SYSTEM = (
     "You are Kairos, a satellite radar analyst explaining a finished Sentinel-1 "
     "analysis to a curious non-expert. Write exactly three short markdown "
@@ -182,7 +162,6 @@ def _result_facts(result: dict, method_description: str = "", place_name: str = 
 def interpret_result(
     result: dict, method_description: str = "", place_name: str = None
 ) -> str:
-    """Plain-language interpretation grounded in the computed numbers only."""
     client = _get_client()
     response = client.chat.completions.create(
         model=MODEL,
@@ -197,7 +176,6 @@ def interpret_result(
 
 
 def search_regional_context(result: dict, place_name: str = None) -> str:
-    """Recent news / trends / concerns for the region, via web search."""
     client = _get_client()
     hs = result.get("headline_stat") or {}
     phenomenon = (result.get("display_name") or "the detected change").lower()
@@ -207,8 +185,8 @@ def search_regional_context(result: dict, place_name: str = None) -> str:
         f"reports, or environmental trends about {phenomenon} in or near {where}. "
         f"A Sentinel-1 radar analysis there found {hs.get('label')} = "
         f"{hs.get('value')} {hs.get('unit')} around {result.get('data_date')}. "
-        "Summarise anything genuinely relevant — official warnings, news coverage, "
-        "long-term trends, or local concerns — and cite each source inline like "
+        "Summarise anything genuinely relevant (official warnings, news coverage, "
+        "long-term trends, or local concerns) and cite each source inline like "
         "[source]. If nothing relevant turns up, say so plainly. 160 words max."
     )
     response = client.chat.completions.create(
@@ -224,10 +202,6 @@ def search_regional_context(result: dict, place_name: str = None) -> str:
 
 
 def fallback_interpretation(result: dict, method_description: str = "") -> str:
-    """
-    Deterministic interpretation used when no OPENROUTER_API_KEY is configured,
-    so the "Explain this result" button is useful even without the AI provider.
-    """
     hs = result.get("headline_stat") or {}
     label = hs.get("label", "Detection")
     value = hs.get("value", 0)
@@ -236,7 +210,7 @@ def fallback_interpretation(result: dict, method_description: str = "") -> str:
     conf = result.get("confidence")
     conf_pct = f"{round(conf * 100)}%" if isinstance(conf, (int, float)) else "an estimated"
     trend = (
-        "No meaningful change was detected in this window — which can be the real "
+        "No meaningful change was detected in this window, which can be the real "
         "answer for a quiet period, not a failure."
         if not value
         else f"The radar flagged {value} {unit} of change between "
@@ -253,5 +227,5 @@ def fallback_interpretation(result: dict, method_description: str = "") -> str:
         "### Possible causes\nRadar measures surface roughness and moisture, not "
         "the phenomenon directly, so confirm with the Optical overlay before acting. "
         "Agricultural activity, soil moisture and wind can all mimic a real signal. "
-        "_(AI provider not configured — this is a rule-based summary.)_"
+        "_(AI provider not configured, this is a rule-based summary.)_"
     )

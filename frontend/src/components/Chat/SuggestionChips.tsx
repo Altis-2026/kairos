@@ -1,4 +1,3 @@
-/** Example queries that demonstrate what Kairos can do — one click to run. */
 import { useChatStore } from "../../stores/chatStore";
 
 const SUGGESTIONS = [

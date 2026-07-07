@@ -1,4 +1,3 @@
-/** Headline stats, confidence, and data provenance for the latest result. */
 import { X } from "lucide-react";
 import { motion } from "framer-motion";
 import { useSidebarStore } from "../../stores/sidebarStore";

@@ -1,10 +1,3 @@
-"""
-POST /query — the natural language entry point.
-
-Flow: user text -> Claude parses intent -> run the analysis -> Claude
-writes a plain-language explanation -> return everything together.
-"""
-
 from fastapi import APIRouter, HTTPException
 from models.requests import QueryRequest
 from api.analyze import run_analysis
@@ -15,7 +8,6 @@ router = APIRouter()
 
 @router.post("/query")
 def query(request: QueryRequest):
-    # 1. Parse intent with Claude (prior turns give follow-ups their context)
     history = (
         [{"role": t.role, "content": t.content} for t in request.history]
         if request.history
@@ -26,12 +18,10 @@ def query(request: QueryRequest):
             request.query, request.viewport_bbox, history
         )
     except RuntimeError as e:
-        # Missing API key — configuration problem, tell the user plainly
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query parsing failed: {e}")
 
-    # 2. Claude needs clarification — return the question, no analysis
     if not parsed.understood:
         return {
             "understood": False,
@@ -42,7 +32,6 @@ def query(request: QueryRequest):
             "explanation": None,
         }
 
-    # Defensive: understood=true requires complete parameters
     if not (parsed.analysis_type and parsed.bbox and parsed.start_date and parsed.end_date):
         return {
             "understood": False,
@@ -53,7 +42,6 @@ def query(request: QueryRequest):
             "explanation": None,
         }
 
-    # 3. Run the analysis
     try:
         result = run_analysis(
             analysis_type=parsed.analysis_type,
@@ -62,7 +50,6 @@ def query(request: QueryRequest):
             end_date=parsed.end_date,
         )
     except ValueError as e:
-        # No data for this place/time — honest, helpful response, not an error page
         return {
             "understood": True,
             "clarification": None,
@@ -74,8 +61,6 @@ def query(request: QueryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
 
-    # 3b. Compound questions can carry up to two extra analyses. Each one is
-    # best-effort: a failure just drops that layer, never the whole answer.
     results = [result]
     extra_notes = []
     for extra in parsed.extra_analyses or []:
@@ -95,7 +80,6 @@ def query(request: QueryRequest):
         except Exception:
             continue
 
-    # 4. Narrate (non-fatal if it fails — the numbers still go back)
     try:
         explanation = narrate_result(result)
     except Exception:

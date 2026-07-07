@@ -1,4 +1,3 @@
-/** Step 4 — see exactly which Sentinel-1 scenes will feed the analysis. */
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { fetchScenes } from "../../../api/scenes";
@@ -33,7 +32,7 @@ export default function PreviewScenes() {
 
       {isError && (
         <div className="rounded-xl bg-bg/70 ring-1 ring-line p-3 text-xs text-dim leading-relaxed">
-          Scene lookup failed — you can still run the analysis; availability is
+          Scene lookup failed. You can still run the analysis; availability is
           re-checked server-side.
         </div>
       )}
@@ -49,7 +48,7 @@ export default function PreviewScenes() {
 
           {data.scene_count === 0 && (
             <p className="text-[11px] text-amber leading-relaxed">
-              No scenes in this window. Widen the date range — Sentinel-1
+              No scenes in this window. Widen the date range, since Sentinel-1
               revisits most places every 12 days.
             </p>
           )}

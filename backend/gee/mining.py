@@ -1,51 +1,13 @@
-"""
-Land Disturbance / Illegal Mining Indicator.
-
-Illegal gold and sand mining scars some of the planet's most remote, cloud-
-covered places — the Amazon, the Congo basin, Myanmar. From orbit it leaves two
-tell-tale radar signatures side by side: freshly *cleared* ground where forest
-was stripped (a collapse in the rough VH canopy return), and new *settling
-ponds* of still water (mirror-smooth, almost black in VV) that aren't part of
-the natural river network. Radar sees both straight through the cloud that
-keeps these sites hidden from optical satellites.
-
-Method:
-Against a 12-month baseline we flag pixels that are EITHER
-  (a) newly cleared — VH backscatter dropped sharply (vegetation removed), or
-  (b) a new pond — VV is now mirror-dark (very smooth water) where there was no
-      permanent water before.
-The union is a "land disturbance" mask: candidate sites for a human to review,
-not a verdict. This powers Kairos Guardian, where people help vet detections.
-
-Data source: Sentinel-1 GRD (IW, VV + VH).
-"""
-
 import ee
 from datetime import datetime, timedelta
 from gee import common
 
-# VH drop (dB) vs baseline that indicates vegetation was cleared.
 _CLEAR_DROP_DB = 3.0
-# VV below this (dB) is mirror-smooth standing water (a fresh pond).
 _POND_DARK_DB = -17.0
-# Disturbance orange-red.
 MINING_COLOR = "#FF6B2C"
 
 
 def detect_land_disturbance(bbox: list, start_date: str, end_date: str) -> dict:
-    """
-    Args:
-        bbox: [min_lon, min_lat, max_lon, max_lat]
-        start_date / end_date: 'YYYY-MM-DD' — the recent window to test
-
-    Returns:
-        tile_url, result_image, disturbed_area_km2, cleared_area_km2,
-        pond_area_km2, confidence, data_date, recent_images_used,
-        baseline_images_used, headline_stat
-
-    Raises:
-        ValueError: if no dual-pol Sentinel-1 data is available
-    """
     geometry = common.bbox_geometry(bbox)
 
     def dual_pol(start, end):
@@ -78,10 +40,8 @@ def detect_land_disturbance(bbox: list, start_date: str, end_date: str) -> dict:
     recent_mean = recent.mean()
     base_mean = baseline.mean()
 
-    # (a) Fresh clearing: VH canopy return collapsed.
     cleared = base_mean.select("VH").subtract(recent_mean.select("VH")).gt(_CLEAR_DROP_DB)
 
-    # (b) New pond: mirror-dark VV now, and not historically permanent water.
     permanent = common.permanent_water_mask(50)
     new_pond = recent_mean.select("VV").lt(_POND_DARK_DB).And(permanent.Not())
 

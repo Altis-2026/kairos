@@ -1,4 +1,3 @@
-/** Kairos — layout composition. The globe is the page; everything floats. */
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import Globe from "./components/Globe";
@@ -27,8 +26,6 @@ export default function App() {
   const timeline = useMapStore((s) => s.timeline);
   const setTutorialOpen = useMapStore((s) => s.setTutorialOpen);
 
-  // Hash routes for the public/embed entry points are evaluated once at load.
-  // An installed PWA launches straight into the app, skipping the landing page.
   const [route, setRoute] = useState(() => {
     const r = getRoute();
     if (r === "landing" && window.matchMedia("(display-mode: standalone)").matches) {
@@ -37,12 +34,10 @@ export default function App() {
     return r;
   });
 
-  // A shared link (#task=...&bbox=...) re-runs its analysis onto the globe.
   useEffect(() => {
     if (route === "app") void restoreFromHash();
   }, [route]);
 
-  // First-time visitors get the guide once; afterwards it's the ? button.
   useEffect(() => {
     if (route !== "app") return;
     let seen = false;

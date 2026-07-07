@@ -1,22 +1,8 @@
-/**
- * Embeddable widgets + public-view routing.
- *
- * Kairos is a single-page app, so "routes" are encoded in the URL hash (the
- * same mechanism the share links already use):
- *   #watch                      -> the public Live Watch dashboard (no login)
- *   #guardian                   -> the citizen-science Guardian mode (no login)
- *   #embed&task=..&bbox=..&..   -> a minimal embeddable result widget
- *   #task=..&bbox=..&..         -> normal app + restore a shared analysis
- *
- * An embed renders one analysis on a bare map with a credit badge, so a news
- * site or NGO can <iframe> a live Kairos result into their own page.
- */
 import type { BBox } from "../types/map";
 import type { CaseRef } from "./share";
 
 export type Route = "watch" | "guardian" | "embed" | "app" | "landing";
 
-/** Full-page navigation into the main app from a public view. */
 export function goToApp(e?: { preventDefault: () => void }) {
   e?.preventDefault();
   location.hash = "app";
@@ -32,11 +18,10 @@ export function getRoute(): Route {
   return "app";
 }
 
-/** Parse the embed hash (#embed&task=..&bbox=..&start=..&end=..). */
 export function parseEmbedHash(): CaseRef | null {
   const hash = location.hash.replace(/^#/, "");
   if (!hash.startsWith("embed")) return null;
-  // Drop the leading "embed&" (or "embed") marker before reading params.
+
   const qs = hash.replace(/^embed&?/, "");
   const p = new URLSearchParams(qs);
   const task = p.get("task");
@@ -64,7 +49,6 @@ export function buildEmbedUrl(ref: CaseRef): string {
   return `${location.origin}${location.pathname}#embed&${params.toString()}`;
 }
 
-/** A ready-to-paste responsive iframe snippet for the given result. */
 export function buildEmbedSnippet(ref: CaseRef): string {
   const url = buildEmbedUrl(ref);
   return `<iframe src="${url}" width="640" height="420" style="border:0;border-radius:12px;max-width:100%" loading="lazy" title="Kairos SAR analysis" allowfullscreen></iframe>`;

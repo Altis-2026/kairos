@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import type { BBox } from "../types/map";
 
-/** A saved analysis ("case") persisted per signed-in user in Firestore. */
 export interface SavedCase {
   id: string;
   userId: string;

@@ -1,12 +1,3 @@
-"""
-Kairos API — FastAPI application entry point.
-
-Run locally:
-    cd backend
-    source venv/bin/activate    (Windows/WSL2: same command inside Ubuntu)
-    uvicorn main:app --reload --port 8000
-"""
-
 import os
 from contextlib import asynccontextmanager
 
@@ -19,7 +10,6 @@ load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize Google Earth Engine once at startup."""
     project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
     if not project_id:
         raise RuntimeError(
@@ -35,7 +25,7 @@ async def lifespan(app: FastAPI):
             with open(creds_path, "w") as f:
                 f.write(ee_creds)
         ee.Initialize(project=project_id)
-        print(f"[kairos] Google Earth Engine initialized — project: {project_id}")
+        print(f"[kairos] Google Earth Engine initialized, project: {project_id}")
     except Exception as e:
         print(f"[kairos] GEE initialization FAILED: {e}")
         print("[kairos] Run: earthengine authenticate")
@@ -44,17 +34,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Kairos API",
-    description="SAR satellite analysis platform — Sentinel-1 powered Earth observation.",
+    description="SAR satellite analysis platform running on Sentinel-1 radar data.",
     version="0.1.0",
     lifespan=lifespan,
 )
 
 allowed_origins = [
-    "http://localhost:5173",   # Vite dev server
-    "http://localhost:4173",   # Vite preview build
+    "http://localhost:5173",
+    "http://localhost:4173",
     "https://kairos-mu-liart.vercel.app",
 ]
-# Production frontend origin, set via env when deployed
 prod_origin = os.getenv("FRONTEND_ORIGIN")
 if prod_origin:
     allowed_origins.append(prod_origin)
@@ -67,17 +56,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from api.analyze import router as analyze_router  # noqa: E402
-from api.query import router as query_router      # noqa: E402
-from api.scenes import router as scenes_router    # noqa: E402
-from api.registry import router as registry_router  # noqa: E402
-from api.status import router as status_router    # noqa: E402
-from api.research import router as research_router  # noqa: E402
-from api.exports import router as exports_router  # noqa: E402
-from api.impact import router as impact_router  # noqa: E402
-from api.events import router as events_router  # noqa: E402
-from api.alerts import router as alerts_router  # noqa: E402
-from api.interpret import router as interpret_router  # noqa: E402
+from api.analyze import router as analyze_router
+from api.query import router as query_router
+from api.scenes import router as scenes_router
+from api.registry import router as registry_router
+from api.status import router as status_router
+from api.research import router as research_router
+from api.exports import router as exports_router
+from api.impact import router as impact_router
+from api.events import router as events_router
+from api.alerts import router as alerts_router
+from api.interpret import router as interpret_router
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -94,5 +83,4 @@ app.include_router(interpret_router)
 
 @app.get("/health")
 def health():
-    """Liveness check — used by Cloud Run and the frontend connection badge."""
     return {"status": "ok", "service": "kairos-api", "version": "0.1.0"}

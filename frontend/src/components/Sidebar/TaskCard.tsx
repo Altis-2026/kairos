@@ -1,4 +1,3 @@
-/** One analysis type in the Select Task step. */
 import {
   Waves,
   Ship,

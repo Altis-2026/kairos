@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import type { BBox } from "../types/map";
 
-/** A watched area + analysis type ("alert"), persisted per user in Firestore. */
 export interface SavedAlert {
   id: string;
   userId: string;
@@ -9,8 +8,7 @@ export interface SavedAlert {
   analysisType: string;
   displayName: string;
   bbox: BBox;
-  // The latest acquisition date we've already seen, so a check can tell whether
-  // a newer Sentinel-1 pass has produced something fresh.
+
   lastDataDate: string | null;
   lastHeadlineValue: number | null;
   lastHeadlineUnit: string | null;

@@ -1,15 +1,3 @@
-"""
-Deforestation and Forest Loss.
-
-Method (per the Kairos spec):
-Intact forest canopy produces consistent VH backscatter over time. Clearing
-the forest changes the surface fundamentally: backscatter shifts and temporal
-variance spikes. We compare the analysis period's mean VH against a 12-month
-historical baseline and flag significant drops (canopy removal lowers VH).
-
-Data source: Sentinel-1 GRD, IW mode, VH polarization time series.
-"""
-
 from datetime import datetime, timedelta
 from gee import common
 
@@ -23,7 +11,6 @@ def detect_deforestation(bbox: list, start_date: str, end_date: str) -> dict:
         current, f"this area between {start_date} and {end_date}"
     )
 
-    # 12-month historical baseline before the analysis window
     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
     base_end = start_dt - timedelta(days=1)
     base_start = base_end - timedelta(days=365)
@@ -36,7 +23,6 @@ def detect_deforestation(bbox: list, start_date: str, end_date: str) -> dict:
 
     diff = current.mean().subtract(baseline.mean())
 
-    # Canopy loss: VH drop of more than 3 dB vs the annual baseline
     loss_mask = diff.lt(-3)
 
     permanent = common.permanent_water_mask(50)

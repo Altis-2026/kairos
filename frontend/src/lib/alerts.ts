@@ -1,11 +1,3 @@
-/**
- * Alert mode persistence — watched areas stored per signed-in user in Firestore.
- *
- * Like saved cases, everything degrades gracefully: no Firebase, no user, or
- * Firestore disabled all become safe no-ops. The backend /alerts/check endpoint
- * does the actual "is there a new pass?" work; this module just stores the
- * watch list and records what each alert last saw.
- */
 import {
   addDoc,
   collection,
@@ -25,7 +17,6 @@ const COLLECTION = "alerts";
 
 export const alertsAvailable = () => Boolean(db);
 
-/** Create an alert watching the area/type of a finished result. */
 export async function createAlert(ref: ResultRef): Promise<void> {
   const user = useAuthStore.getState().user;
   if (!db || !user) return;
@@ -75,7 +66,6 @@ export async function loadAlerts(): Promise<void> {
   }
 }
 
-/** Persist what an alert last saw after a check. */
 export async function markAlertChecked(
   id: string,
   patch: { lastDataDate?: string; lastHeadlineValue?: number; lastHeadlineUnit?: string }

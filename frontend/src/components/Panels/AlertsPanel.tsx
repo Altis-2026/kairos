@@ -1,11 +1,3 @@
-/**
- * Alert mode — watched areas for the signed-in user.
- *
- * Each alert remembers the last Sentinel-1 acquisition it saw. "Check now" asks
- * the backend whether a newer pass has produced a fresh detection; if so the
- * result lands on the globe and the alert advances. This is the manual half of
- * alert mode — a scheduler can hit the same endpoint to make it automatic.
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Bell, BellRing, Loader2, Radar, Trash2, X } from "lucide-react";
@@ -58,7 +50,7 @@ export default function AlertsPanel({ onClose }: { onClose: () => void }) {
           lastHeadlineValue: res.result.headline_stat.value,
           lastHeadlineUnit: res.result.headline_stat.unit,
         });
-        setFlashFor(a.id, `New pass ${res.result.data_date} — result on globe.`);
+        setFlashFor(a.id, `New pass ${res.result.data_date}, result on globe.`);
         onClose();
       } else if (res.data_date) {
         await markAlertChecked(a.id, {});

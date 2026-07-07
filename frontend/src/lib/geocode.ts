@@ -1,8 +1,3 @@
-/**
- * Reverse geocoding via Mapbox — turns an analysis bbox into a human place name
- * ("Khemisset, Morocco") so the AI explainer can ground itself and search the
- * right region. Degrades to undefined when no token is configured.
- */
 import type { BBox } from "../types/map";
 
 const TOKEN = (import.meta.env.VITE_MAPBOX_TOKEN as string) || "";

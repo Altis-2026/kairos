@@ -1,15 +1,3 @@
-"""
-Wildfire Burn Scar Mapping.
-
-Method (per the Kairos spec):
-Fire removes vegetation and exposes bare rough soil, which INCREASES
-VH backscatter relative to the pre-fire state. We compare the post-fire
-period to a pre-fire baseline and flag pixels with a significant VH rise.
-Works through smoke that blinds optical satellites.
-
-Data source: Sentinel-1 GRD, IW mode, VH polarization.
-"""
-
 from gee import common
 
 
@@ -28,10 +16,8 @@ def detect_burn_scar(bbox: list, start_date: str, end_date: str) -> dict:
 
     diff = post.mean().subtract(pre.mean())
 
-    # Burned areas: VH backscatter rise of more than 2.5 dB
     burn_mask = diff.gt(2.5)
 
-    # Exclude water (low backscatter, irrelevant for fire)
     permanent = common.permanent_water_mask(50)
     burn = burn_mask.where(permanent, 0).selfMask().clip(geometry)
 

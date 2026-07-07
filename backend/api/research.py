@@ -1,15 +1,3 @@
-"""
-Research-grade SAR views layered on top of the core detections:
-
-  POST /research/backscatter  — grayscale raw SAR composite (the physics)
-  POST /research/optical      — Sentinel-2 true-color for the same window
-  POST /research/compare      — before/after grayscale composites (for a slider)
-  POST /research/timeseries   — the analysis run across stepped time windows
-
-All operate on the same {analysis_type, bbox, dates} an analysis already used,
-so they apply to any result regardless of how it was produced.
-"""
-
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
@@ -29,14 +17,12 @@ router = APIRouter()
 
 
 def _bands_for(analysis_type: str):
-    """(polarization, instrument_mode) for an analysis, with safe defaults."""
     cfg = ANALYSIS_REGISTRY.get(analysis_type, {})
     return cfg.get("sar_polarization", "VV"), cfg.get("instrument_mode", "IW")
 
 
 @router.post("/research/backscatter")
 def backscatter(req: AnalyzeRequest):
-    """Raw calibrated SAR backscatter as a grayscale layer."""
     pol, mode = _bands_for(req.analysis_type)
     try:
         data = common.backscatter_tile(
@@ -58,7 +44,6 @@ def backscatter(req: AnalyzeRequest):
 
 @router.post("/research/optical")
 def optical(req: OpticalRequest):
-    """Least-cloudy Sentinel-2 true-color scene for the window."""
     try:
         data = optical_image(req.bbox, req.start_date, req.end_date)
     except ValueError as e:
@@ -78,7 +63,6 @@ def optical(req: OpticalRequest):
 
 @router.post("/research/population")
 def population(req: PopulationRequest):
-    """Population-density heatmap (JRC GHSL) as a context overlay for the AOI."""
     try:
         data = population_density_tile(req.bbox)
     except Exception as e:
@@ -94,11 +78,6 @@ def population(req: PopulationRequest):
 
 @router.post("/research/compare")
 def compare(req: AnalyzeRequest):
-    """
-    Before/after grayscale composites: the analysis window ('after') and the
-    equally long window immediately preceding it ('before'). The frontend
-    cross-fades between them with a slider.
-    """
     pol, mode = _bands_for(req.analysis_type)
 
     start = datetime.strptime(req.start_date, "%Y-%m-%d")
@@ -117,7 +96,6 @@ def compare(req: AnalyzeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Compare (after) failed: {e}")
 
-    # The 'before' window may be empty at this duration; widen once before giving up.
     before = None
     for widen in (0, duration + 30):
         b_start = (pre_start - timedelta(days=widen)).strftime("%Y-%m-%d")
@@ -156,12 +134,6 @@ def compare(req: AnalyzeRequest):
 
 @router.post("/research/timeseries")
 def timeseries(req: TimeSeriesRequest):
-    """
-    Run the same analysis across `steps` consecutive `interval_days` windows
-    ending at end_date. Returns one frame per window with the detection tile and
-    its headline value, oldest first — the frontend scrubs/animates through them.
-    Frames with no available data are skipped rather than failing the request.
-    """
     if req.analysis_type not in ANALYSIS_REGISTRY:
         raise HTTPException(
             status_code=400, detail=f"Unknown analysis type '{req.analysis_type}'."
@@ -180,7 +152,6 @@ def timeseries(req: TimeSeriesRequest):
                 end_date=frame_end.strftime("%Y-%m-%d"),
             )
         except Exception:
-            # No data (or transient issue) for this window — skip the frame.
             continue
         hs = raw.get("headline_stat", {"label": "Result", "value": 0, "unit": ""})
         frames.append(
@@ -193,7 +164,7 @@ def timeseries(req: TimeSeriesRequest):
             }
         )
 
-    frames.reverse()  # chronological: oldest -> newest
+    frames.reverse()
 
     if len(frames) < 2:
         raise HTTPException(

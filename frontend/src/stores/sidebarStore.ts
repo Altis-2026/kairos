@@ -1,8 +1,3 @@
-/**
- * The sidebar is a finite state machine. The state is always exactly one of
- * the six steps. Transitions are explicit functions — there is no way to
- * reach an ambiguous state.
- */
 import { create } from "zustand";
 import type { AnalysisResult, AnalysisType } from "../types/analysis";
 

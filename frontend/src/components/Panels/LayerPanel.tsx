@@ -1,4 +1,3 @@
-/** Layer management: visibility, opacity, removal, base style, overlays. */
 import { useState } from "react";
 import { AlertTriangle, Eye, EyeOff, Loader2, Trash2, X } from "lucide-react";
 import { motion } from "framer-motion";
@@ -8,7 +7,7 @@ import { fetchHistoricalEvents, eventsToFeatureCollection } from "../../api/even
 const EVENTS_LAYER_ID = "historical-events";
 
 export default function LayerPanel({ onClose }: { onClose: () => void }) {
-  // Compare/timeline frames are managed by their own floating controls.
+
   const layers = useMapStore((s) => s.layers.filter((l) => !l.group));
   const pointLayers = useMapStore((s) => s.pointLayers);
   const baseStyle = useMapStore((s) => s.baseStyle);
@@ -75,7 +74,6 @@ export default function LayerPanel({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      {/* Base style */}
       <div className="flex gap-2">
         {(["satellite", "dark", "terrain"] as const).map((s) => (
           <button
@@ -92,7 +90,6 @@ export default function LayerPanel({ onClose }: { onClose: () => void }) {
         ))}
       </div>
 
-      {/* Context overlays */}
       <div className="space-y-1.5">
         <button
           onClick={toggleHistoricalEvents}
@@ -130,11 +127,10 @@ export default function LayerPanel({ onClose }: { onClose: () => void }) {
         )}
       </div>
 
-      {/* Analysis layers */}
       {layers.length === 0 ? (
         <p className="text-xs text-dim leading-relaxed">
           No analysis layers yet. Run an analysis from the sidebar or ask a
-          question below — results appear here.
+          question below. Results appear here.
         </p>
       ) : (
         <ul className="space-y-3 max-h-72 overflow-y-auto">

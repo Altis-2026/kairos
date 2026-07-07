@@ -1,4 +1,3 @@
-/** Left tool palette: select / draw rectangle AOI / free-hand polygon / pins / clear. */
 import { MousePointer2, Square, Hexagon, MapPin, Zap, Eraser } from "lucide-react";
 import { useMapStore } from "../stores/mapStore";
 import { aoiAreaKm2, aoiPerimeterKm } from "../lib/geo";

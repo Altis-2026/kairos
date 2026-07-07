@@ -1,14 +1,3 @@
-"""
-Sea Ice Extent.
-
-Method (per the Kairos spec):
-Sea ice backscatters strongly; open polar water is dark. We threshold the
-contrast to map the ice edge. Uses Sentinel-1 EW (Extra Wide Swath) mode,
-which is what ESA acquires over polar regions, with HH polarization.
-
-Data source: Sentinel-1 GRD, EW mode, HH polarization.
-"""
-
 from gee import common
 
 
@@ -25,7 +14,6 @@ def detect_sea_ice(bbox: list, start_date: str, end_date: str) -> dict:
 
     composite = period.mean()
 
-    # Ice vs open water: HH backscatter above -18 dB indicates ice
     ice_mask = composite.gt(-18).selfMask().clip(geometry)
 
     url = common.tile_url(ice_mask, {"palette": ["#BFEFFF"], "min": 0, "max": 1})

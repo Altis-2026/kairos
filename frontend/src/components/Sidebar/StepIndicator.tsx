@@ -1,4 +1,3 @@
-/** The 6-step progress rail. Encodes real sequence — order carries meaning. */
 import { useSidebarStore, STEP_ORDER, type SidebarStep } from "../../stores/sidebarStore";
 
 const LABELS: Record<SidebarStep, string> = {
@@ -21,7 +20,7 @@ export default function StepIndicator() {
       {STEP_ORDER.map((s, i) => {
         const done = i < currentIdx;
         const active = i === currentIdx;
-        // Completed steps are revisitable (except while running)
+
         const clickable = done && step !== "RUNNING" && (i > 0 ? !!selectedTask : true);
         return (
           <li key={s} className="flex items-center gap-1">

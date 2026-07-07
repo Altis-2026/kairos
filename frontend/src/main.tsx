@@ -27,7 +27,7 @@ try {
     document.documentElement.classList.add("hc");
   }
 } catch {
-  /* private browsing */
+
 }
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {

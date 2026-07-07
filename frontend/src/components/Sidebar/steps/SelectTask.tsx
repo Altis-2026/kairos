@@ -1,4 +1,3 @@
-/** Step 1 — choose an analysis. Built live from GET /registry. */
 import { useQuery } from "@tanstack/react-query";
 import { fetchRegistry } from "../../../api/registry";
 import { useSidebarStore } from "../../../stores/sidebarStore";

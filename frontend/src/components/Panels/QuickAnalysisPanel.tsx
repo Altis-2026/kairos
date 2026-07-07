@@ -1,9 +1,3 @@
-/**
- * Quick-analysis fast lane. Dropping the ⚡ pin sets a ~50 km AOI and opens
- * this compact panel: pick an analysis type, confirm the date range, hit Run.
- * It's a faster alternative to the full six-step wizard, not a replacement —
- * the result lands on the globe exactly like a chat or wizard result does.
- */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -126,7 +120,6 @@ export default function QuickAnalysisPanel() {
         </p>
       )}
 
-      {/* Analysis type chips */}
       <div className="grid grid-cols-2 gap-2">
         {(tasks ?? []).map((t: AnalysisType) => {
           const Icon = ICONS[t.icon] ?? Waves;
@@ -153,7 +146,6 @@ export default function QuickAnalysisPanel() {
         })}
       </div>
 
-      {/* Date range */}
       <div className="grid grid-cols-2 gap-2">
         <label className="space-y-1">
           <span className="font-mono text-[9px] tracking-[0.18em] text-dim uppercase">

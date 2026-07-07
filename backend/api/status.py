@@ -1,5 +1,3 @@
-"""GET /status/{job_id} — poll an async analysis job."""
-
 from fastapi import APIRouter, HTTPException
 from rq.job import Job
 
@@ -14,7 +12,7 @@ def job_status(job_id: str):
     if queue is None:
         raise HTTPException(
             status_code=503,
-            detail="Job queue unavailable. Redis is not running — analyses "
+            detail="Job queue unavailable. Redis is not running, so analyses "
             "are executing synchronously instead.",
         )
     try:

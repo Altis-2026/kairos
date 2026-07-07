@@ -1,5 +1,3 @@
-/** Mirrors the backend's /registry and /analyze response shapes. */
-
 export interface AnalysisType {
   id: string;
   display_name: string;
@@ -49,7 +47,6 @@ export interface QueryResponse {
   explanation: string | null;
 }
 
-/** Research views (backscatter / optical / compare / time-series). */
 export interface ResearchLayerResponse {
   kind: string;
   tile_url: string;
@@ -85,7 +82,6 @@ export interface TimeSeriesResponse {
   unit: string;
 }
 
-/** Result of an alert-mode check ("is there a new pass?"). */
 export interface AlertCheckResponse {
   new: boolean;
   data_date: string | null;
@@ -95,7 +91,6 @@ export interface AlertCheckResponse {
   result: AnalysisResult | null;
 }
 
-/** Historical natural-disaster markers (NASA EONET). */
 export interface EventMarker {
   id: string;
   title: string;
@@ -117,7 +112,6 @@ export interface EventsResponse {
   note?: string;
 }
 
-/** Plain-language interpretation of a result (and optional regional context). */
 export interface InterpretResponse {
   available: boolean;
   text: string;
@@ -125,7 +119,6 @@ export interface InterpretResponse {
   note?: string;
 }
 
-/** Population & infrastructure impact for a detection footprint. */
 export interface ImpactResponse {
   analysis_type: string;
   population_affected: number;

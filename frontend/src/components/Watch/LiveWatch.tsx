@@ -1,10 +1,3 @@
-/**
- * Public Live Watch dashboard (#watch).
- *
- * A login-free planetary view of currently active natural disasters (NASA
- * EONET, open events). Markers on the globe + a side list; click an event to
- * fly to it. Degrades gracefully when the feed is unreachable.
- */
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Loader2, Radio, X } from "lucide-react";
@@ -70,7 +63,6 @@ export default function LiveWatch() {
     <div className="relative h-full w-full bg-bg overflow-hidden">
       <Globe />
 
-      {/* Header */}
       <div className="absolute left-5 top-5 z-30 flex items-center gap-2.5 rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel px-4 py-2.5">
         <Radio size={16} className="text-amber animate-pulse" />
         <div>
@@ -83,7 +75,6 @@ export default function LiveWatch() {
         </div>
       </div>
 
-      {/* Event list */}
       <aside className="absolute right-5 top-1/2 -translate-y-1/2 z-30 w-80 max-h-[80vh] rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3 overflow-hidden flex flex-col">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] tracking-[0.2em] text-dim">

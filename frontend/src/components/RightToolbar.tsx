@@ -1,4 +1,3 @@
-/** Right-side controls: analytics, globe view, layers, zoom, locate. */
 import {
   BarChart3,
   Bell,
@@ -64,7 +63,7 @@ export default function RightToolbar() {
     try {
       localStorage.setItem(CONTRAST_KEY, next ? "1" : "0");
     } catch {
-      /* private browsing */
+
     }
   }
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
@@ -73,7 +72,6 @@ export default function RightToolbar() {
   const panelRequest = useMapStore((s) => s.panelRequest);
   const clearPanelRequest = useMapStore((s) => s.clearPanelRequest);
 
-  // The tutorial's "Try it" buttons ask us to open a specific panel.
   useEffect(() => {
     if (!panelRequest) return;
     const known = ["layers", "analytics", "research", "history", "batch", "alerts"];
@@ -84,7 +82,7 @@ export default function RightToolbar() {
   }, [panelRequest, clearPanelRequest]);
 
   const zoomBy = (delta: number) => {
-    // Globe listens to flyTo; for zoom buttons we nudge using current viewport
+
     const vb = useMapStore.getState().viewportBbox;
     const center: [number, number] = vb
       ? [(vb[0] + vb[2]) / 2, (vb[1] + vb[3]) / 2]

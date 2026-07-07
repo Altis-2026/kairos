@@ -1,13 +1,3 @@
-"""
-Background job worker.
-
-Run with:  python -m jobs.worker   (from the backend/ directory, venv active)
-Requires a running Redis (REDIS_URL in .env).
-
-The worker initializes GEE itself because it is a separate process
-from the API server.
-"""
-
 import os
 
 import ee
@@ -19,7 +9,6 @@ load_dotenv()
 
 
 def job_run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: str):
-    """Job function — importable by rq from this module path."""
     from api.analyze import run_analysis
 
     return run_analysis(analysis_type, bbox, start_date, end_date)

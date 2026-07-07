@@ -1,7 +1,3 @@
-/**
- * Step 5 — execute. A staged telemetry log narrates the real pipeline stages
- * while the (single, synchronous) API call runs. Never a generic spinner.
- */
 import { useEffect, useRef, useState } from "react";
 import { runAnalyze } from "../../../api/analyze";
 import { useMapStore } from "../../../stores/mapStore";
@@ -26,7 +22,6 @@ export default function RunAnalysis() {
   const aoi = useMapStore((s) => s.aoi);
   const aoiPolygon = useMapStore((s) => s.aoiPolygon);
 
-  // Advance the staged log on a cadence derived from the estimate
   useEffect(() => {
     const est = (selectedTask?.estimated_seconds ?? 20) * 1000;
     const perStage = Math.max(1500, est / STAGES.length);
@@ -41,13 +36,12 @@ export default function RunAnalysis() {
     };
   }, [selectedTask]);
 
-  // Fire the actual request exactly once
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
 
     if (!selectedTask || !aoi) {
-      failRun("Missing task or area — go back and complete the earlier steps.");
+      failRun("Missing task or area. Go back and complete the earlier steps.");
       return;
     }
 
@@ -67,7 +61,7 @@ export default function RunAnalysis() {
           e instanceof Error ? e.message : "Analysis failed for an unknown reason."
         );
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, []);
 
   return (
@@ -91,7 +85,7 @@ export default function RunAnalysis() {
         <span className="text-teal">{elapsed}s</span>
       </div>
       <p className="text-[11px] text-dim leading-relaxed">
-        Computation runs on Google Earth Engine — petabytes stay in the cloud,
+        Computation runs on Google Earth Engine. Petabytes stay in the cloud,
         only the result tiles come back.
       </p>
     </div>

@@ -1,11 +1,3 @@
-/**
- * Guardian patrol log — a local record of the zones a user has reviewed and
- * the verdicts they submitted.
- *
- * Kept in localStorage so anyone can take part instantly, no login required.
- * (A shared, moderated community board is a natural next step on the backend;
- * this is the personal patrol log that drives the same review loop today.)
- */
 export type Verdict = "flagged" | "natural" | "skip";
 
 export interface Finding {
@@ -14,7 +6,7 @@ export interface Finding {
   zoneName: string;
   country: string;
   analysisType: string;
-  /** Headline detection value at review time, e.g. km² disturbed or vessel count. */
+
   metricLabel: string;
   metricValue: number;
   metricUnit: string;
@@ -47,7 +39,7 @@ export function saveFinding(f: Omit<Finding, "id" | "createdAt">): Finding[] {
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {
-    /* private mode — keep it in memory for this session only */
+
   }
   return next;
 }

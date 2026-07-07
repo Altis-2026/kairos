@@ -1,14 +1,3 @@
-"""
-The AnalysisRegistry: the single source of truth for every Kairos analysis type.
-
-To add a new analysis type:
-  1. Write the GEE function in a new file (e.g. gee/wetland.py)
-  2. Import it here
-  3. Add ONE entry to this dict
-Nothing else in the codebase changes. The /registry endpoint serializes this
-dict, and the frontend sidebar builds itself from that response.
-"""
-
 from gee.flood import detect_flood
 from gee.ships import detect_ships
 from gee.fire import detect_burn_scar
@@ -130,7 +119,7 @@ ANALYSIS_REGISTRY = {
         "function": detect_deformation,
         "display_name": "Surface Deformation / Change",
         "description": (
-            "Flags ground that has changed beyond its normal variability — "
+            "Flags ground that has changed beyond its normal variability: "
             "subsidence, landslide scarring, construction or ground disturbance. "
             "Uses an amplitude temporal-coherence proxy: pixels whose recent VV "
             "backscatter deviates from a 12-month stability baseline by more than "
@@ -169,7 +158,7 @@ ANALYSIS_REGISTRY = {
         "display_name": "Earthquake / Building Damage",
         "description": (
             "Maps likely-damaged buildings within hours of an earthquake, blast or "
-            "strike — through the dust and cloud that blind optical satellites. "
+            "strike, through the dust and cloud that blind optical satellites. "
             "Flags built-up pixels (JRC GHSL) whose Sentinel-1 VV signature changed "
             "sharply between a pre-event and post-event window, as collapse destroys "
             "a building's steady radar return. A rapid triage proxy for responders."
@@ -187,7 +176,7 @@ ANALYSIS_REGISTRY = {
         "function": detect_subsidence,
         "display_name": "Land Subsidence Indicator",
         "description": (
-            "Surfaces ground undergoing slow, progressive change — sinking cities, "
+            "Surfaces ground undergoing slow, progressive change: sinking cities, "
             "over-pumped aquifers, reworked land. Fits a straight-line trend to each "
             "pixel's VV backscatter over a long window and flags steep, consistent "
             "drifts. An amplitude-trend proxy that highlights candidate zones for a "
@@ -225,7 +214,7 @@ ANALYSIS_REGISTRY = {
         "function": monitor_crops,
         "display_name": "Agriculture / Crop Vigour",
         "description": (
-            "Tracks crop health and cropland continuously — even through the cloud "
+            "Tracks crop health and cropland continuously, even through the cloud "
             "that blinds optical indices like NDVI for weeks. Computes the dual-pol "
             "Radar Vegetation Index (RVI) from Sentinel-1 VV+VH: a growing canopy "
             "scatters radar in all directions and raises VH, so the map reads "
@@ -264,7 +253,6 @@ ANALYSIS_REGISTRY = {
 
 
 def registry_as_json() -> list:
-    """Serializable registry for the GET /registry endpoint (drops the callables)."""
     return [
         {
             "id": analysis_id,

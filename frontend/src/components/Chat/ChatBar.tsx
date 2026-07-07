@@ -1,7 +1,3 @@
-/**
- * "Ask about this area…" — the natural language entry point.
- * Sends the query plus the current viewport bbox so "this area" resolves.
- */
 import { useState } from "react";
 import { ArrowUp } from "lucide-react";
 import { runQuery } from "../../api/query";
@@ -11,7 +7,6 @@ import SuggestionChips from "./SuggestionChips";
 import ChatMessages from "./ChatMessage";
 import { applyResultToGlobe } from "../../lib/applyResult";
 
-// Re-exported for existing importers; canonical home is lib/applyResult.
 export { applyResultToGlobe };
 
 let msgId = 0;
@@ -25,7 +20,7 @@ export default function ChatBar() {
     const query = text.trim();
     if (!query || loading) return;
     setInput("");
-    // Capture history BEFORE adding the new turn so we send prior context only.
+
     const history = useChatStore
       .getState()
       .messages.filter((m) => !m.pending)
@@ -52,14 +47,14 @@ export default function ChatBar() {
         });
         return;
       }
-      // Extra layers first, primary last, so research tools track the primary.
+
       const all = res.results?.length ? res.results : res.result ? [res.result] : [];
       for (const r of all.slice(1).reverse()) applyResultToGlobe(r);
       if (all[0]) applyResultToGlobe(all[0]);
       updateMessage(pendingId, {
         text:
           res.explanation ??
-          "Analysis complete — the result layer has been added to the globe.",
+          "Analysis complete. The result layer has been added to the globe.",
         pending: false,
       });
     } catch (e) {

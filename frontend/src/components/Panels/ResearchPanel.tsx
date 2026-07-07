@@ -1,13 +1,3 @@
-/**
- * Research tools — extra ways to interrogate the latest analysis result:
- *   • Raw SAR backscatter (grayscale physics, not just the binary mask)
- *   • Sentinel-2 optical (true-color context)
- *   • Before/After comparison (cross-fade slider)
- *   • Time-series (scrub/animate the metric over time)
- *
- * Each acts on mapStore.lastResult, so it works whether the result came from
- * the wizard, the chat, or the quick-analysis pin.
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -112,7 +102,6 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
   const opticalOn = layers.some((l) => l.id === OPTICAL_ID);
   const populationOn = layers.some((l) => l.id === POPULATION_ID);
 
-  // A new analysis invalidates the previous impact figures + watch state.
   useEffect(() => {
     setImpact(null);
     setWatched(false);
@@ -310,7 +299,7 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
 
       {!lastResult ? (
         <p className="text-xs text-dim leading-relaxed">
-          Run an analysis first — from the sidebar, the chat, or the ⚡ quick-pin.
+          Run an analysis first, from the sidebar, the chat, or the ⚡ quick-pin.
           These tools build on the most recent result.
         </p>
       ) : (
@@ -395,7 +384,7 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
             <ToolRow
               icon={<UsersRound size={14} />}
               label="Population density"
-              hint="GHSL heatmap — where the people are"
+              hint="GHSL heatmap of where people live"
               active={populationOn}
               loading={busy === "population"}
               error={errors.population}

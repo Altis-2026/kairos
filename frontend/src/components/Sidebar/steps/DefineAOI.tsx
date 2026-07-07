@@ -1,4 +1,3 @@
-/** Step 2 — define the area of interest on the globe. */
 import { Square, Hexagon, MapPin } from "lucide-react";
 import { useMapStore } from "../../../stores/mapStore";
 import { useSidebarStore } from "../../../stores/sidebarStore";

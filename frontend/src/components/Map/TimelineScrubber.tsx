@@ -1,8 +1,3 @@
-/**
- * Time-series scrubber — drag or play through the analysis run across stepped
- * time windows. Only the current frame's layer is visible; a sparkline shows
- * how the headline metric changed over the window.
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Pause, Play, X } from "lucide-react";
@@ -15,7 +10,6 @@ export default function TimelineScrubber() {
   const setLayerVisible = useMapStore((s) => s.setLayerVisible);
   const [playing, setPlaying] = useState(false);
 
-  // Show only the current frame's layer.
   useEffect(() => {
     if (!timeline) return;
     timeline.frames.forEach((f, i) =>
@@ -23,7 +17,6 @@ export default function TimelineScrubber() {
     );
   }, [timeline, index, setLayerVisible]);
 
-  // Playback: advance through frames on a loop.
   useEffect(() => {
     if (!playing || !timeline) return;
     const id = setInterval(() => {
@@ -46,7 +39,6 @@ export default function TimelineScrubber() {
     map.setTimeline(null);
   }
 
-  // Sparkline geometry
   const values = frames.map((f) => f.value);
   const vmax = Math.max(...values, 1);
   const vmin = Math.min(...values, 0);
@@ -105,7 +97,6 @@ export default function TimelineScrubber() {
           </div>
         </div>
 
-        {/* Sparkline */}
         <svg
           viewBox={`0 0 ${W} ${H}`}
           width={88}
