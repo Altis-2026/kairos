@@ -31,7 +31,7 @@ export default function LeftToolbar() {
   );
 
   return (
-    <div className="absolute left-5 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel divide-y divide-line">
+    <div className="absolute left-2 sm:left-5 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel divide-y divide-line">
       <Item
         title="Select / pan"
         active={drawMode === null}

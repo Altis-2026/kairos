@@ -24,7 +24,7 @@ export default function MapLegend() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
-          className="absolute left-5 bottom-20 z-20 max-w-[16rem] rounded-xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel px-3 py-2.5 pointer-events-none"
+          className="absolute z-20 max-sm:left-3 max-sm:top-16 sm:left-5 sm:bottom-20 max-w-[16rem] rounded-xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel px-3 py-2.5 pointer-events-none"
         >
           <div className="font-mono text-[9px] tracking-[0.2em] text-dim uppercase mb-1.5">
             On the map

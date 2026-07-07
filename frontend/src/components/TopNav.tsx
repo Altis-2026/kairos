@@ -4,7 +4,16 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { HelpCircle, Menu, Search, LogOut, MapPin, Radio, Shield } from "lucide-react";
+import {
+  HelpCircle,
+  Menu,
+  MoreVertical,
+  Search,
+  LogOut,
+  MapPin,
+  Radio,
+  Shield,
+} from "lucide-react";
 import { useMapStore } from "../stores/mapStore";
 import { useSidebarStore } from "../stores/sidebarStore";
 import { useAuthStore } from "../stores/authStore";
@@ -26,6 +35,7 @@ export default function TopNav() {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   // Set right after a pick so the debounce effect doesn't re-open the dropdown.
   const justPickedRef = useRef(false);
@@ -130,26 +140,27 @@ export default function TopNav() {
   }
 
   return (
-    <header className="absolute top-0 inset-x-0 z-30 flex items-center gap-4 px-5 h-16 pointer-events-none">
+    <header className="absolute top-0 inset-x-0 z-30 flex items-center gap-2 sm:gap-4 px-3 sm:px-5 h-16 pointer-events-none">
       <div className="flex items-center gap-3 pointer-events-auto">
         <img
           src="/kairos-icon.png"
           alt="Kairos"
           className="h-9 w-9 rounded-xl ring-1 ring-line"
         />
-        <div className="font-display font-semibold text-lg text-ink tracking-tight">
+        <div className="hidden sm:block font-display font-semibold text-lg text-ink tracking-tight">
           Kairos
         </div>
       </div>
 
       {/* Menu + Search */}
-      <div className="flex-1 flex items-center justify-center gap-3 pointer-events-auto">
+      <div className="flex-1 flex items-center justify-center gap-2 sm:gap-3 pointer-events-auto min-w-0">
         <button
           onClick={toggleSidebar}
-          className="flex items-center gap-2 h-10 px-4 rounded-full bg-surface/90 backdrop-blur ring-1 ring-line text-sm text-ink hover:ring-amber/60 transition-colors"
+          className="flex items-center gap-2 h-10 px-3 sm:px-4 rounded-full bg-surface/90 backdrop-blur ring-1 ring-line text-sm text-ink hover:ring-amber/60 transition-colors shrink-0"
+          aria-label="New analysis"
         >
           <Menu size={16} className="text-dim" />
-          Menu
+          <span className="hidden sm:inline">Menu</span>
         </button>
         <div className="relative w-full max-w-md">
           <Search
@@ -169,7 +180,7 @@ export default function TopNav() {
             aria-autocomplete="list"
             className="w-full h-10 pl-10 pr-14 rounded-full bg-surface/90 backdrop-blur ring-1 ring-line text-sm text-ink placeholder-dim outline-none focus:ring-amber/60 transition-shadow"
           />
-          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-dim bg-raised px-1.5 py-0.5 rounded ring-1 ring-line">
+          <kbd className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-dim bg-raised px-1.5 py-0.5 rounded ring-1 ring-line">
             {searching ? "…" : "⌘K"}
           </kbd>
 
@@ -201,36 +212,78 @@ export default function TopNav() {
       </div>
 
       {/* Help + Auth */}
-      <div className="flex items-center gap-3 pointer-events-auto">
+      <div className="flex items-center gap-2 sm:gap-3 pointer-events-auto">
         <button
           onClick={() => {
             location.hash = "watch";
             location.reload();
           }}
-          title="Live Watch — active disasters worldwide"
-          className="h-10 px-3.5 grid grid-flow-col items-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-amber transition-colors"
+          title="Live Watch: active disasters worldwide"
+          className="hidden md:grid h-10 px-3.5 grid-flow-col items-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-amber transition-colors"
         >
           <Radio size={15} className="text-amber" />
-          <span className="text-xs font-medium hidden sm:inline">Live Watch</span>
+          <span className="text-xs font-medium">Live Watch</span>
         </button>
         <button
           onClick={() => {
             location.hash = "guardian";
             location.reload();
           }}
-          title="Guardian — help spot illegal activity from space"
-          className="h-10 px-3.5 grid grid-flow-col items-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-teal transition-colors"
+          title="Guardian: help spot illegal activity from space"
+          className="hidden md:grid h-10 px-3.5 grid-flow-col items-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-teal transition-colors"
         >
           <Shield size={15} className="text-teal" />
-          <span className="text-xs font-medium hidden sm:inline">Guardian</span>
+          <span className="text-xs font-medium">Guardian</span>
         </button>
         <button
           onClick={() => setTutorialOpen(true)}
-          title="How to use Kairos — interactive guide"
-          className="h-10 w-10 grid place-items-center rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-ink transition-colors"
+          title="How to use Kairos"
+          className="hidden md:grid h-10 w-10 place-items-center rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-ink transition-colors"
         >
           <HelpCircle size={17} />
         </button>
+        <div className="relative md:hidden">
+          <button
+            onClick={() => setMoreOpen((v) => !v)}
+            title="More"
+            aria-label="More options"
+            aria-expanded={moreOpen}
+            className="h-10 w-10 grid place-items-center rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-ink transition-colors"
+          >
+            <MoreVertical size={17} />
+          </button>
+          {moreOpen && (
+            <div className="absolute right-0 top-12 z-50 w-48 rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel py-1.5">
+              <button
+                onClick={() => {
+                  location.hash = "watch";
+                  location.reload();
+                }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-dim hover:text-ink"
+              >
+                <Radio size={15} className="text-amber" /> Live Watch
+              </button>
+              <button
+                onClick={() => {
+                  location.hash = "guardian";
+                  location.reload();
+                }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-dim hover:text-ink"
+              >
+                <Shield size={15} className="text-teal" /> Guardian
+              </button>
+              <button
+                onClick={() => {
+                  setMoreOpen(false);
+                  setTutorialOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-dim hover:text-ink"
+              >
+                <HelpCircle size={15} /> How to use Kairos
+              </button>
+            </div>
+          )}
+        </div>
         {user ? (
           <div className="flex items-center gap-2">
             {user.photoUrl ? (

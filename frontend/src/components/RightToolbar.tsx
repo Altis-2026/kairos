@@ -78,7 +78,7 @@ export default function RightToolbar() {
 
   return (
     <>
-      <div className="absolute right-5 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel divide-y divide-line">
+      <div className="absolute right-2 sm:right-5 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel divide-y divide-line">
         <ToolButton
           title="Analytics"
           active={openPanel === "analytics"}

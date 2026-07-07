@@ -35,7 +35,7 @@ export default function Sidebar() {
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: -420, opacity: 0 }}
           transition={{ type: "spring", stiffness: 320, damping: 32 }}
-          className="absolute left-5 top-20 bottom-24 z-40 w-[360px] flex flex-col rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel"
+          className="absolute z-40 max-sm:inset-x-3 max-sm:top-16 max-sm:bottom-20 sm:left-5 sm:top-20 sm:bottom-24 sm:w-[360px] flex flex-col rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel"
         >
           <div className="p-4 pb-3 space-y-3 border-b border-line">
             <div className="flex items-center justify-between">

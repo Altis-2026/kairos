@@ -20,7 +20,7 @@ export default function ChatMessages() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 12 }}
-        className="w-full max-w-2xl max-h-72 overflow-y-auto rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3 pointer-events-auto"
+        className="w-full max-w-2xl max-h-60 sm:max-h-72 overflow-y-auto rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3 pointer-events-auto"
       >
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
