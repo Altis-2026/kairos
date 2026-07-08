@@ -18,9 +18,11 @@ async def lifespan(app: FastAPI):
         )
     try:
         ee_creds = os.getenv("EE_CREDENTIALS")
+        print(f"[kairos] build check v2 | EE_CREDENTIALS present: {bool(ee_creds)}, length: {len(ee_creds) if ee_creds else 0}")
         if ee_creds:
             import json
             key_dict = json.loads(ee_creds)
+            print(f"[kairos] service account email: {key_dict.get('client_email')}")
             credentials = ee.ServiceAccountCredentials(
                 key_dict["client_email"], key_data=ee_creds
             )
