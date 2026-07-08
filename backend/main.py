@@ -20,11 +20,13 @@ async def lifespan(app: FastAPI):
         ee_creds = os.getenv("EE_CREDENTIALS")
         if ee_creds:
             import json
-            creds_path = os.path.expanduser("~/.config/earthengine/credentials")
-            os.makedirs(os.path.dirname(creds_path), exist_ok=True)
-            with open(creds_path, "w") as f:
-                f.write(ee_creds)
-        ee.Initialize(project=project_id)
+            key_dict = json.loads(ee_creds)
+            credentials = ee.ServiceAccountCredentials(
+                key_dict["client_email"], key_data=ee_creds
+            )
+            ee.Initialize(credentials, project=project_id)
+        else:
+            ee.Initialize(project=project_id)
         print(f"[kairos] Google Earth Engine initialized, project: {project_id}")
     except Exception as e:
         print(f"[kairos] GEE initialization FAILED: {e}")
