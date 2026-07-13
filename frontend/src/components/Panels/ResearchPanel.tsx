@@ -34,6 +34,7 @@ import ResultInsight from "../Insight/ResultInsight";
 import type { ImpactResponse } from "../../types/analysis";
 import {
   downloadGeoTIFF,
+  downloadKML,
   downloadReport,
   type ExportSource,
 } from "../../lib/exporters";
@@ -493,7 +494,7 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
             <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
               Export &amp; share
             </h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() =>
                   exportSrc &&
@@ -524,6 +525,17 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
                   <FileText size={12} />
                 )}
                 Report
+              </button>
+              <button
+                onClick={() => {
+                  if (!exportSrc) return;
+                  downloadKML(exportSrc, useMapStore.getState().aoiPolygon);
+                }}
+                className="h-9 rounded-xl text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition"
+                title="Download the footprint as KML for Google Earth and GIS tools"
+              >
+                <Download size={12} />
+                KML
               </button>
             </div>
             <div className="grid grid-cols-2 gap-2">

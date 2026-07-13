@@ -14,6 +14,7 @@ import {
   Trees,
   Waves,
 } from "lucide-react";
+import { ANALYSIS_COLORS, fetchFeed, timeAgo, type Finding } from "../../api/feed";
 
 const EXAMPLE_QUESTIONS = [
   "is there flooding near Dhaka right now?",
@@ -156,9 +157,16 @@ function RadarSweep() {
 
 export default function Landing({ onLaunch }: { onLaunch: () => void }) {
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
+  const [findings, setFindings] = useState<Finding[]>([]);
   const starsSmall = useMemo(() => starField(90, 1337), []);
   const starsBright = useMemo(() => starField(30, 4242), []);
   const typed = useTypewriter(EXAMPLE_QUESTIONS);
+
+  useEffect(() => {
+    fetchFeed(3)
+      .then((d) => setFindings(d.findings.slice(0, 3)))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
@@ -281,6 +289,55 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
           <ArrowDown size={16} className="animate-pulse-soft text-dim" />
         </div>
       </section>
+
+      {findings.length > 0 && (
+        <section className="border-y border-line bg-surface/40">
+          <div className="mx-auto max-w-5xl px-6 py-10 sm:px-10">
+            <div className="flex items-center gap-2 font-mono text-[11px] tracking-[0.25em] text-teal">
+              <span className="h-1.5 w-1.5 rounded-full bg-teal animate-pulse-soft" />
+              KAIROS FOUND THIS, UNPROMPTED
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {findings.map((f) => (
+                <motion.div
+                  key={f.id}
+                  {...reveal}
+                  className="rounded-2xl bg-bg p-4 ring-1 ring-line"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-2 w-2 rounded-full shrink-0"
+                      style={{ background: ANALYSIS_COLORS[f.analysis_type] ?? "#00BFA8" }}
+                    />
+                    <span className="text-sm font-medium truncate">{f.region}</span>
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-dim line-clamp-3">
+                    {f.summary}
+                  </p>
+                  <div className="mt-2 font-mono text-[10px] text-dim">
+                    {f.headline_value != null &&
+                      `${Math.round(f.headline_value).toLocaleString()} ${f.headline_unit} · `}
+                    {timeAgo(f.created_at)}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+            <p className="mt-4 text-xs text-dim">
+              The system sweeps disaster zones and watchlist regions on its own
+              schedule. Nobody asked it these questions.{" "}
+              <button
+                onClick={() => {
+                  location.hash = "watch";
+                  location.reload();
+                }}
+                className="text-teal hover:underline"
+              >
+                See the live feed
+              </button>
+            </p>
+          </div>
+        </section>
+      )}
 
       <section className="mx-auto max-w-5xl px-6 py-20 sm:px-10">
         <h2 className="font-display text-2xl font-semibold sm:text-3xl">

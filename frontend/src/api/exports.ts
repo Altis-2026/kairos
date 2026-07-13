@@ -47,3 +47,36 @@ export function fetchReport(p: ReportParams): Promise<ReportResponse> {
     body: JSON.stringify(p),
   });
 }
+
+export interface BriefingFinding {
+  analysis_type: string;
+  display_name: string;
+  headline_label: string;
+  headline_value: number;
+  headline_unit: string;
+  data_date: string;
+  start_date: string;
+  end_date: string;
+  confidence: number;
+  summary?: string | null;
+}
+
+export interface BriefingParams {
+  area_name: string;
+  area_label?: string;
+  area_km2?: number;
+  prepared_for?: string;
+  findings: BriefingFinding[];
+}
+
+export interface BriefingResponse {
+  filename: string;
+  html: string;
+}
+
+export function fetchBriefing(p: BriefingParams): Promise<BriefingResponse> {
+  return apiFetch<BriefingResponse>("/export/briefing", {
+    method: "POST",
+    body: JSON.stringify(p),
+  });
+}

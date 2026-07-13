@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import ee
 from fastapi import APIRouter, HTTPException
 
-from models.requests import AnalyzeRequest, ReportRequest
+from models.requests import AnalyzeRequest, BriefingRequest, ReportRequest
 from gee.registry import ANALYSIS_REGISTRY
 
 router = APIRouter()
@@ -247,4 +247,142 @@ def export_report(req: ReportRequest):
     return {
         "filename": f"kairos_{req.analysis_type}_{req.data_date}_report.md",
         "markdown": markdown,
+    }
+
+
+def _fmt_value(v: float) -> str:
+    if v == int(v):
+        return f"{int(v):,}"
+    return f"{v:,.1f}"
+
+
+def _briefing_bluf(req) -> str:
+    starts = [f.start_date for f in req.findings]
+    ends = [f.end_date for f in req.findings]
+    parts = []
+    for f in req.findings:
+        parts.append(
+            f"{f.display_name.lower()} measured "
+            f"{_fmt_value(f.headline_value)} {f.headline_unit} "
+            f"({f.headline_label.lower()}, satellite pass {f.data_date})"
+        )
+    joined = "; ".join(parts)
+    return (
+        f"Sentinel-1 radar analysis of {req.area_name} covering "
+        f"{min(starts)} to {max(ends)} produced {len(req.findings)} "
+        f"finding{'s' if len(req.findings) != 1 else ''}: {joined}. "
+        "Figures are modelled estimates from open satellite radar data and "
+        "should be verified against ground reports before operational use."
+    )
+
+
+def _build_briefing_html(req) -> str:
+    generated = datetime.now(timezone.utc).strftime("%B %d, %Y at %H:%M UTC")
+    label = f" ({req.area_label})" if req.area_label else ""
+    area_line = (
+        f"{_fmt_value(req.area_km2)} km² analysed"
+        if req.area_km2
+        else "See finding footprints"
+    )
+    prepared = req.prepared_for or "General distribution"
+
+    rows = []
+    for i, f in enumerate(req.findings, start=1):
+        method = _METHOD.get(f.analysis_type, {})
+        summary = f.summary or (
+            f"{f.display_name} over the area of interest returned "
+            f"{f.headline_label.lower()} of {_fmt_value(f.headline_value)} "
+            f"{f.headline_unit}, based on the Sentinel-1 acquisition of "
+            f"{f.data_date}."
+        )
+        rows.append(f"""
+      <section class="finding">
+        <h3>{i}. {f.display_name}</h3>
+        <div class="stat">{f.headline_label}: <b>{_fmt_value(f.headline_value)} {f.headline_unit}</b>
+          <span class="conf">{round(f.confidence * 100)}% confidence</span></div>
+        <p>{summary}</p>
+        <div class="meta">Window {f.start_date} to {f.end_date} · latest pass {f.data_date}
+          · method: {method.get("threshold", "Sentinel-1 backscatter change detection")}</div>
+      </section>""")
+
+    findings_html = "\n".join(rows)
+
+    return f"""<meta charset="utf-8">
+<title>Kairos briefing: {req.area_name}</title>
+<style>
+  body {{ font-family: Georgia, 'Times New Roman', serif; color: #111;
+         background: #fff; max-width: 760px; margin: 40px auto; padding: 0 24px;
+         line-height: 1.55; }}
+  .letterhead {{ display: flex; justify-content: space-between; align-items: baseline;
+         border-bottom: 3px double #111; padding-bottom: 10px; }}
+  .letterhead .org {{ font-size: 13px; letter-spacing: 3px; font-weight: bold; }}
+  .letterhead .date {{ font-size: 12px; color: #444; }}
+  h1 {{ font-size: 26px; margin: 26px 0 4px; }}
+  .subtitle {{ font-size: 13px; color: #444; margin-bottom: 22px; }}
+  table.meta-block {{ font-size: 13px; border-collapse: collapse; margin-bottom: 24px; }}
+  table.meta-block td {{ padding: 3px 18px 3px 0; vertical-align: top; }}
+  table.meta-block td:first-child {{ font-weight: bold; width: 110px; }}
+  h2 {{ font-size: 13px; letter-spacing: 2px; text-transform: uppercase;
+        border-bottom: 1px solid #999; padding-bottom: 4px; margin-top: 30px; }}
+  .bluf {{ background: #f4f4f0; border-left: 4px solid #0d7a6e; padding: 12px 16px;
+        font-size: 14px; }}
+  .finding {{ margin-top: 18px; }}
+  .finding h3 {{ font-size: 15px; margin: 0 0 4px; }}
+  .finding .stat {{ font-size: 14px; }}
+  .finding .stat b {{ color: #0d7a6e; }}
+  .finding .conf {{ font-size: 11px; color: #666; margin-left: 10px; }}
+  .finding p {{ font-size: 13px; margin: 6px 0; }}
+  .finding .meta {{ font-size: 11px; color: #666; }}
+  .footer {{ margin-top: 36px; border-top: 1px solid #999; padding-top: 10px;
+        font-size: 11px; color: #555; }}
+  .print-btn {{ position: fixed; top: 14px; right: 14px; padding: 8px 16px;
+        background: #0d7a6e; color: #fff; border: 0; border-radius: 6px;
+        font-size: 13px; cursor: pointer; }}
+  @media print {{ .print-btn {{ display: none; }} body {{ margin: 0; }} }}
+</style>
+<button class="print-btn" onclick="window.print()">Print / save as PDF</button>
+<div class="letterhead">
+  <span class="org">KAIROS EARTH OBSERVATION</span>
+  <span class="date">{generated}</span>
+</div>
+<h1>Situation Briefing</h1>
+<div class="subtitle">Open-source satellite radar assessment</div>
+<table class="meta-block">
+  <tr><td>Subject</td><td>{req.area_name}{label}</td></tr>
+  <tr><td>Prepared for</td><td>{prepared}</td></tr>
+  <tr><td>Coverage</td><td>{area_line}</td></tr>
+  <tr><td>Data source</td><td>Copernicus Sentinel-1 C-band SAR via Google Earth Engine</td></tr>
+</table>
+<h2>Bottom line</h2>
+<p class="bluf">{_briefing_bluf(req)}</p>
+<h2>Findings</h2>
+{findings_html}
+<h2>Methodology</h2>
+<p style="font-size:13px">Each finding is derived from Sentinel-1 synthetic aperture radar
+backscatter, comparing the analysis window against a historical baseline for the same
+area. Radar imaging is independent of cloud cover and daylight, so acquisitions are
+consistent regardless of weather. Computation runs server-side on Google Earth Engine
+against the full Copernicus archive; no imagery is modified by hand.</p>
+<h2>Caveats</h2>
+<p style="font-size:13px">Radar backscatter responds to surface roughness and moisture,
+not directly to the phenomenon of interest. Wet farmland can resemble flooding, calm water
+can resemble an oil slick, and terrain shadowing can mask detections. Confidence figures
+reflect data availability and method reliability, not ground-truth validation. Treat this
+briefing as decision support, not as a verified assessment.</p>
+<div class="footer">
+  Generated by Kairos, a student-built Earth observation platform.
+  Contains modified Copernicus Sentinel data processed by the European Space Agency,
+  analysed on Google Earth Engine. Population and district figures where shown are
+  modelled estimates.
+</div>
+"""
+
+
+@router.post("/export/briefing")
+def export_briefing(req: BriefingRequest):
+    html = _build_briefing_html(req)
+    safe = "".join(c if c.isalnum() else "-" for c in req.area_name.lower())[:40]
+    return {
+        "filename": f"kairos_briefing_{safe}.html",
+        "html": html,
     }

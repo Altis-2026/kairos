@@ -6,6 +6,7 @@ import {
   FlaskConical,
   Globe2,
   History,
+  Landmark,
   Layers,
   LocateFixed,
   Map as MapIcon,
@@ -20,6 +21,7 @@ import ResearchPanel from "./Panels/ResearchPanel";
 import HistoryPanel from "./Panels/HistoryPanel";
 import BatchPanel from "./Panels/BatchPanel";
 import AlertsPanel from "./Panels/AlertsPanel";
+import DistrictPanel from "./Panels/DistrictPanel";
 
 function ToolButton({
   title,
@@ -50,7 +52,14 @@ const CONTRAST_KEY = "kairos_high_contrast";
 
 export default function RightToolbar() {
   const [openPanel, setOpenPanel] = useState<
-    "layers" | "analytics" | "research" | "history" | "batch" | "alerts" | null
+    | "layers"
+    | "analytics"
+    | "research"
+    | "district"
+    | "history"
+    | "batch"
+    | "alerts"
+    | null
   >(null);
   const [highContrast, setHighContrast] = useState(
     () => document.documentElement.classList.contains("hc")
@@ -74,7 +83,15 @@ export default function RightToolbar() {
 
   useEffect(() => {
     if (!panelRequest) return;
-    const known = ["layers", "analytics", "research", "history", "batch", "alerts"];
+    const known = [
+      "layers",
+      "analytics",
+      "research",
+      "district",
+      "history",
+      "batch",
+      "alerts",
+    ];
     if (known.includes(panelRequest)) {
       setOpenPanel(panelRequest as typeof openPanel);
     }
@@ -134,6 +151,13 @@ export default function RightToolbar() {
           <FlaskConical size={17} />
         </ToolButton>
         <ToolButton
+          title="My district"
+          active={openPanel === "district"}
+          onClick={() => setOpenPanel(openPanel === "district" ? null : "district")}
+        >
+          <Landmark size={17} />
+        </ToolButton>
+        <ToolButton
           title="My analyses"
           active={openPanel === "history"}
           onClick={() => setOpenPanel(openPanel === "history" ? null : "history")}
@@ -182,6 +206,9 @@ export default function RightToolbar() {
       {openPanel === "layers" && <LayerPanel onClose={() => setOpenPanel(null)} />}
       {openPanel === "research" && (
         <ResearchPanel onClose={() => setOpenPanel(null)} />
+      )}
+      {openPanel === "district" && (
+        <DistrictPanel onClose={() => setOpenPanel(null)} />
       )}
       {openPanel === "history" && (
         <HistoryPanel onClose={() => setOpenPanel(null)} />

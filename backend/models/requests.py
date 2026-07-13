@@ -48,8 +48,8 @@ class AnalyzeRequest(BaseModel):
             return v
         if len(v) < 3:
             raise ValueError("polygon needs at least 3 vertices")
-        if len(v) > 100:
-            raise ValueError("polygon must have 100 vertices or fewer")
+        if len(v) > 2000:
+            raise ValueError("polygon must have 2000 vertices or fewer")
         for point in v:
             if len(point) != 2:
                 raise ValueError("each polygon vertex must be [lon, lat]")
@@ -328,3 +328,42 @@ class QueryRequest(BaseModel):
         if v and len(v) > 12:
             return v[-12:]
         return v
+
+
+class BriefingFinding(BaseModel):
+
+    analysis_type: str
+    display_name: str
+    headline_label: str
+    headline_value: float
+    headline_unit: str
+    data_date: str
+    start_date: str
+    end_date: str
+    confidence: float
+    summary: Optional[str] = None
+
+
+class BriefingRequest(BaseModel):
+
+    area_name: str
+    area_label: Optional[str] = None
+    area_km2: Optional[float] = None
+    prepared_for: Optional[str] = None
+    findings: List[BriefingFinding]
+
+    @field_validator("findings")
+    @classmethod
+    def cap_findings(cls, v):
+        if not v:
+            raise ValueError("a briefing needs at least one finding")
+        if len(v) > 8:
+            return v[:8]
+        return v
+
+    @field_validator("area_name")
+    @classmethod
+    def require_area(cls, v):
+        if not v or not v.strip():
+            raise ValueError("area_name must not be empty")
+        return v.strip()
