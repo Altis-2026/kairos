@@ -17,6 +17,10 @@ _BASE_SCALE = {
     "deforestation": 30,
     "sea_ice": 100,
     "surface_deformation": 30,
+    "ocean_wind": 100,
+    "soil_moisture": 60,
+    "fire_fusion": 30,
+    "ice_drift": 400,
 }
 
 _METHOD = {
@@ -73,6 +77,42 @@ _METHOD = {
         "baseline": "Mean composite over the analysis window",
         "masking": "None (polar EW acquisitions)",
         "resolution": "100 m",
+    },
+    "ocean_wind": {
+        "collection": "COPERNICUS/S1_GRD",
+        "band": "VV",
+        "mode": "IW",
+        "threshold": "Empirical mapping of VV backscatter over water to wind speed (roughness proxy, not a CMOD retrieval)",
+        "baseline": "Mean composite over the analysis window",
+        "masking": "Restricted to permanent water (occurrence > 50%)",
+        "resolution": "100 m",
+    },
+    "soil_moisture": {
+        "collection": "COPERNICUS/S1_GRD",
+        "band": "VV",
+        "mode": "IW",
+        "threshold": "Per-pixel normalized index: recent VV positioned on its own 12-month min-to-max range",
+        "baseline": "365-day per-pixel dry and wet references; pixels with under 3 dB of range excluded",
+        "masking": "Permanent water excluded",
+        "resolution": "60 m",
+    },
+    "fire_fusion": {
+        "collection": "COPERNICUS/S1_GRD + LANDSAT/LC08+LC09/C02/T1_L2",
+        "band": "VH + ST_B10",
+        "mode": "IW",
+        "threshold": "Radar: VH rise > 2.5 dB vs pre-fire baseline. Thermal: land surface temperature above 325 K",
+        "baseline": "60-day pre-fire radar window; thermal max composite over the analysis window",
+        "masking": "Permanent water excluded from the radar scar",
+        "resolution": "30 m",
+    },
+    "ice_drift": {
+        "collection": "COPERNICUS/S1_GRD",
+        "band": "HH",
+        "mode": "EW",
+        "threshold": "Offset tracking (patch cross-correlation) between composites of the two window halves, displacement over elapsed days",
+        "baseline": "First-half composite is the reference image",
+        "masking": "Restricted to ice (HH > -18 dB)",
+        "resolution": "400 m analysis grid",
     },
     "surface_deformation": {
         "collection": "COPERNICUS/S1_GRD",

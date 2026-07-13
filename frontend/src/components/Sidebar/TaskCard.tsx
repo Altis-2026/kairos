@@ -3,6 +3,7 @@ import {
   Ship,
   Flame,
   Droplets,
+  Droplet,
   Trees,
   Snowflake,
   Activity,
@@ -11,6 +12,9 @@ import {
   TrendingDown,
   Sprout,
   Pickaxe,
+  Wind,
+  Thermometer,
+  Move,
   type LucideIcon,
 } from "lucide-react";
 import type { AnalysisType } from "../../types/analysis";
@@ -20,6 +24,7 @@ const ICONS: Record<string, LucideIcon> = {
   ship: Ship,
   flame: Flame,
   droplets: Droplets,
+  droplet: Droplet,
   trees: Trees,
   snowflake: Snowflake,
   activity: Activity,
@@ -28,6 +33,9 @@ const ICONS: Record<string, LucideIcon> = {
   "trending-down": TrendingDown,
   sprout: Sprout,
   pickaxe: Pickaxe,
+  wind: Wind,
+  thermometer: Thermometer,
+  move: Move,
 };
 
 export default function TaskCard({

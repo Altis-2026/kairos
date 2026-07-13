@@ -74,6 +74,10 @@ WINDOW_DAYS = {
     "land_subsidence": 120,
     "surface_deformation": 30,
     "building_damage": 21,
+    "ocean_wind": 10,
+    "soil_moisture": 30,
+    "fire_fusion": 30,
+    "ice_drift": 24,
 }
 
 MIN_HEADLINE = {
@@ -89,6 +93,10 @@ MIN_HEADLINE = {
     "building_damage": 0.5,
     "sea_ice": 1.0,
     "crop_monitoring": 0.01,
+    "ocean_wind": 0.5,
+    "soil_moisture": 0.01,
+    "fire_fusion": 1.0,
+    "ice_drift": 0.1,
 }
 
 EONET_ANALYSIS = {

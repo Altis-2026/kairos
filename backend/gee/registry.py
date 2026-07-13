@@ -11,6 +11,10 @@ from gee.subsidence import detect_subsidence
 from gee.urban import detect_urban_growth
 from gee.agriculture import monitor_crops
 from gee.mining import detect_land_disturbance
+from gee.wind import estimate_ocean_wind
+from gee.soil_moisture import estimate_soil_moisture
+from gee.fire_fusion import fuse_fire
+from gee.ice_drift import track_ice_drift
 
 ANALYSIS_REGISTRY = {
     "flood_extent": {
@@ -248,6 +252,82 @@ ANALYSIS_REGISTRY = {
         "icon": "pickaxe",
         "sar_polarization": "VH",
         "instrument_mode": "IW",
+    },
+    "ocean_wind": {
+        "function": estimate_ocean_wind,
+        "display_name": "Ocean Wind (Roughness Proxy)",
+        "description": (
+            "Wind roughens the sea surface, and rougher water throws more radar "
+            "energy back at the satellite. Kairos maps that C-band backscatter "
+            "over open water to an approximate wind speed. An empirical proxy, "
+            "not a full geophysical retrieval, and it also flags the calm zones "
+            "where oil-spill detection produces false positives."
+        ),
+        "category": "Maritime and Security",
+        "data_sources": ["S1"],
+        "estimated_seconds": 30,
+        "output_type": "raster",
+        "color_palette": ["#1E6FE8", "#00BFA8", "#E8E36A", "#E8541E"],
+        "icon": "wind",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "soil_moisture": {
+        "function": estimate_soil_moisture,
+        "display_name": "Surface Soil Moisture Index",
+        "description": (
+            "Wet soil reflects radar more strongly than dry soil. Each pixel's "
+            "recent VV backscatter is placed on its own 12-month dry-to-wet "
+            "scale, giving a 0 to 1 moisture index that works through cloud. "
+            "Moisture and crop vigour are different signals, so this pairs with "
+            "the vegetation analysis rather than repeating it."
+        ),
+        "category": "Environmental",
+        "data_sources": ["S1"],
+        "estimated_seconds": 35,
+        "output_type": "raster",
+        "color_palette": ["#8B5A2B", "#7BC043", "#1E6FE8"],
+        "icon": "droplet",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "fire_fusion": {
+        "function": fuse_fire,
+        "display_name": "Wildfire Radar + Thermal Fusion",
+        "description": (
+            "Two sensors on one map: Sentinel-1 radar outlines the burn scar "
+            "through the smoke, while Landsat 8/9 thermal imaging marks the "
+            "surface hotspots that were actively hot when a satellite passed. "
+            "Radar shows where the fire has been, thermal shows where it "
+            "still burns."
+        ),
+        "category": "Disaster Response",
+        "data_sources": ["S1", "L8/9"],
+        "estimated_seconds": 40,
+        "output_type": "raster",
+        "color_palette": ["#E8541E", "#FFD166", "#FF3B5C"],
+        "icon": "thermometer",
+        "sar_polarization": "VH",
+        "instrument_mode": "IW",
+    },
+    "ice_drift": {
+        "function": track_ice_drift,
+        "display_name": "Sea Ice Drift Velocity",
+        "description": (
+            "Goes beyond where the ice is to how fast it is moving. Two radar "
+            "composites from the halves of the date window are pattern-matched "
+            "against each other (offset tracking), and the displacement between "
+            "them becomes a drift speed in km per day. Polar EW acquisitions "
+            "only."
+        ),
+        "category": "Environmental",
+        "data_sources": ["S1"],
+        "estimated_seconds": 50,
+        "output_type": "raster",
+        "color_palette": ["#1E6FE8", "#BFEFFF", "#FFFFFF"],
+        "icon": "move",
+        "sar_polarization": "HH",
+        "instrument_mode": "EW",
     },
 }
 

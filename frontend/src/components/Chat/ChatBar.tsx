@@ -51,11 +51,15 @@ export default function ChatBar() {
       const all = res.results?.length ? res.results : res.result ? [res.result] : [];
       for (const r of all.slice(1).reverse()) applyResultToGlobe(r);
       if (all[0]) applyResultToGlobe(all[0]);
+      const params = res.parameters as Record<string, unknown> | null;
+      const reasoning =
+        params && typeof params.reasoning === "string" ? params.reasoning : undefined;
       updateMessage(pendingId, {
         text:
           res.explanation ??
           "Analysis complete. The result layer has been added to the globe.",
         pending: false,
+        reasoning,
       });
     } catch (e) {
       updateMessage(pendingId, {

@@ -4,6 +4,7 @@ import type {
   BBox,
   CompareControl,
   DrawMode,
+  ImageLayer,
   PointLayer,
   Projection,
   RasterLayer,
@@ -22,6 +23,7 @@ interface MapState {
   coords: { lng: number; lat: number } | null;
   layers: RasterLayer[];
   pointLayers: PointLayer[];
+  imageLayers: ImageLayer[];
   aoi: BBox | null;
   aoiPolygon: [number, number][] | null;
   drawMode: DrawMode;
@@ -43,6 +45,7 @@ interface MapState {
   setViewportBbox: (b: BBox) => void;
   addRasterLayer: (layer: RasterLayer) => void;
   addPointLayer: (layer: PointLayer) => void;
+  addImageLayer: (layer: ImageLayer) => void;
   removeLayer: (id: string) => void;
   clearGroup: (group: "compare" | "timeline") => void;
   setLayerOpacity: (id: string, opacity: number) => void;
@@ -70,6 +73,7 @@ export const useMapStore = create<MapState>((set) => ({
   coords: null,
   layers: [],
   pointLayers: [],
+  imageLayers: [],
   aoi: null,
   aoiPolygon: null,
   drawMode: null,
@@ -95,16 +99,24 @@ export const useMapStore = create<MapState>((set) => ({
     set((s) => ({
       pointLayers: [...s.pointLayers.filter((l) => l.id !== layer.id), layer],
     })),
+  addImageLayer: (layer) =>
+    set((s) => ({
+      imageLayers: [...s.imageLayers.filter((l) => l.id !== layer.id), layer],
+    })),
   removeLayer: (id) =>
     set((s) => ({
       layers: s.layers.filter((l) => l.id !== id),
       pointLayers: s.pointLayers.filter((l) => l.id !== id),
+      imageLayers: s.imageLayers.filter((l) => l.id !== id),
     })),
   clearGroup: (group) =>
     set((s) => ({ layers: s.layers.filter((l) => l.group !== group) })),
   setLayerOpacity: (id, opacity) =>
     set((s) => ({
       layers: s.layers.map((l) => (l.id === id ? { ...l, opacity } : l)),
+      imageLayers: s.imageLayers.map((l) =>
+        l.id === id ? { ...l, opacity } : l
+      ),
     })),
   toggleLayerVisible: (id) =>
     set((s) => ({
@@ -114,6 +126,9 @@ export const useMapStore = create<MapState>((set) => ({
       pointLayers: s.pointLayers.map((l) =>
         l.id === id ? { ...l, visible: !l.visible } : l
       ),
+      imageLayers: s.imageLayers.map((l) =>
+        l.id === id ? { ...l, visible: !l.visible } : l
+      ),
     })),
   setLayerVisible: (id, visible) =>
     set((s) => ({
@@ -121,8 +136,11 @@ export const useMapStore = create<MapState>((set) => ({
       pointLayers: s.pointLayers.map((l) =>
         l.id === id ? { ...l, visible } : l
       ),
+      imageLayers: s.imageLayers.map((l) =>
+        l.id === id ? { ...l, visible } : l
+      ),
     })),
-  clearLayers: () => set({ layers: [], pointLayers: [] }),
+  clearLayers: () => set({ layers: [], pointLayers: [], imageLayers: [] }),
   setAoi: (aoi) => set({ aoi, aoiPolygon: null }),
   setAoiPolygon: (ring) => set({ aoiPolygon: ring, aoi: polygonBBox(ring) }),
   setDrawMode: (drawMode) => set({ drawMode }),

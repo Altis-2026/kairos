@@ -79,6 +79,8 @@ from api.alerts import router as alerts_router
 from api.interpret import router as interpret_router
 from api.feed import router as feed_router
 from api.districts import router as districts_router
+from api.agent import router as agent_router
+from api.insar import router as insar_router
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -93,6 +95,8 @@ app.include_router(alerts_router)
 app.include_router(interpret_router)
 app.include_router(feed_router)
 app.include_router(districts_router)
+app.include_router(agent_router)
+app.include_router(insar_router)
 
 
 @app.get("/health")

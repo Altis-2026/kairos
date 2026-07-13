@@ -229,3 +229,119 @@ def fallback_interpretation(result: dict, method_description: str = "") -> str:
         "Agricultural activity, soil moisture and wind can all mimic a real signal. "
         "_(AI provider not configured, this is a rule-based summary.)_"
     )
+
+
+_MISSION_SYSTEM = (
+    "You are the mission planner for Kairos, a Sentinel-1 satellite radar "
+    "analysis platform. The user gives one high-level goal. You break it into "
+    "1 to 4 concrete radar analyses that together answer it, each with a "
+    "specific bounding box and date window.\n\n"
+    "Respond with ONLY a JSON object, parseable by json.loads():\n"
+    '{"understood": true|false, "plan_summary": "<one sentence describing the '
+    'plan>", "steps": [{"analysis_type": "<id>", "location_name": "<place>", '
+    '"bbox": [min_lon, min_lat, max_lon, max_lat], "start_date": "YYYY-MM-DD", '
+    '"end_date": "YYYY-MM-DD", "purpose": "<why this step serves the goal>"}], '
+    '"clarification": "<one question, only when understood is false>"}\n\n'
+    "Rules:\n"
+    "- Valid analysis_type ids: {ids}\n"
+    "- Every step needs its own bbox from your geographic knowledge. Keep each "
+    "box under 5 degrees across. For a large region, pick the most relevant "
+    "sub-areas as separate steps rather than one giant box.\n"
+    "- Steps can differ in place (compare regions), in time (compare periods), "
+    "or in analysis type (different signals on one event).\n"
+    "- Today's date arrives in the user message. Default windows to the last "
+    "30 days unless the goal implies otherwise.\n"
+    "- sea_ice and ice_drift only work above roughly 55 degrees latitude.\n"
+    "- Set understood false only when the goal is impossible to act on, and "
+    "ask exactly one clarifying question."
+)
+
+
+def plan_mission(
+    goal: str, viewport_bbox: list = None, history: list = None
+) -> "MissionPlan":
+    from ai.parser import MissionPlan, parse_mission_response
+    from gee.registry import ANALYSIS_REGISTRY
+
+    client = _get_client()
+    system = _MISSION_SYSTEM.replace("{ids}", ", ".join(ANALYSIS_REGISTRY.keys()))
+
+    context_lines = [f"Today's date: {date.today().isoformat()}"]
+    if viewport_bbox:
+        context_lines.append(f"viewport_bbox: {viewport_bbox}")
+    user_message = "\n".join(context_lines) + f"\n\nMission goal: {goal}"
+
+    messages = [{"role": "system", "content": system}]
+    messages.extend(_history_messages(history))
+    messages.append({"role": "user", "content": user_message})
+
+    response = client.chat.completions.create(
+        model=MODEL,
+        max_tokens=1200,
+        messages=messages,
+        extra_body=_PROVIDER_PREFS,
+    )
+    text = response.choices[0].message.content
+    try:
+        return parse_mission_response(text)
+    except Exception as first_error:
+        retry = client.chat.completions.create(
+            model=MODEL,
+            max_tokens=1200,
+            messages=[
+                *messages,
+                {"role": "assistant", "content": text},
+                {
+                    "role": "user",
+                    "content": (
+                        f"Your response failed validation: {first_error}. "
+                        "Respond again with ONLY the corrected JSON object."
+                    ),
+                },
+            ],
+            extra_body=_PROVIDER_PREFS,
+        )
+        return parse_mission_response(retry.choices[0].message.content)
+
+
+def fallback_mission_report(goal: str, outcomes: list) -> str:
+    lines = [f'Mission complete for: "{goal}".']
+    for o in outcomes:
+        name = o.get("display_name") or o.get("analysis_type", "analysis")
+        where = o.get("location_name") or "the target area"
+        if o.get("status") == "ok":
+            lines.append(
+                f"{name} over {where}: {o.get('headline_label', 'result')} "
+                f"{o.get('headline_value')} {o.get('headline_unit', '')}, "
+                f"pass {o.get('data_date')}."
+            )
+        elif o.get("status") == "no_data":
+            lines.append(f"{name} over {where}: no usable radar data in the window.")
+        else:
+            lines.append(f"{name} over {where}: the run failed.")
+    ok = sum(1 for o in outcomes if o.get("status") == "ok")
+    lines.append(f"{ok} of {len(outcomes)} analyses completed and are on the globe.")
+    return " ".join(lines)
+
+
+def write_mission_report(goal: str, plan_summary: str, outcomes: list) -> str:
+    import json as _json
+
+    client = _get_client()
+    prompt = (
+        "You are Kairos summarizing a finished multi-step satellite radar "
+        "mission for the person who requested it. Write 3 to 5 plain sentences: "
+        "lead with the direct answer to their goal, compare the step results "
+        "against each other where that is meaningful, name concrete numbers and "
+        "dates, and mention any step that failed or had no data. No JSON, no "
+        "headers, no bullet points.\n\n"
+        f"Goal: {goal}\nPlan: {plan_summary}\n"
+        f"Step outcomes: {_json.dumps(outcomes, default=str)}"
+    )
+    response = client.chat.completions.create(
+        model=MODEL,
+        max_tokens=500,
+        messages=[{"role": "user", "content": prompt}],
+        extra_body=_PROVIDER_PREFS,
+    )
+    return response.choices[0].message.content.strip()

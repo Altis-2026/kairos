@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
+import { Lightbulb, X } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
 
 export default function ChatMessages() {
@@ -48,11 +48,30 @@ export default function ChatMessages() {
               }`}
             >
               {m.text}
+              {m.reasoning && <Reasoning text={m.reasoning} />}
             </div>
           </div>
         ))}
         <div ref={endRef} />
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+function Reasoning({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2 border-t border-line pt-1.5">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 font-mono text-[10px] tracking-wide text-dim hover:text-teal transition-colors"
+      >
+        <Lightbulb size={11} />
+        {open ? "Hide reasoning" : "Why this analysis?"}
+      </button>
+      {open && (
+        <p className="mt-1.5 text-[11px] text-dim leading-relaxed">{text}</p>
+      )}
+    </div>
   );
 }

@@ -52,6 +52,15 @@ export interface PointLayer {
   visible: boolean;
 }
 
+export interface ImageLayer {
+  id: string;
+  name: string;
+  url: string;
+  bbox: BBox;
+  opacity: number;
+  visible: boolean;
+}
+
 export type DrawMode = "rectangle" | "polygon" | "pin" | "quickpin" | null;
 
 export type BaseStyle = "satellite" | "dark" | "terrain";

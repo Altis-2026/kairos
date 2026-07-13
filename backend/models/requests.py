@@ -367,3 +367,55 @@ class BriefingRequest(BaseModel):
         if not v or not v.strip():
             raise ValueError("area_name must not be empty")
         return v.strip()
+
+
+class AgentPlanRequest(BaseModel):
+
+    goal: str
+    viewport_bbox: Optional[List[float]] = None
+    history: Optional[List[ConversationTurn]] = None
+
+    @field_validator("goal")
+    @classmethod
+    def validate_goal(cls, v):
+        if not v or not v.strip():
+            raise ValueError("goal must not be empty")
+        if len(v) > 2000:
+            raise ValueError("goal must be under 2000 characters")
+        return v.strip()
+
+
+class AgentOutcome(BaseModel):
+
+    analysis_type: str
+    display_name: Optional[str] = None
+    location_name: Optional[str] = None
+    status: str
+    headline_label: Optional[str] = None
+    headline_value: Optional[float] = None
+    headline_unit: Optional[str] = None
+    data_date: Optional[str] = None
+    detail: Optional[str] = None
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v):
+        if v not in ("ok", "no_data", "failed"):
+            raise ValueError("status must be 'ok', 'no_data' or 'failed'")
+        return v
+
+
+class AgentReportRequest(BaseModel):
+
+    goal: str
+    plan_summary: Optional[str] = None
+    outcomes: List[AgentOutcome]
+
+    @field_validator("outcomes")
+    @classmethod
+    def cap_outcomes(cls, v):
+        if not v:
+            raise ValueError("a report needs at least one outcome")
+        if len(v) > 6:
+            return v[:6]
+        return v

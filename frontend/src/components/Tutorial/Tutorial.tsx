@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   FlaskConical,
   Landmark,
+  Bot,
   Layers,
   MessageSquare,
   MousePointerSquareDashed,
@@ -141,6 +142,17 @@ const STEPS: Step[] = [
       "“Kairos found this” tab.",
     tip: "Every feed item reruns as a live analysis when you click VIEW.",
     action: { label: "See the findings feed", run: openLiveWatch },
+  },
+  {
+    icon: <Bot size={20} />,
+    chip: "Agent mode",
+    title: "Give it a goal, not a question",
+    body:
+      "Open Agent mode and describe a mission like “find the newest " +
+      "deforestation across the Amazon this month.” Kairos plans several " +
+      "analyses, runs each one, shows its progress live, and writes back what " +
+      "it found across all of them.",
+    action: { label: "Open Agent mode", run: () => openPanel("agent") },
   },
   {
     icon: <Landmark size={20} />,

@@ -76,3 +76,41 @@ def extract_json(text: str) -> dict:
 def parse_query_response(text: str) -> ParsedQuery:
     data = extract_json(text)
     return ParsedQuery(**data)
+
+
+class MissionStep(BaseModel):
+
+    analysis_type: str
+    location_name: Optional[str] = None
+    bbox: List[float]
+    start_date: str
+    end_date: str
+    purpose: Optional[str] = None
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        checked = _check_bbox(v)
+        if checked is None:
+            raise ValueError("each mission step needs a bbox")
+        return checked
+
+
+class MissionPlan(BaseModel):
+
+    understood: bool
+    plan_summary: Optional[str] = None
+    steps: Optional[List[MissionStep]] = None
+    clarification: Optional[str] = None
+
+    @field_validator("steps")
+    @classmethod
+    def cap_steps(cls, v):
+        if v and len(v) > 4:
+            return v[:4]
+        return v
+
+
+def parse_mission_response(text: str) -> MissionPlan:
+    data = extract_json(text)
+    return MissionPlan(**data)

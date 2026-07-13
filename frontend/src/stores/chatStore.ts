@@ -5,6 +5,7 @@ export interface ChatMessage {
   role: "user" | "kairos";
   text: string;
   pending?: boolean;
+  reasoning?: string;
 }
 
 interface ChatState {
