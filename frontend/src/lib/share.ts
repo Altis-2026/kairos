@@ -55,8 +55,9 @@ export async function restoreFromHash(): Promise<void> {
   const ref = parseShareHash();
   if (!ref) return;
   restored = true;
-  // Clear the hash so a refresh doesn't keep re-triggering the run.
-  history.replaceState(null, "", location.pathname + location.search);
+  // Swap the hash for the plain app route so a refresh doesn't re-trigger
+  // the run (and doesn't bounce back out to the landing page).
+  history.replaceState(null, "", location.pathname + location.search + "#app");
 
   const chat = useChatStore.getState();
   const id = `restore-${Date.now()}`;

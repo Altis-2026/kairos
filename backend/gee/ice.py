@@ -23,7 +23,8 @@ def detect_sea_ice(bbox: list, start_date: str, end_date: str) -> dict:
         "(sea ice mapping requires EW-mode data, which ESA only acquires over polar regions)",
     )
 
-    composite = period.mean()
+    # EW scenes are 40 m native; a wider median kernel cleans the ice edge.
+    composite = common.despeckle(period.mean(), radius_m=100)
 
     # Ice vs open water: HH backscatter above -18 dB indicates ice
     ice_mask = composite.gt(-18).selfMask().clip(geometry)

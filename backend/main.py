@@ -40,6 +40,15 @@ async def lifespan(app: FastAPI):
         print(f"[kairos] GEE initialization FAILED: {e}")
         print("[kairos] Run: earthengine authenticate")
         raise
+
+    # Autonomous sweep: on a schedule, run analyses over active disaster zones
+    # (NASA EONET) and a global watchlist, and store noteworthy findings for
+    # the public /feed. Disable with FEED_SWEEP_ENABLED=0.
+    from watch import store as feed_store
+    from watch import sweeper as feed_sweeper
+
+    feed_store.init_db()
+    feed_sweeper.start_scheduler()
     yield
 
 app = FastAPI(
@@ -78,6 +87,9 @@ from api.impact import router as impact_router  # noqa: E402
 from api.events import router as events_router  # noqa: E402
 from api.alerts import router as alerts_router  # noqa: E402
 from api.interpret import router as interpret_router  # noqa: E402
+from api.feed import router as feed_router  # noqa: E402
+from api.validation import router as validation_router  # noqa: E402
+from api.waitlist import router as waitlist_router  # noqa: E402
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -90,6 +102,9 @@ app.include_router(impact_router)
 app.include_router(events_router)
 app.include_router(alerts_router)
 app.include_router(interpret_router)
+app.include_router(feed_router)
+app.include_router(validation_router)
+app.include_router(waitlist_router)
 
 
 @app.get("/health")

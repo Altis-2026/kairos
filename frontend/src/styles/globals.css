@@ -74,7 +74,59 @@ body,
   animation: scanline 1.8s linear infinite;
 }
 
+/* Visible keyboard focus, in the accent color */
+:focus-visible {
+  outline: 2px solid #e8a318;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Landing page: rotating radar sweep, blips, typewriter caret, starfield */
+@keyframes radar-spin {
+  to { transform: rotate(360deg); }
+}
+.radar-sweep {
+  background: conic-gradient(
+    from 0deg,
+    rgba(0, 191, 168, 0.45) 0deg,
+    rgba(0, 191, 168, 0.1) 42deg,
+    transparent 68deg
+  );
+  animation: radar-spin 5s linear infinite;
+}
+@keyframes radar-blip {
+  0%, 100% { opacity: 0.15; transform: scale(1); }
+  10% { opacity: 1; transform: scale(1.6); }
+  30% { opacity: 0.5; transform: scale(1); }
+}
+.radar-blip {
+  animation: radar-blip 5s ease-out infinite;
+}
+@keyframes caret-blink {
+  0%, 45% { opacity: 1; }
+  55%, 100% { opacity: 0; }
+}
+.typing-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: #00bfa8;
+  animation: caret-blink 1s steps(1) infinite;
+}
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+.star-twinkle {
+  animation: star-twinkle 3.5s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .scanline::after { animation: none; }
   .animate-pulse-soft { animation: none; }
+  .radar-sweep { animation: none; }
+  .radar-blip { animation: none; }
+  .star-twinkle { animation: none; }
 }
