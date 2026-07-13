@@ -189,9 +189,10 @@ ANALYSIS_REGISTRY = {
         "description": (
             "Surfaces ground undergoing slow, progressive change — sinking cities, "
             "over-pumped aquifers, reworked land. Fits a straight-line trend to each "
-            "pixel's VV backscatter over a long window and flags steep, consistent "
-            "drifts. An amplitude-trend proxy that highlights candidate zones for a "
-            "proper InSAR study, not millimetre InSAR displacement itself."
+            "pixel's VV backscatter, then screens it with the two tests real PSInSAR "
+            "uses to pick measurement points: amplitude-dispersion stability "
+            "(persistent scatterers) and temporal consistency. Highlights candidate "
+            "zones for a proper InSAR study, not millimetre displacement itself."
         ),
         "category": "Environmental",
         "data_sources": ["S1"],

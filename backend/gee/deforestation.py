@@ -34,7 +34,10 @@ def detect_deforestation(bbox: list, start_date: str, end_date: str) -> dict:
         baseline, "the 12-month historical baseline"
     )
 
-    diff = current.mean().subtract(baseline.mean())
+    # Multi-look both windows, despeckle, then difference (see common.despeckle)
+    diff = common.despeckle(current.mean()).subtract(
+        common.despeckle(baseline.mean())
+    )
 
     # Canopy loss: VH drop of more than 3 dB vs the annual baseline
     loss_mask = diff.lt(-3)
