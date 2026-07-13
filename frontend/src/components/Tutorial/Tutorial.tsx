@@ -6,10 +6,12 @@ import {
   ChevronRight,
   FileSpreadsheet,
   FlaskConical,
+  Landmark,
   Layers,
   MessageSquare,
   MousePointerSquareDashed,
   PanelRightOpen,
+  Radar,
   Radio,
   Satellite,
   Shield,
@@ -127,6 +129,28 @@ const STEPS: Step[] = [
       "Sentinel-1 pass and flags fresh detections in your Alerts panel, ideal for " +
       "monitoring a flood-prone region or a port.",
     action: { label: "Open alerts", run: () => openPanel("alerts") },
+  },
+  {
+    icon: <Radar size={20} />,
+    chip: "Unprompted",
+    title: "Kairos finds things on its own",
+    body:
+      "Every few hours the system sweeps active disasters and a watchlist of " +
+      "known hotspots, runs the radar analyses itself, and posts what it finds " +
+      "to a public feed. Nobody has to ask. Open Live Watch and check the " +
+      "“Kairos found this” tab.",
+    tip: "Every feed item reruns as a live analysis when you click VIEW.",
+    action: { label: "See the findings feed", run: openLiveWatch },
+  },
+  {
+    icon: <Landmark size={20} />,
+    chip: "My district",
+    title: "A dashboard for your district",
+    body:
+      "Pick your US congressional district and Kairos loads its real boundary " +
+      "as the analysis area. Run flood, crop, growth and subsidence checks " +
+      "inside it, then export the results as a printable briefing memo.",
+    action: { label: "Open My District", run: () => openPanel("district") },
   },
   {
     icon: <FileSpreadsheet size={20} />,
