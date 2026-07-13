@@ -1,0 +1,47 @@
+{
+  "name": "Kairos",
+  "short_name": "Kairos",
+  "description": "Ask the Earth a question, get a radar answer. Real Sentinel-1 satellite radar analysis on a 3D globe.",
+  "id": "/",
+  "start_url": "/#app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0B120E",
+  "theme_color": "#0B120E",
+  "categories": ["education", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live Watch",
+      "short_name": "Live Watch",
+      "description": "Active disasters worldwide right now",
+      "url": "/#watch",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Guardian",
+      "short_name": "Guardian",
+      "description": "Help vet possible illegal activity spotted from orbit",
+      "url": "/#guardian",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

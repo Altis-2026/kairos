@@ -27,9 +27,11 @@ def detect_oil_spill(bbox: list, start_date: str, end_date: str) -> dict:
 
     latest = ee.Image(period.sort("system:time_start", False).first())
 
-    # Restrict to ocean / permanent water
+    # Restrict to ocean / permanent water. Despeckle the single scene so
+    # isolated dark speckle pixels don't read as micro-slicks. (Slicks are
+    # extended features, so a median filter preserves them.)
     water = common.permanent_water_mask(50)
-    ocean_vv = latest.updateMask(water)
+    ocean_vv = common.despeckle(latest).updateMask(water)
 
     stats = ocean_vv.reduceRegion(
         reducer=ee.Reducer.mean().combine(ee.Reducer.stdDev(), sharedInputs=True),

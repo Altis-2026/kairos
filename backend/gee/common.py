@@ -96,6 +96,66 @@ def permanent_water_tile(geometry: ee.Geometry, occurrence_pct: int = 50) -> str
     return tile_url(water, {"palette": [WATER_BLUE], "min": 0, "max": 1})
 
 
+def despeckle(image: ee.Image, radius_m: int = 50) -> ee.Image:
+    """
+    Spatial speckle filter: focal median over a circular kernel (default 50 m,
+    following the UN-SPIDER recommended practice for Sentinel-1 flood mapping).
+
+    SAR composites carry salt-and-pepper speckle even after temporal
+    multi-looking (the .mean() over the window's scenes). A median kernel
+    suppresses isolated noise pixels while preserving flood/burn edges far
+    better than a mean would. Do NOT apply this to ship detection — vessels
+    are point targets a spatial filter would smear away.
+    """
+    return image.focalMedian(radius_m, "circle", "meters")
+
+
+def ensemble_area(
+    diff_image: ee.Image,
+    thresholds: list,
+    geometry: ee.Geometry,
+    band: str,
+    exclude_mask: ee.Image = None,
+    direction: str = "lt",
+    scale: int = 30,
+) -> dict:
+    """
+    Uncertainty quantification by threshold ensemble.
+
+    A detection that collapses when the dB threshold moves half a decibel was
+    never robust; one that barely moves is trustworthy. Runs the same detection
+    at each threshold and returns the areas, keyed by threshold, plus the
+    relative spread between the loosest and strictest members.
+
+    direction: 'lt' flags pixels below the threshold (floods, oil), 'gt' above
+    (burn scars, urban growth). exclude_mask pixels (e.g. permanent water) are
+    dropped from every ensemble member.
+    """
+    areas = {}
+    for t in thresholds:
+        mask = diff_image.lt(t) if direction == "lt" else diff_image.gt(t)
+        if exclude_mask is not None:
+            mask = mask.where(exclude_mask, 0)
+        mask = mask.selfMask().clip(geometry)
+        areas[t] = area_km2(mask, geometry, band=band, scale=scale)
+
+    values = list(areas.values())
+    low, high = min(values), max(values)
+    mid = sorted(values)[len(values) // 2]
+    spread = round((high - low) / mid, 3) if mid > 0 else 0.0
+    return {
+        "areas_by_threshold": {str(t): a for t, a in areas.items()},
+        "area_low_km2": low,
+        "area_high_km2": high,
+        "relative_spread": spread,
+    }
+
+
+def spread_penalty(spread: float, max_penalty: float = 0.25) -> float:
+    """Confidence penalty for threshold-fragile detections (spread from ensemble_area)."""
+    return min(max_penalty, max_penalty * spread)
+
+
 def tile_url(image: ee.Image, vis_params: dict) -> str:
     """Generate a Mapbox-compatible XYZ tile URL from a GEE image."""
     map_id = image.getMapId(vis_params)
