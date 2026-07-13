@@ -549,7 +549,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
         <div className="mx-auto max-w-5xl px-6 py-20 sm:px-10">
           <div className="flex items-center gap-2 font-mono text-[11px] tracking-[0.25em] text-amber">
             <Telescope size={13} />
-            COMING SOON
+            NOW IN EARLY ACCESS
           </div>
           <h2 className="mt-4 font-display text-2xl font-semibold sm:text-3xl">
             Meet Janus, your satellite research mentor
@@ -559,7 +559,8 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
             Bring any research question about the Earth and Janus works with you
             like a PhD scientist: it helps you read the literature, find and
             extract the right datasets, run rigorous analyses with Kairos, and
-            defend every conclusion you draw.
+            defend every conclusion you draw. Try it now inside Kairos (the
+            telescope icon), free while in early access.
           </p>
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             {JANUS_PILLARS.map((p, i) => (

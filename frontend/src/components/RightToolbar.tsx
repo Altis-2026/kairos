@@ -11,6 +11,7 @@ import {
   Map as MapIcon,
   Minus,
   Plus,
+  Telescope,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useMapStore } from "../stores/mapStore";
@@ -20,6 +21,7 @@ import ResearchPanel from "./Panels/ResearchPanel";
 import HistoryPanel from "./Panels/HistoryPanel";
 import BatchPanel from "./Panels/BatchPanel";
 import AlertsPanel from "./Panels/AlertsPanel";
+import JanusPanel from "./Janus/JanusPanel";
 
 function ToolButton({
   title,
@@ -47,7 +49,14 @@ function ToolButton({
 
 export default function RightToolbar() {
   const [openPanel, setOpenPanel] = useState<
-    "layers" | "analytics" | "research" | "history" | "batch" | "alerts" | null
+    | "layers"
+    | "analytics"
+    | "research"
+    | "history"
+    | "batch"
+    | "alerts"
+    | "janus"
+    | null
   >(null);
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
   const projection = useMapStore((s) => s.projection);
@@ -58,7 +67,15 @@ export default function RightToolbar() {
   // The tutorial's "Try it" buttons ask us to open a specific panel.
   useEffect(() => {
     if (!panelRequest) return;
-    const known = ["layers", "analytics", "research", "history", "batch", "alerts"];
+    const known = [
+      "layers",
+      "analytics",
+      "research",
+      "history",
+      "batch",
+      "alerts",
+      "janus",
+    ];
     if (known.includes(panelRequest)) {
       setOpenPanel(panelRequest as typeof openPanel);
     }
@@ -79,6 +96,16 @@ export default function RightToolbar() {
   return (
     <>
       <div className="absolute right-5 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel divide-y divide-line">
+        {/* Janus wears amber, not teal: mentor, not data. */}
+        <button
+          title="Janus — research mentor"
+          onClick={() => setOpenPanel(openPanel === "janus" ? null : "janus")}
+          className={`h-10 w-10 grid place-items-center transition-colors ${
+            openPanel === "janus" ? "text-amber" : "text-dim hover:text-amber"
+          }`}
+        >
+          <Telescope size={17} />
+        </button>
         <ToolButton
           title="Analytics"
           active={openPanel === "analytics"}
@@ -172,6 +199,7 @@ export default function RightToolbar() {
       {openPanel === "analytics" && (
         <AnalyticsPanel onClose={() => setOpenPanel(null)} />
       )}
+      {openPanel === "janus" && <JanusPanel onClose={() => setOpenPanel(null)} />}
     </>
   );
 }

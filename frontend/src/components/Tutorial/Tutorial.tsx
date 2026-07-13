@@ -24,6 +24,7 @@ import {
   Satellite,
   Shield,
   Sparkles,
+  Telescope,
   X,
 } from "lucide-react";
 import { useMapStore } from "../../stores/mapStore";
@@ -145,6 +146,18 @@ const STEPS: Step[] = [
       "Have many locations? Upload a CSV of areas and analysis types to run them " +
       "all at once, watch live progress, and export the results as a single CSV.",
     action: { label: "Open batch mode", run: () => openPanel("batch") },
+  },
+  {
+    icon: <Telescope size={20} />,
+    chip: "Mentor",
+    title: "Janus: research with a mentor",
+    body:
+      "Open the telescope icon to meet Janus. Bring it any question about the " +
+      "Earth and it works with you like a PhD advisor: it teaches the skills, " +
+      "designs the study with you, runs real analyses mid-conversation, finds " +
+      "actual papers, and pushes back on weak reasoning.",
+    tip: "Try a course like SAR Fundamentals, or start straight from your own question.",
+    action: { label: "Open Janus", run: () => openPanel("janus") },
   },
   {
     icon: <Shield size={20} />,

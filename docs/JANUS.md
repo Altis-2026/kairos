@@ -138,6 +138,14 @@ Deliberately thin on top of what already exists:
 
 ## 6. Launch sequence
 
+0. **SHIPPED — v1 mentor loop is live in the app** (`backend/janus/*`,
+   `api/janus.py`, the telescope panel in the frontend): persistent
+   projects, both curricula, study designer with saved designs, literature
+   companion (OpenAlex, real citations only), dataset scout, methods
+   critic (review mode), and live tool calls into run_analysis /
+   scene preview / ground-truth validation / human impact. Free while in
+   early access; per-turn model routing (Haiku for tutoring, Sonnet for
+   design/review) already in place.
 1. **Now:** waitlist live on the landing page (`/waitlist`, shipped) with
    the three-pillar teaser. Every signup logged durably.
 2. **Waitlist warm-up:** short demo clips (30-60s: "Janus designs a flood

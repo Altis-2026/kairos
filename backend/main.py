@@ -49,6 +49,11 @@ async def lifespan(app: FastAPI):
 
     feed_store.init_db()
     feed_sweeper.start_scheduler()
+
+    # Janus mentor project memory (SQLite; see backend/janus/store.py).
+    from janus import store as janus_store
+
+    janus_store.init_db()
     yield
 
 app = FastAPI(
@@ -90,6 +95,7 @@ from api.interpret import router as interpret_router  # noqa: E402
 from api.feed import router as feed_router  # noqa: E402
 from api.validation import router as validation_router  # noqa: E402
 from api.waitlist import router as waitlist_router  # noqa: E402
+from api.janus import router as janus_router  # noqa: E402
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -105,6 +111,7 @@ app.include_router(interpret_router)
 app.include_router(feed_router)
 app.include_router(validation_router)
 app.include_router(waitlist_router)
+app.include_router(janus_router)
 
 
 @app.get("/health")
