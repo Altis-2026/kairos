@@ -72,6 +72,15 @@ teach you how a scientist would answer it, then work with you until you have."
 - **Custom pipelines:** guided authoring of new analysis recipes (thresholds,
   bands, baselines) saved to the user's account, riding on the existing
   AnalysisRegistry pattern.
+- **Voice mode:** talk to Janus like an advisor in office hours instead of
+  typing. Push-to-talk in the mentor panel; Janus can also narrate a running
+  analysis out loud ("pulling the pre-flood baseline now, 14 scenes found")
+  so a student can watch the globe instead of reading a chat log. Session
+  transcripts still land in the project's text history, so nothing spoken is
+  lost to search or citation later. This is a v2 feature, not launch scope:
+  it needs the mentor loop itself proven out first, and it is the single
+  most expensive feature to run well, so it waits until subscription revenue
+  funds it.
 
 ### v3 — the moat
 - **Cohorts and classrooms:** teacher dashboards, assignment templates,
@@ -99,6 +108,14 @@ Deliberately thin on top of what already exists:
 - **Frontend:** a Janus panel in the existing app shell (same design
   system), plus a project view. The chat bar already exists; Janus is a mode
   of it, not a second app.
+- **Voice (v2):** browser mic capture streamed to a speech-to-text API
+  (OpenAI Whisper or Deepgram, picked at build time on latency/cost), text
+  goes through the same mentor pipeline and tool calls as typed chat so
+  there is no separate "voice brain," and the reply is spoken back with a
+  low-latency TTS API (ElevenLabs or OpenAI TTS). Turn-taking and interrupt
+  handling are the hard part, not the model call, so this gets its own spike
+  before being scoped into a release. Priced into the Researcher tier only
+  at first, since STT/TTS cost per minute dwarfs a text turn's token cost.
 - **System prompt:** a mentor persona with hard rules: never fabricate a
   citation, never state a detection as ground truth, always name the
   false-positive modes, push the student to answer before answering.
