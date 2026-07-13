@@ -15,7 +15,7 @@ actual numbers back to the student.
 
 import json
 
-from janus import catalog, curriculum, literature, store
+from janus import catalog, curriculum, knowledge, literature, store
 
 # OpenAI function-calling schemas, served to OpenRouter with every turn.
 TOOL_SCHEMAS = [
@@ -144,6 +144,44 @@ TOOL_SCHEMAS = [
                 "type": "object",
                 "properties": {"query": {"type": "string"}},
                 "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "explain_concept",
+            "description": (
+                "Look up a grounded SAR/remote-sensing physics primer "
+                "(backscatter, polarization, scattering mechanisms, speckle, "
+                "InSAR vs amplitude, revisit/modes, change-detection design, "
+                "optical vs radar), each citing real NASA/ESA/UN-SPIDER "
+                "resources. Use this to teach core physics accurately "
+                "rather than explaining from memory, especially in "
+                "sar-fundamentals sessions. Omit concept_id to search by "
+                "free text instead."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "concept_id": {
+                        "type": "string",
+                        "enum": [
+                            "backscatter",
+                            "polarization",
+                            "scattering-mechanisms",
+                            "speckle",
+                            "insar-vs-amplitude",
+                            "revisit-and-modes",
+                            "change-detection-design",
+                            "optical-vs-radar",
+                        ],
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Free-text search if concept_id is unknown",
+                    },
+                },
             },
         },
     },
@@ -387,6 +425,37 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                 "label": f"Dataset scout: {len(results)} matches",
                 "status": "ok",
                 "datasets": results,
+            }
+
+        if name == "explain_concept":
+            cid = args.get("concept_id")
+            if cid:
+                primer = knowledge.explain_concept(cid)
+                if "error" in primer:
+                    return primer, {
+                        "tool": name,
+                        "label": f"No primer for '{cid}'",
+                        "status": "empty",
+                    }
+                return primer, {
+                    "tool": name,
+                    "label": f"Grounded explainer: {primer['title']}",
+                    "status": "ok",
+                    "concept": primer,
+                }
+            query = args.get("query", "")
+            matches = knowledge.search_concepts(query) if query else []
+            if not matches:
+                return {"concepts": [], "available": knowledge.list_concepts()}, {
+                    "tool": name,
+                    "label": f"No grounded primer matched “{query}”",
+                    "status": "empty",
+                }
+            return {"concepts": matches}, {
+                "tool": name,
+                "label": f"Grounded explainer: {matches[0]['title']}",
+                "status": "ok",
+                "concept": matches[0],
             }
 
         if name == "run_ground_truth_validation":

@@ -37,11 +37,24 @@ export interface JanusPaper {
   abstract_snippet: string;
 }
 
+export interface ConceptResource {
+  name: string;
+  url: string;
+}
+
+export interface ConceptPrimer {
+  id?: string;
+  title: string;
+  explanation: string;
+  resources: ConceptResource[];
+}
+
 export interface ToolEvent {
   tool: string;
   label: string;
   status: "ok" | "empty" | "error";
   result?: AnalysisResult;
+  concept?: ConceptPrimer;
   papers?: JanusPaper[];
   datasets?: Record<string, string>[];
   design?: StudyDesign;
