@@ -176,6 +176,7 @@ function DesignCard({ design }: { design: StudyDesign }) {
 
 function EventChip({ event }: { event: ToolEvent }) {
   const [showPapers, setShowPapers] = useState(false);
+  const [showConcept, setShowConcept] = useState(false);
   const tone =
     event.status === "error"
       ? "text-[#FF3B5C] ring-[#FF3B5C]/30"
@@ -207,7 +208,36 @@ function EventChip({ event }: { event: ToolEvent }) {
             {showPapers ? "hide" : "view"}
           </button>
         )}
+        {event.concept && (
+          <button
+            onClick={() => setShowConcept(!showConcept)}
+            className="shrink-0 rounded-md bg-raised px-1.5 py-0.5 text-dim hover:text-ink transition"
+          >
+            {showConcept ? "hide" : "view"}
+          </button>
+        )}
       </div>
+      {showConcept && event.concept && (
+        <div className="rounded-lg bg-bg/60 ring-1 ring-line px-2.5 py-2 space-y-1.5">
+          <div className="text-[11px] leading-relaxed text-ink/90">
+            {event.concept.explanation}
+          </div>
+          <div className="flex flex-wrap gap-1.5 pt-0.5">
+            {event.concept.resources.map((r, i) => (
+              <a
+                key={i}
+                href={r.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 rounded-md bg-raised px-1.5 py-0.5 font-mono text-[9px] text-dim hover:text-teal transition"
+              >
+                {r.name}
+                <ExternalLink size={9} />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
       {showPapers && event.papers && (
         <div className="space-y-1.5 pl-1">
           {event.papers.map((p, i) => (
@@ -333,7 +363,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     <motion.aside
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
-      className="absolute right-20 top-1/2 -translate-y-1/2 z-30 w-[26rem] max-w-[calc(100vw-7rem)] max-h-[88vh] rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 flex flex-col gap-3"
+      className="absolute right-20 top-20 bottom-24 z-40 w-[26rem] max-w-[calc(100vw-7rem)] rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 flex flex-col gap-3"
     >
       {header}
 
