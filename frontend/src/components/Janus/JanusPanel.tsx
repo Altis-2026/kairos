@@ -72,6 +72,11 @@ const MODES: { id: JanusMode; label: string; hint: string }[] = [
   { id: "mentor", label: "Mentor", hint: "Teach me and think with me" },
   { id: "design", label: "Design", hint: "Lock down the study design" },
   { id: "review", label: "Review", hint: "Critique my work like a reviewer" },
+  {
+    id: "autopilot",
+    label: "Auto",
+    hint: "Describe a goal; Janus runs the whole investigation and reports back",
+  },
 ];
 
 /** Markdown-lite: ### headers, "- " bullets, blank-line paragraphs. */
@@ -989,7 +994,9 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
             {sending && (
               <div className="flex justify-start">
                 <div className="relative overflow-hidden scanline rounded-xl bg-bg/80 ring-1 ring-amber/30 px-3 py-2 font-mono text-[10px] text-amber">
-                  Janus is working — it may run analyses or search literature…
+                  {mode === "autopilot"
+                    ? "Autopilot running the full investigation — this can take a minute…"
+                    : "Janus is working — it may run analyses or search literature…"}
                 </div>
               </div>
             )}
@@ -1070,6 +1077,8 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                     ? "Describe what you want to study…"
                     : mode === "review"
                     ? "Paste a claim or draft for review…"
+                    : mode === "autopilot"
+                    ? "Describe a goal — e.g. “check if there was flooding near Dhaka last month and whether it's real”…"
                     : "Ask, answer, or think out loud…"
                 }
                 rows={2}

@@ -12,6 +12,8 @@ import {
   TrendingDown,
   Sprout,
   Pickaxe,
+  Wind,
+  Factory,
   type LucideIcon,
 } from "lucide-react";
 import type { AnalysisType } from "../../types/analysis";
@@ -29,6 +31,8 @@ const ICONS: Record<string, LucideIcon> = {
   "trending-down": TrendingDown,
   sprout: Sprout,
   pickaxe: Pickaxe,
+  wind: Wind,
+  factory: Factory,
 };
 
 export default function TaskCard({

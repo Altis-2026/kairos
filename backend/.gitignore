@@ -1,0 +1,4 @@
+
+# Local SQLite databases (feed, janus, waitlist)
+*.db
+kairos_*.db
