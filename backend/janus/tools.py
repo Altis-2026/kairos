@@ -108,6 +108,51 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "literature_review",
+            "description": (
+                "Run a small systematic literature review: give 3-5 related "
+                "search angles and Janus pools, dedupes and ranks the real "
+                "papers, returning the corpus plus its year span and the most-"
+                "cited work. Use this (not single search_literature) when the "
+                "student needs a literature review or a 'what's been done / "
+                "where's the gap' synthesis. Cite ONLY papers it returns."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "queries": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "3-5 complementary search phrases",
+                    },
+                    "year_from": {"type": "integer"},
+                },
+                "required": ["queries"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "format_citations",
+            "description": (
+                "Format the project's saved bibliography as a paste-ready "
+                "reference list in APA, AGU or IEEE style."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "style": {
+                        "type": "string",
+                        "enum": ["apa", "agu", "ieee"],
+                    }
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "save_reference",
             "description": (
                 "Save a paper (found via search_literature) into the "
@@ -386,7 +431,12 @@ TOOL_SCHEMAS = [
                 "properties": {
                     "curriculum_id": {
                         "type": "string",
-                        "enum": ["sar-fundamentals", "question-to-study"],
+                        "enum": [
+                            "sar-fundamentals",
+                            "question-to-study",
+                            "air-quality-from-space",
+                            "forests-and-carbon",
+                        ],
                     }
                 },
             },
@@ -511,6 +561,44 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                 "label": f"Found {len(papers)} papers for “{args['query']}”",
                 "status": "ok",
                 "papers": papers,
+            }
+
+        if name == "literature_review":
+            review = literature.systematic_review(
+                args.get("queries") or [], year_from=args.get("year_from")
+            )
+            if review["paper_count"] == 0:
+                return (
+                    {"papers": [], "note": "No papers found; say so, don't invent."},
+                    {
+                        "tool": name,
+                        "label": "Literature review: no results",
+                        "status": "empty",
+                    },
+                )
+            span = review.get("year_span")
+            span_txt = f" ({span[0]}-{span[1]})" if span else ""
+            return review, {
+                "tool": name,
+                "label": (
+                    f"Reviewed {review['paper_count']} papers across "
+                    f"{len(review['queries'])} searches{span_txt}"
+                ),
+                "status": "ok",
+                "papers": review["papers"],
+            }
+
+        if name == "format_citations":
+            from janus.citations import format_bibliography
+
+            result = format_bibliography(project_id, style=args.get("style", "apa"))
+            return result, {
+                "tool": name,
+                "label": (
+                    f"Formatted {result['count']} references ({result['style'].upper()})"
+                ),
+                "status": "ok",
+                "citations": result,
             }
 
         if name == "save_reference":

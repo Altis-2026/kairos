@@ -21,13 +21,15 @@ from ai.client import _get_client
 from janus import store
 from janus.tools import TOOL_SCHEMAS, execute_tool, parse_tool_args
 
-# Deep-reasoning turns (study design, methods review) escalate to Sonnet —
-# the per-turn routing decided in docs/JANUS.md §4.
+# Deep-reasoning turns (study design, methods review, autopilot) escalate to
+# Sonnet — the per-turn routing decided in docs/JANUS.md §4.
 MODEL_DEEP = "anthropic/claude-sonnet-4.6"
-_DEEP_MODES = {"design", "review"}
+_DEEP_MODES = {"design", "review", "autopilot"}
 
-# Safety bound on tool round-trips within one turn.
+# Safety bound on tool round-trips within one turn. Autopilot chains many
+# tools autonomously, so it gets a larger budget than an ordinary turn.
 MAX_TOOL_ROUNDS = 6
+AUTOPILOT_TOOL_ROUNDS = 14
 
 SYSTEM_PROMPT = """You are Janus, the research mentor inside Kairos, a satellite radar analysis platform. You work with the student the way a good PhD advisor would: you teach the craft of Earth-observation research and you push their thinking, but THEY do the research.
 
@@ -52,6 +54,7 @@ SYSTEM_PROMPT = """You are Janus, the research mentor inside Kairos, a satellite
 - mentor: everyday tutoring and discussion. If the project has a curriculum, teach the current session from get_curriculum, in order, ending with its exercise.
 - design: turn the student's interest into a testable design (hypothesis, AOI, windows, analysis types, confounders, validation plan). Persist every agreed element with update_study_design. Do not let a vague question through: sharpen it until it is falsifiable.
 - review: be the tough reviewer. Examine the design, the runs and the student's claims for overclaiming, missing confounders, baseline leakage, causal leaps and missing validation. Cite which numbers support or undercut each claim.
+- autopilot: the student described a goal in one message and wants you to CARRY OUT the whole investigation yourself, then report. Work autonomously through the chain without stopping to ask, unless the request is genuinely ambiguous about location or timeframe. A good autopilot run: pick the right analysis (list_analysis_types / search_datasets if unsure), confirm coverage (preview_scene_availability), run_analysis, then check_confounders on the result, run a validation if a benchmark fits, log_hypothesis for what you set out to test and update_hypothesis with the finding. Narrate each step as one short line as you go ("Checking Sentinel-1 coverage...", "Running flood detection...", "Testing rainfall as a confounder..."), then finish with a plain-language verdict that is honest about false positives and uncertainty. Never fabricate: if a step fails, say so and continue. End by telling the student they can export a reproducibility pack or ask for a peer review.
 
 ## Formatting
 Markdown-lite only: '### ' section headers, short paragraphs, '- ' bullets. No tables, no images, no em dashes.
@@ -126,8 +129,9 @@ def run_turn(project_id: int, user_message: str, mode: str = "mentor") -> dict:
 
     events = []
     reply = ""
+    rounds = AUTOPILOT_TOOL_ROUNDS if mode == "autopilot" else MAX_TOOL_ROUNDS
 
-    for _ in range(MAX_TOOL_ROUNDS + 1):
+    for _ in range(rounds + 1):
         response = client.chat.completions.create(
             model=model,
             max_tokens=1200,

@@ -126,13 +126,50 @@ and the panel.
   into every mentor turn so Janus teaches to the gaps and genuinely remembers
   who it's working with — the "it knows me" upgrade.
 
-### v4 — the moat (next)
+### v4 — beyond SAR, and hands-off autopilot (SHIPPED)
+
+The layer that makes Janus useful to people who don't care about radar at all,
+and lets a user just describe a goal and have it carried out.
+
+- **Multi-sensor expansion (3 new analyses):** the platform is no longer
+  radar-only. `forest_biomass` fuses ALOS PALSAR L-band radar (which
+  penetrates canopy, unlike Sentinel-1's C-band) with Sentinel-2 NDVI for an
+  above-ground-biomass estimate — a genuine two-sensor fusion. `methane` and
+  `air_quality` map Sentinel-5P/TROPOMI CH4 and NO2 columns, a completely
+  different modality (atmospheric composition) that opens climate and
+  pollution research. All three are ordinary registry entries, so they flow
+  through the sidebar, the chat, and every Janus tool automatically.
+- **Autopilot mode:** the student describes a goal in one message ("check if
+  there was flooding near Dhaka last month and whether it's real") and Janus
+  runs the whole investigation autonomously — pick analysis, check coverage,
+  run it, test confounders, validate if a benchmark fits, log the hypothesis,
+  and report an honest verdict — narrating each step. Larger tool budget (14
+  rounds), Sonnet-tier reasoning, gated to paid tiers (compute-heavy). Pairs
+  naturally with voice: describe it out loud, hear it work.
+- **Systematic literature review** (`literature.systematic_review`,
+  `literature_review` tool): multiple search angles pooled, deduped and ranked
+  by citation impact, with a year-span summary the mentor synthesizes into a
+  "what's been done / where's the gap" narrative — still citing only real
+  returned papers.
+- **Citation formatting** (`citations.py`, `format_citations` tool +
+  `GET .../citations`): the bibliography as a paste-ready reference list in
+  APA, AGU or IEEE.
+- **ARSET-modeled curricula:** two new teaching tracks — "Air Quality from
+  Space" and "Forests and Carbon" — modeled on NASA ARSET's real training
+  themes, each teaching the new data with live exercises.
+- **Earthdata plumbing** (`gee/earthdata.py`): reads `EARTHDATA_TOKEN` from the
+  environment (never hardcoded) and reports InSAR-readiness. The credential
+  path for future Sentinel-1 SLC / InSAR is wired; the interferometric
+  processor on dedicated compute remains the separate infrastructure build.
+
+### v5 — the moat (next)
+- **True InSAR:** a compute backend (SNAP/ISCE on Cloud Batch) pulling SLC
+  from ASF with the Earthdata token — the one item that needs real
+  infrastructure spend, not just a key.
 - **Cohorts and classrooms:** teacher dashboards, assignment templates,
   team projects (school license revenue).
 - **Janus-reviewed public gallery:** finished student projects published with
   reproducible links; the marketing engine and the credibility engine.
-- **Cross-domain packs:** curricula and dataset bundles per field
-  (public health, conservation, maritime, disaster risk).
 - **Proactive push notifications** and premium neural voice.
 - **Custom pipelines:** guided authoring of new analysis recipes saved to the
   user's account, riding on the AnalysisRegistry pattern.
