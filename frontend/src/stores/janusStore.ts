@@ -105,7 +105,11 @@ export const useJanusStore = create<JanusState>((set, get) => ({
     try {
       const bundle = await createProject(title, question, curriculumId);
       set((s) => ({
-        bundle: { ...bundle, insights: bundle.insights ?? [] },
+        bundle: {
+          ...bundle,
+          insights: bundle.insights ?? [],
+          hypotheses: bundle.hypotheses ?? [],
+        },
         projects: [bundle.project, ...s.projects],
         openingId: null,
       }));
@@ -145,6 +149,7 @@ export const useJanusStore = create<JanusState>((set, get) => ({
               messages: [...s.bundle.messages, turn.message],
               bibliography: turn.bibliography,
               insights: s.bundle.insights,
+              hypotheses: turn.hypotheses ?? s.bundle.hypotheses,
             }
           : s.bundle,
         projects: s.projects.map((p) =>

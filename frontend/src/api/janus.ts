@@ -36,6 +36,13 @@ export interface Insight {
   created_at: number;
 }
 
+export interface Skill {
+  skill: string;
+  level: "learning" | "practiced" | "confident";
+  note: string | null;
+  updated_at: number;
+}
+
 export interface Entitlements {
   tier: string;
   tier_name: string;
@@ -44,6 +51,17 @@ export interface Entitlements {
   project_cap: number | null;
   catalog: { id: string; name: string; price_usd_month: number; blurb: string }[];
   unread_insights: number;
+  skills: Skill[];
+}
+
+export interface Hypothesis {
+  id: number;
+  project_id: number;
+  statement: string;
+  status: "open" | "supported" | "refuted" | "inconclusive";
+  evidence: string | null;
+  created_at: number;
+  updated_at: number;
 }
 
 export interface StudyDesign {
@@ -79,6 +97,19 @@ export interface ConceptPrimer {
   resources: ConceptResource[];
 }
 
+export interface ConfounderFinding {
+  variable: string;
+  finding: string;
+  concern: "high" | "some" | "low";
+}
+
+export interface ConfounderReport {
+  analysis_type: string;
+  measurements: Record<string, unknown>;
+  findings: ConfounderFinding[];
+  overall_concern: "high" | "some" | "low";
+}
+
 export interface ToolEvent {
   tool: string;
   label: string;
@@ -89,6 +120,8 @@ export interface ToolEvent {
   datasets?: Record<string, string>[];
   design?: StudyDesign;
   validation?: Record<string, unknown>;
+  confounders?: ConfounderReport;
+  hypothesis?: Hypothesis;
 }
 
 export interface JanusMessage {
@@ -160,6 +193,7 @@ export interface ProjectBundle {
   messages: JanusMessage[];
   bibliography: Reference[];
   insights: Insight[];
+  hypotheses: Hypothesis[];
 }
 
 export function createProject(
@@ -195,6 +229,7 @@ export interface ChatTurn {
   message: JanusMessage;
   project: JanusProject;
   bibliography: Reference[];
+  hypotheses: Hypothesis[];
 }
 
 export function sendChat(
@@ -229,16 +264,22 @@ export function dismissInsight(insightId: number): Promise<{ dismissed: boolean 
   return apiFetch(`/janus/insights/${insightId}/dismiss`, { method: "POST" });
 }
 
-/** Build the reproducibility-pack download URL (auth via owner query param). */
-export function packUrl(projectId: number): string {
-  return `${API_BASE}/janus/projects/${projectId}/pack?owner=${encodeURIComponent(
-    janusOwner()
-  )}`;
+function slugify(title: string): string {
+  return (
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 50) || "project"
+  );
 }
 
-/** Fetch the pack and trigger a browser download, keeping the owner param. */
-export async function downloadPack(projectId: number, title: string) {
-  const res = await fetch(packUrl(projectId));
+/** Fetch a document endpoint and trigger a browser download. */
+async function downloadDoc(path: string, filename: string) {
+  const sep = path.includes("?") ? "&" : "?";
+  const res = await fetch(
+    `${API_BASE}${path}${sep}owner=${encodeURIComponent(janusOwner())}`
+  );
   if (!res.ok) {
     let detail = `Export failed (${res.status})`;
     try {
@@ -253,15 +294,32 @@ export async function downloadPack(projectId: number, title: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  const slug =
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 50) || "project";
-  a.download = `kairos-research-pack-${slug}.md`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/** Download the Markdown reproducibility pack. */
+export function downloadPack(projectId: number, title: string) {
+  return downloadDoc(
+    `/janus/projects/${projectId}/pack`,
+    `kairos-research-pack-${slugify(title)}.md`
+  );
+}
+
+/** Download the runnable Python Earth Engine script. */
+export function downloadNotebook(projectId: number, title: string) {
+  return downloadDoc(
+    `/janus/projects/${projectId}/notebook`,
+    `kairos_reproduce_${slugify(title).replace(/-/g, "_")}.py`
+  );
+}
+
+/** Generate a peer-review report (Markdown string) for the project. */
+export function fetchPeerReview(projectId: number): Promise<{ markdown: string }> {
+  return apiFetch(
+    `/janus/projects/${projectId}/review?owner=${encodeURIComponent(janusOwner())}`
+  );
 }
