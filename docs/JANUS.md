@@ -60,27 +60,46 @@ teach you how a scientist would answer it, then work with you until you have."
 - **Project memory:** each research project is a persistent thread: question,
   design, runs, readings, drafts, critiques. Resumable for months.
 
-### v2 — the researcher's power tools
-- **Reproducibility pack:** one click exports a project's full method trail
-  (every analysis, parameter, date, dataset version) as a methods-section
-  draft plus a shareable Kairos case link. Reviewers can re-run everything.
-- **Validation coach:** wires the user's claims to the ground-truth
-  validation endpoints (IoU / precision / recall against Global Flood
-  Database, MCD64A1, Hansen) and teaches what the numbers mean.
-- **Writing reviewer:** critiques drafts for overclaiming, missing caveats,
-  and unsupported causal language. Reviews, does not write.
-- **Custom pipelines:** guided authoring of new analysis recipes (thresholds,
-  bands, baselines) saved to the user's account, riding on the existing
-  AnalysisRegistry pattern.
-- **Voice mode:** talk to Janus like an advisor in office hours instead of
-  typing. Push-to-talk in the mentor panel; Janus can also narrate a running
-  analysis out loud ("pulling the pre-flood baseline now, 14 scenes found")
-  so a student can watch the globe instead of reading a chat log. Session
-  transcripts still land in the project's text history, so nothing spoken is
-  lost to search or citation later. This is a v2 feature, not launch scope:
-  it needs the mentor loop itself proven out first, and it is the single
-  most expensive feature to run well, so it waits until subscription revenue
-  funds it.
+### v2 — the researcher's power tools + the "feels alive" layer
+
+**SHIPPED (backend/janus/ + the panel):**
+- **Reproducibility pack** (`reproducibility.py`, `GET /janus/projects/{id}/pack`):
+  one click exports a project's full method trail as a Markdown research
+  pack — question, study design, every analysis run with its exact
+  parameters and imagery date, ground-truth validation results, the
+  annotated bibliography, reproducible Kairos case links, and an honest
+  limitations footer. Everything is reconstructed from stored tool events,
+  so it cannot claim a run that did not happen.
+- **Proactive monitoring** (`proactive.py`, the Watch toggle): a project can
+  be put on WATCH. On a schedule (and instantly when toggled on), Janus
+  checks for a fresh Sentinel-1 pass over the study area since the last
+  analysis and, when one lands, surfaces an insight banner — "Janus noticed
+  a new pass on <date>, want me to re-run and compare?" — with a one-click
+  re-run. This is the highest-leverage "feels like a real AI" upgrade:
+  Janus acts without being prompted. Deliberately cheap (scene-date checks,
+  not full analyses) and opt-in.
+- **Voice mode** (`lib/voice.ts`): push-to-talk dictation and read-aloud
+  replies, built on the browser Web Speech API, so it costs nothing and
+  needs no API key. Everything spoken still lands in the project's text
+  history for search and citation. (Premium neural TTS — ElevenLabs / OpenAI
+  TTS — is the documented upgrade path; the client-side version is the
+  zero-cost foundation.)
+- **Entitlements / paid gating** (`entitlements.py`, `GET /janus/entitlements`):
+  the tier → feature map is real and enforced today (project caps, feature
+  gates return HTTP 402). The default tier is a generous "early access" that
+  unlocks everything free, so the launch feels unlimited while the gates
+  quietly exist, ready for Stripe.
+- **Validation coach:** the mentor's `run_ground_truth_validation` tool +
+  review mode already teach IoU/precision/recall against the benchmark suite.
+
+**Still v2 backlog:**
+- **Writing reviewer as a distinct surface** (review mode covers it
+  conversationally today; a dedicated draft-critique view is the next step).
+- **Custom pipelines:** guided authoring of new analysis recipes saved to
+  the user's account, riding on the AnalysisRegistry pattern.
+- **Premium neural voice** and proactive **push notifications** (email/web
+  push when a watched project gets a new insight, so Janus reaches out even
+  when the app is closed).
 
 ### v3 — the moat
 - **Cohorts and classrooms:** teacher dashboards, assignment templates,
@@ -177,3 +196,47 @@ Deliberately thin on top of what already exists:
   every DOI/arXiv ID it emits before display.
 - **Scope creep:** v1 ships the mentor loop only. No figure generation, no
   manuscript writing, no LMS integrations until the loop retains users.
+
+## 9. What YOU need to provide to turn it all on
+
+Everything below is already wired in code; these are the inputs only you can
+supply. Nothing here blocks the free early-access experience — that works the
+moment the backend is deployed with the existing keys.
+
+**Required for Janus to respond at all (already have it):**
+- `OPENROUTER_API_KEY` — the same key the chat already uses. Janus reuses it.
+  No new AI account needed.
+
+**Required for the live analysis / monitoring tools (already have it):**
+- The existing Google Earth Engine service-account credentials. Janus's
+  run_analysis, scene-preview, validation and proactive-watch tools all ride
+  the same GEE setup Kairos already uses. No new cloud project needed.
+
+**Optional, to tune behavior (have sensible defaults):**
+- `OPENALEX_MAILTO` — an email for the OpenAlex "polite pool" (faster
+  literature search). Defaults to the project email.
+- `FRONTEND_ORIGIN` — your deployed app URL, so reproducibility-pack links
+  point at the real site instead of the placeholder.
+- `JANUS_WATCH_ENABLED` (default on) and `JANUS_WATCH_INTERVAL_HOURS`
+  (default 12) — the proactive-monitoring scheduler.
+
+**Needed later, to charge money (NOT needed for early access):**
+- A Stripe account + `STRIPE_SECRET_KEY` and a webhook. The tier→feature
+  gates already exist (`entitlements.py`); a successful checkout just needs
+  to call `store.set_tier(owner, tier)`. Until then, everyone is on the free
+  "early access" tier that unlocks everything, which is exactly what you want
+  for launch.
+
+**Needed before real paid launch (not a key, a decision):**
+- Move project state and the waitlist off SQLite (ephemeral on Cloud Run)
+  onto Firestore or Cloud SQL. This is an afternoon of work when you're
+  ready; flagged so it doesn't surprise you.
+
+**Optional premium upgrade (money, later):**
+- An ElevenLabs or OpenAI TTS key if you want studio-quality spoken replies
+  instead of the free built-in browser voice. Purely a polish upgrade for
+  the paid tier; the free voice already works.
+
+In short: with the keys you already have, deploy and the entire v1+v2
+experience is live and free. The only genuinely new thing you must obtain,
+and only when you decide to start charging, is a Stripe account.
