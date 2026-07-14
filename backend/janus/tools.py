@@ -277,6 +277,104 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "check_confounders",
+            "description": (
+                "Actually test a detection's false-positive modes. Pulls real "
+                "rainfall (CHIRPS), wind (ERA5) and land cover (WorldCover) for "
+                "the AOI and dates and judges whether a confounder plausibly "
+                "explains the signal (e.g. did rain wet the ground before a "
+                "'flood', was wind too low so calm sea mimics an 'oil slick', is "
+                "it cropland whose harvest mimics 'clearing'). Run this whenever "
+                "you interpret a detection the student cares about. Slow (~20 s)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "analysis_type": {"type": "string"},
+                    "bbox": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "minItems": 4,
+                        "maxItems": 4,
+                    },
+                    "start_date": {"type": "string"},
+                    "end_date": {"type": "string"},
+                },
+                "required": ["analysis_type", "bbox", "start_date", "end_date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "log_hypothesis",
+            "description": (
+                "Record a hypothesis in the project's research log once the "
+                "student commits to one. Keep it a single falsifiable statement."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "statement": {"type": "string"},
+                    "evidence": {
+                        "type": "string",
+                        "description": "Optional initial note on evidence so far",
+                    },
+                },
+                "required": ["statement"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_hypothesis",
+            "description": (
+                "Update a logged hypothesis after evidence comes in: set its "
+                "status and add a note on what supported or undercut it. Use the "
+                "hypothesis id from the research log in project context."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "hypothesis_id": {"type": "integer"},
+                    "status": {
+                        "type": "string",
+                        "enum": ["open", "supported", "refuted", "inconclusive"],
+                    },
+                    "evidence": {"type": "string"},
+                },
+                "required": ["hypothesis_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "record_skill",
+            "description": (
+                "Note a research skill the student has just demonstrated or is "
+                "learning, so you can teach adaptively across all their "
+                "projects. Use sparingly, for real milestones (e.g. 'reading a "
+                "change-detection result', 'choosing a non-leaky baseline')."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "skill": {"type": "string"},
+                    "level": {
+                        "type": "string",
+                        "enum": ["learning", "practiced", "confident"],
+                    },
+                    "note": {"type": "string"},
+                },
+                "required": ["skill", "level"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_curriculum",
             "description": (
                 "Fetch a teaching curriculum (or the list of all curricula "
@@ -519,6 +617,60 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                 "label": "Study design updated",
                 "status": "ok",
                 "design": project["design"],
+            }
+
+        if name == "check_confounders":
+            from gee.confounders import analyze_confounders
+
+            report = analyze_confounders(
+                analysis_type=args["analysis_type"],
+                bbox=args["bbox"],
+                start_date=args["start_date"],
+                end_date=args["end_date"],
+            )
+            return report, {
+                "tool": name,
+                "label": (
+                    f"Confounder check: {report['overall_concern']} concern of "
+                    "a false-positive driver"
+                ),
+                "status": "ok",
+                "confounders": report,
+            }
+
+        if name == "log_hypothesis":
+            hyp = store.add_hypothesis(
+                project_id, args["statement"], evidence=args.get("evidence")
+            )
+            return {"hypothesis": hyp}, {
+                "tool": name,
+                "label": f"Logged hypothesis: {args['statement'][:70]}",
+                "status": "ok",
+                "hypothesis": hyp,
+            }
+
+        if name == "update_hypothesis":
+            hyp = store.update_hypothesis(
+                args["hypothesis_id"],
+                status=args.get("status"),
+                evidence=args.get("evidence"),
+            )
+            return {"hypothesis": hyp}, {
+                "tool": name,
+                "label": f"Hypothesis now: {hyp['status']}",
+                "status": "ok",
+                "hypothesis": hyp,
+            }
+
+        if name == "record_skill":
+            owner = store.get_project(project_id)["owner"]
+            saved = store.record_skill(
+                owner, args["skill"], args["level"], note=args.get("note")
+            )
+            return {"skill": saved}, {
+                "tool": name,
+                "label": f"Skill noted: {args['skill']} ({args['level']})",
+                "status": "ok",
             }
 
         if name == "get_curriculum":

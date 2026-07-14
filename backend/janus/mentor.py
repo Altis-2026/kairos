@@ -44,6 +44,9 @@ SYSTEM_PROMPT = """You are Janus, the research mentor inside Kairos, a satellite
 4. CHECK BEFORE DESIGNING: Use preview_scene_availability before committing a study to an AOI/date window, and search_datasets rather than guessing about data.
 5. Confirm parameters with the student before calling run_analysis (it is slow and paints their globe). Exception: they already stated them or asked you to just run it.
 6. GROUNDED PHYSICS: When explaining core SAR physics (backscatter, polarization, scattering mechanisms, speckle, InSAR vs amplitude, revisit/modes, change-detection design, optical vs radar), call explain_concept rather than explaining from memory. It returns a reviewed primer citing NASA ARSET, ASF, ESA/Copernicus, UN-SPIDER or NISAR. Weave its explanation into your own words for the student's level, then name the resource so a curious student can go deeper on the primary source.
+7. TEST CONFOUNDERS, DON'T JUST NAME THEM: after running a detection the student cares about, call check_confounders to actually pull the rainfall/wind/land-cover evidence and report whether a false-positive driver is plausibly in play. Real evidence beats a generic warning.
+8. KEEP THE RESEARCH LOG: when the student commits to a hypothesis, log_hypothesis it; when evidence arrives, update_hypothesis with the new status and why. The log is the backbone of their eventual write-up.
+9. REMEMBER THE STUDENT: when they clearly demonstrate or grasp a research skill, record_skill it. Read the skills profile in context and teach to their gaps rather than repeating what they already know.
 
 ## Modes (set per message by the student)
 - mentor: everyday tutoring and discussion. If the project has a curriculum, teach the current session from get_curriculum, in order, ending with its exercise.
@@ -68,13 +71,32 @@ def _project_context(project: dict) -> str:
             f"Curriculum: {project['curriculum_id']}, current session index: "
             f"{project.get('curriculum_session', 0)} (0-based)"
         )
-    design = project.get("design") or {}
+    design = {k: v for k, v in (project.get("design") or {}).items() if k != "last_run"}
     if design:
         lines.append("Current study design: " + json.dumps(design))
     biblio = store.get_bibliography(project["id"])
     if biblio:
         titles = "; ".join(b["title"] for b in biblio[-8:])
         lines.append(f"Bibliography so far: {titles}")
+
+    # The research log: hypotheses with ids so the mentor can update them.
+    hyps = store.get_hypotheses(project["id"])
+    if hyps:
+        lines.append(
+            "Research log (hypotheses): "
+            + "; ".join(
+                f"#{h['id']} [{h['status']}] {h['statement']}" for h in hyps
+            )
+        )
+
+    # The cross-project skills profile — the mentor's memory of this student.
+    skills = store.get_skills(project["owner"])
+    if skills:
+        lines.append(
+            "Student skills so far (across all their projects): "
+            + "; ".join(f"{s['skill']} ({s['level']})" for s in skills[:12])
+            + ". Teach to the gaps; don't re-explain what they're confident in."
+        )
     return "\n".join(lines)
 
 
@@ -167,6 +189,7 @@ def run_turn(project_id: int, user_message: str, mode: str = "mentor") -> dict:
         "message": saved,
         "project": store.get_project(project_id),
         "bibliography": store.get_bibliography(project_id),
+        "hypotheses": store.get_hypotheses(project_id),
     }
 
 

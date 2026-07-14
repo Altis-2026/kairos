@@ -94,6 +94,36 @@ def init_db():
             )
             """
         )
+        # v3: the research log — structured hypotheses with an evolving status
+        # and the evidence tied to each, turning the chat into a notebook.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS hypotheses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                statement TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'open',
+                evidence TEXT,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            )
+            """
+        )
+        # v3: per-owner skills profile Janus maintains across ALL projects, so
+        # it teaches adaptively and remembers what you already know.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS skills (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner TEXT NOT NULL,
+                skill TEXT NOT NULL,
+                level TEXT NOT NULL DEFAULT 'learning',
+                note TEXT,
+                updated_at REAL NOT NULL,
+                UNIQUE(owner, skill)
+            )
+            """
+        )
         # v2: per-owner subscription tier (billing wired later; see
         # janus/entitlements.py). Absence means the default early-access tier.
         conn.execute(
@@ -206,6 +236,7 @@ def delete_project(project_id: int):
         conn.execute("DELETE FROM messages WHERE project_id = ?", (project_id,))
         conn.execute("DELETE FROM bibliography WHERE project_id = ?", (project_id,))
         conn.execute("DELETE FROM insights WHERE project_id = ?", (project_id,))
+        conn.execute("DELETE FROM hypotheses WHERE project_id = ?", (project_id,))
         conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
         conn.commit()
 
@@ -412,3 +443,97 @@ def set_tier(owner: str, tier: str):
             (owner, tier, time.time()),
         )
         conn.commit()
+
+
+# --- hypotheses (the research log) ------------------------------------------
+
+_HYP_STATUSES = {"open", "supported", "refuted", "inconclusive"}
+
+
+def add_hypothesis(project_id: int, statement: str, evidence: str = None) -> dict:
+    now = time.time()
+    with _lock, _connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO hypotheses (project_id, statement, status, evidence, "
+            "created_at, updated_at) VALUES (?, ?, 'open', ?, ?, ?)",
+            (project_id, statement, evidence, now, now),
+        )
+        conn.commit()
+        hid = int(cur.lastrowid)
+    return get_hypothesis(hid)
+
+
+def get_hypothesis(hypothesis_id: int) -> dict:
+    with _lock, _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM hypotheses WHERE id = ?", (hypothesis_id,)
+        ).fetchone()
+    if not row:
+        raise ValueError(f"Hypothesis {hypothesis_id} not found.")
+    return dict(row)
+
+
+def update_hypothesis(
+    hypothesis_id: int, status: str = None, evidence: str = None
+) -> dict:
+    sets, values = [], []
+    if status is not None:
+        if status not in _HYP_STATUSES:
+            raise ValueError(
+                f"Invalid status '{status}'. Use one of {sorted(_HYP_STATUSES)}."
+            )
+        sets.append("status = ?")
+        values.append(status)
+    if evidence is not None:
+        sets.append("evidence = ?")
+        values.append(evidence)
+    if sets:
+        sets.append("updated_at = ?")
+        values.append(time.time())
+        values.append(hypothesis_id)
+        with _lock, _connect() as conn:
+            conn.execute(
+                f"UPDATE hypotheses SET {', '.join(sets)} WHERE id = ?", values
+            )
+            conn.commit()
+    return get_hypothesis(hypothesis_id)
+
+
+def get_hypotheses(project_id: int) -> list:
+    with _lock, _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM hypotheses WHERE project_id = ? ORDER BY created_at ASC",
+            (project_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# --- skills profile (per owner, across all projects) ------------------------
+
+_SKILL_LEVELS = {"learning", "practiced", "confident"}
+
+
+def record_skill(owner: str, skill: str, level: str, note: str = None) -> dict:
+    if level not in _SKILL_LEVELS:
+        level = "learning"
+    now = time.time()
+    with _lock, _connect() as conn:
+        conn.execute(
+            "INSERT INTO skills (owner, skill, level, note, updated_at) "
+            "VALUES (?, ?, ?, ?, ?) ON CONFLICT(owner, skill) DO UPDATE SET "
+            "level = excluded.level, note = excluded.note, "
+            "updated_at = excluded.updated_at",
+            (owner, skill, level, note, now),
+        )
+        conn.commit()
+    return {"owner": owner, "skill": skill, "level": level, "note": note}
+
+
+def get_skills(owner: str) -> list:
+    with _lock, _connect() as conn:
+        rows = conn.execute(
+            "SELECT skill, level, note, updated_at FROM skills WHERE owner = ? "
+            "ORDER BY updated_at DESC",
+            (owner,),
+        ).fetchall()
+    return [dict(r) for r in rows]
