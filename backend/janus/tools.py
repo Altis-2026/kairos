@@ -347,6 +347,19 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                 start_date=args["start_date"],
                 end_date=args["end_date"],
             )
+            # Remember this run so proactive monitoring knows what to watch
+            # over this AOI and from which imagery date onward.
+            store.record_last_run(
+                project_id,
+                {
+                    "analysis_type": result.get("analysis_type"),
+                    "display_name": result.get("display_name"),
+                    "bbox": result.get("bbox"),
+                    "start_date": result.get("start_date"),
+                    "end_date": result.get("end_date"),
+                    "data_date": result.get("data_date"),
+                },
+            )
             hs = result.get("headline_stat") or {}
             return _slim_result(result), {
                 "tool": name,

@@ -78,6 +78,39 @@ def init_db():
             )
             """
         )
+        # v2: proactive insights the mentor surfaces without being asked.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS insights (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                content TEXT NOT NULL,
+                dedupe_key TEXT,
+                action TEXT,
+                dismissed INTEGER DEFAULT 0,
+                created_at REAL NOT NULL,
+                UNIQUE(project_id, dedupe_key)
+            )
+            """
+        )
+        # v2: per-owner subscription tier (billing wired later; see
+        # janus/entitlements.py). Absence means the default early-access tier.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS plans (
+                owner TEXT PRIMARY KEY,
+                tier TEXT NOT NULL,
+                updated_at REAL NOT NULL
+            )
+            """
+        )
+        # v2: monitoring flag added to an existing table — migrate in place.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(projects)")}
+        if "watched" not in cols:
+            conn.execute(
+                "ALTER TABLE projects ADD COLUMN watched INTEGER DEFAULT 0"
+            )
         conn.commit()
 
 
@@ -130,7 +163,14 @@ def list_projects(owner: str) -> list:
 
 def update_project(project_id: int, **fields) -> dict:
     """Update whitelisted columns; design dicts are merged, not replaced."""
-    allowed = {"title", "question", "stage", "curriculum_id", "curriculum_session"}
+    allowed = {
+        "title",
+        "question",
+        "stage",
+        "curriculum_id",
+        "curriculum_session",
+        "watched",
+    }
     sets, values = [], []
     design_patch = fields.pop("design", None)
 
@@ -165,8 +205,31 @@ def delete_project(project_id: int):
     with _lock, _connect() as conn:
         conn.execute("DELETE FROM messages WHERE project_id = ?", (project_id,))
         conn.execute("DELETE FROM bibliography WHERE project_id = ?", (project_id,))
+        conn.execute("DELETE FROM insights WHERE project_id = ?", (project_id,))
         conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
         conn.commit()
+
+
+def record_last_run(project_id: int, run: dict):
+    """
+    Stash the most recent real analysis (type, bbox, dates, data_date) on the
+    project so proactive monitoring knows what to re-check and from when.
+    Kept inside `design` so no schema change is needed.
+    """
+    update_project(project_id, design={"last_run": run})
+
+
+def all_watched_projects() -> list:
+    with _lock, _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM projects WHERE watched = 1"
+        ).fetchall()
+    out = []
+    for row in rows:
+        p = dict(row)
+        p["design"] = json.loads(p["design"] or "{}")
+        out.append(p)
+    return out
 
 
 # --- messages ---------------------------------------------------------------
@@ -265,3 +328,87 @@ def get_bibliography(project_id: int) -> list:
             (project_id,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# --- proactive insights -----------------------------------------------------
+
+
+def add_insight(
+    project_id: int,
+    kind: str,
+    content: str,
+    dedupe_key: str = None,
+    action: dict = None,
+) -> bool:
+    """Store a proactive note. dedupe_key stops the same insight recurring."""
+    with _lock, _connect() as conn:
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO insights (project_id, kind, content, "
+            "dedupe_key, action, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                project_id,
+                kind,
+                content,
+                dedupe_key,
+                json.dumps(action) if action else None,
+                time.time(),
+            ),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def get_insights(project_id: int, include_dismissed: bool = False) -> list:
+    query = "SELECT * FROM insights WHERE project_id = ?"
+    if not include_dismissed:
+        query += " AND dismissed = 0"
+    query += " ORDER BY created_at DESC"
+    with _lock, _connect() as conn:
+        rows = conn.execute(query, (project_id,)).fetchall()
+    out = []
+    for row in rows:
+        i = dict(row)
+        i["action"] = json.loads(i["action"]) if i["action"] else None
+        out.append(i)
+    return out
+
+
+def dismiss_insight(insight_id: int):
+    with _lock, _connect() as conn:
+        conn.execute(
+            "UPDATE insights SET dismissed = 1 WHERE id = ?", (insight_id,)
+        )
+        conn.commit()
+
+
+def unread_insight_count(owner: str) -> int:
+    """Total live insights across all of an owner's projects (for the badge)."""
+    with _lock, _connect() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM insights i JOIN projects p "
+            "ON i.project_id = p.id WHERE p.owner = ? AND i.dismissed = 0",
+            (owner,),
+        ).fetchone()
+        return int(row["n"])
+
+
+# --- plans / entitlements ---------------------------------------------------
+
+
+def get_tier(owner: str) -> str | None:
+    with _lock, _connect() as conn:
+        row = conn.execute(
+            "SELECT tier FROM plans WHERE owner = ?", (owner,)
+        ).fetchone()
+    return row["tier"] if row else None
+
+
+def set_tier(owner: str, tier: str):
+    with _lock, _connect() as conn:
+        conn.execute(
+            "INSERT INTO plans (owner, tier, updated_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(owner) DO UPDATE SET tier = excluded.tier, "
+            "updated_at = excluded.updated_at",
+            (owner, tier, time.time()),
+        )
+        conn.commit()
