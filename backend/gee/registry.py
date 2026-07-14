@@ -22,6 +22,8 @@ from gee.subsidence import detect_subsidence
 from gee.urban import detect_urban_growth
 from gee.agriculture import monitor_crops
 from gee.mining import detect_land_disturbance
+from gee.biomass import estimate_biomass
+from gee.atmosphere import detect_methane, monitor_air_quality
 
 ANALYSIS_REGISTRY = {
     "flood_extent": {
@@ -260,6 +262,63 @@ ANALYSIS_REGISTRY = {
         "icon": "pickaxe",
         "sar_polarization": "VH",
         "instrument_mode": "IW",
+    },
+    "forest_biomass": {
+        "function": estimate_biomass,
+        "display_name": "Forest Biomass & Structure",
+        "description": (
+            "Estimates above-ground forest biomass by fusing two satellites. "
+            "ALOS PALSAR L-band radar penetrates the canopy and scatters off "
+            "trunks and branches (its HV return rises with woody biomass), and "
+            "Sentinel-2 optical NDVI confirms the pixels are genuinely live "
+            "vegetation. A rough saturating proxy in Mg/ha, not a calibrated "
+            "inventory: L-band saturates over the densest tropical forest."
+        ),
+        "category": "Environmental",
+        "data_sources": ["PALSAR", "S2"],
+        "estimated_seconds": 35,
+        "output_type": "raster",
+        "color_palette": ["#2E8B3D"],
+        "icon": "trees",
+        "sar_polarization": "HV",
+        "instrument_mode": "PALSAR",
+    },
+    "methane": {
+        "function": detect_methane,
+        "display_name": "Methane Monitoring",
+        "description": (
+            "Maps the methane column from Sentinel-5P (TROPOMI) and flags "
+            "enhancement zones well above the local background — candidate "
+            "emission areas like oil and gas fields, landfills and wetlands. "
+            "Coarse (~7 km) and column-integrated, so it finds regional "
+            "enhancements, not a single smokestack."
+        ),
+        "category": "Environmental",
+        "data_sources": ["S5P"],
+        "estimated_seconds": 20,
+        "output_type": "raster",
+        "color_palette": ["#00BFA8"],
+        "icon": "wind",
+        "sar_polarization": None,
+        "instrument_mode": "TROPOMI",
+    },
+    "air_quality": {
+        "function": monitor_air_quality,
+        "display_name": "Air Quality (NO2)",
+        "description": (
+            "Maps tropospheric nitrogen dioxide from Sentinel-5P (TROPOMI), a "
+            "marker of combustion from traffic, power plants and industry, and "
+            "flags pollution hotspots above the local mean. Column-integrated "
+            "and ~7 km, so it reads city- and region-scale pollution patterns."
+        ),
+        "category": "Environmental",
+        "data_sources": ["S5P"],
+        "estimated_seconds": 20,
+        "output_type": "raster",
+        "color_palette": ["#E8A318"],
+        "icon": "factory",
+        "sar_polarization": None,
+        "instrument_mode": "TROPOMI",
     },
 }
 

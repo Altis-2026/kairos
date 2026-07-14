@@ -152,7 +152,7 @@ export interface Curriculum {
   sessions: string[];
 }
 
-export type JanusMode = "mentor" | "design" | "review";
+export type JanusMode = "mentor" | "design" | "review" | "autopilot";
 
 const OWNER_KEY = "kairos_janus_owner";
 

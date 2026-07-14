@@ -58,7 +58,9 @@ class UpdateProjectRequest(BaseModel):
 class ChatRequest(BaseModel):
     owner: str = Field(min_length=1, max_length=128)
     message: str = Field(min_length=1, max_length=4000)
-    mode: str = Field(default="mentor", pattern="^(mentor|design|review)$")
+    mode: str = Field(
+        default="mentor", pattern="^(mentor|design|review|autopilot)$"
+    )
 
 
 class WatchRequest(BaseModel):
@@ -78,7 +80,12 @@ def _owned_project(project_id: int, owner: str) -> dict:
 
 @router.get("/janus/status")
 def janus_status():
-    return {"available": bool(os.getenv("OPENROUTER_API_KEY"))}
+    from gee import earthdata
+
+    return {
+        "available": bool(os.getenv("OPENROUTER_API_KEY")),
+        "earthdata": earthdata.status(),
+    }
 
 
 @router.get("/janus/entitlements")
@@ -182,6 +189,11 @@ def chat(project_id: int, request: ChatRequest):
                 "(OPENROUTER_API_KEY). The rest of Kairos works without it."
             ),
         )
+    if request.mode == "autopilot":
+        try:
+            entitlements.require(request.owner, "autopilot")
+        except entitlements.FeatureLocked as e:
+            raise HTTPException(status_code=402, detail=str(e))
     try:
         return run_turn(project_id, request.message, mode=request.mode)
     except HTTPException:
@@ -274,6 +286,19 @@ def peer_review(
         return {"markdown": review_report.build_review(project_id)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Review failed: {e}")
+
+
+@router.get("/janus/projects/{project_id}/citations")
+def citations(
+    project_id: int,
+    owner: str = Query(..., min_length=1, max_length=128),
+    style: str = Query(default="apa", pattern="^(apa|agu|ieee)$"),
+):
+    """The project's bibliography formatted in a chosen citation style."""
+    _owned_project(project_id, owner)
+    from janus.citations import format_bibliography
+
+    return format_bibliography(project_id, style=style)
 
 
 @router.post("/janus/insights/{insight_id}/dismiss")
