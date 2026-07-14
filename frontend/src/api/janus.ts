@@ -1,5 +1,5 @@
 /** Typed client for the Janus mentor API. */
-import { apiFetch } from "./client";
+import { apiFetch, API_BASE } from "./client";
 import { useAuthStore } from "../stores/authStore";
 import type { AnalysisResult } from "../types/analysis";
 
@@ -12,8 +12,38 @@ export interface JanusProject {
   curriculum_id: string | null;
   curriculum_session: number;
   design: StudyDesign;
+  watched: number;
   created_at: number;
   updated_at: number;
+}
+
+export interface InsightAction {
+  type: string;
+  analysis_type?: string;
+  bbox?: [number, number, number, number];
+  start_date?: string;
+  end_date?: string;
+  label?: string;
+}
+
+export interface Insight {
+  id: number;
+  project_id: number;
+  kind: string;
+  content: string;
+  action: InsightAction | null;
+  dismissed: number;
+  created_at: number;
+}
+
+export interface Entitlements {
+  tier: string;
+  tier_name: string;
+  blurb: string;
+  features: string[];
+  project_cap: number | null;
+  catalog: { id: string; name: string; price_usd_month: number; blurb: string }[];
+  unread_insights: number;
 }
 
 export interface StudyDesign {
@@ -117,6 +147,10 @@ export function fetchCurricula(): Promise<{ curricula: Curriculum[] }> {
   return apiFetch("/janus/curricula");
 }
 
+export function fetchEntitlements(): Promise<Entitlements> {
+  return apiFetch(`/janus/entitlements?owner=${encodeURIComponent(janusOwner())}`);
+}
+
 export function listProjects(): Promise<{ projects: JanusProject[] }> {
   return apiFetch(`/janus/projects?owner=${encodeURIComponent(janusOwner())}`);
 }
@@ -125,6 +159,7 @@ export interface ProjectBundle {
   project: JanusProject;
   messages: JanusMessage[];
   bibliography: Reference[];
+  insights: Insight[];
 }
 
 export function createProject(
@@ -171,4 +206,62 @@ export function sendChat(
     method: "POST",
     body: JSON.stringify({ owner: janusOwner(), message, mode }),
   });
+}
+
+export interface WatchResult {
+  project: JanusProject;
+  new_insight: boolean;
+  insights?: Insight[];
+  check_error?: string;
+}
+
+export function toggleWatch(
+  projectId: number,
+  watch: boolean
+): Promise<WatchResult> {
+  return apiFetch(`/janus/projects/${projectId}/watch`, {
+    method: "POST",
+    body: JSON.stringify({ owner: janusOwner(), watch }),
+  });
+}
+
+export function dismissInsight(insightId: number): Promise<{ dismissed: boolean }> {
+  return apiFetch(`/janus/insights/${insightId}/dismiss`, { method: "POST" });
+}
+
+/** Build the reproducibility-pack download URL (auth via owner query param). */
+export function packUrl(projectId: number): string {
+  return `${API_BASE}/janus/projects/${projectId}/pack?owner=${encodeURIComponent(
+    janusOwner()
+  )}`;
+}
+
+/** Fetch the pack and trigger a browser download, keeping the owner param. */
+export async function downloadPack(projectId: number, title: string) {
+  const res = await fetch(packUrl(projectId));
+  if (!res.ok) {
+    let detail = `Export failed (${res.status})`;
+    try {
+      const body = await res.json();
+      if (typeof body.detail === "string") detail = body.detail;
+    } catch {
+      /* non-JSON */
+    }
+    throw new Error(detail);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const slug =
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 50) || "project";
+  a.download = `kairos-research-pack-${slug}.md`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }

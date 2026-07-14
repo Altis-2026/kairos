@@ -6,12 +6,17 @@ import { create } from "zustand";
 import {
   createProject,
   deleteProject,
+  dismissInsight,
   fetchCurricula,
+  fetchEntitlements,
   fetchJanusStatus,
   getProject,
   listProjects,
   sendChat,
+  toggleWatch,
   type Curriculum,
+  type Entitlements,
+  type Insight,
   type JanusMessage,
   type JanusMode,
   type ProjectBundle,
@@ -20,12 +25,14 @@ import {
 
 interface JanusState {
   available: boolean | null;
+  entitlements: Entitlements | null;
   projects: JanusProject[];
   curricula: Curriculum[];
   bundle: ProjectBundle | null;
   loadingHome: boolean;
   openingId: number | null;
   sending: boolean;
+  watchBusy: boolean;
   error: string | null;
 
   loadHome: () => Promise<void>;
@@ -36,6 +43,8 @@ interface JanusState {
     curriculumId: string | null
   ) => Promise<void>;
   send: (message: string, mode: JanusMode) => Promise<void>;
+  setWatch: (watch: boolean) => Promise<void>;
+  dismiss: (insightId: number) => Promise<void>;
   backToList: () => void;
   remove: (id: number) => Promise<void>;
   clearError: () => void;
@@ -43,26 +52,30 @@ interface JanusState {
 
 export const useJanusStore = create<JanusState>((set, get) => ({
   available: null,
+  entitlements: null,
   projects: [],
   curricula: [],
   bundle: null,
   loadingHome: false,
   openingId: null,
   sending: false,
+  watchBusy: false,
   error: null,
 
   loadHome: async () => {
     set({ loadingHome: true, error: null });
     try {
-      const [status, projects, curricula] = await Promise.all([
+      const [status, projects, curricula, entitlements] = await Promise.all([
         fetchJanusStatus(),
         listProjects(),
         fetchCurricula(),
+        fetchEntitlements().catch(() => null),
       ]);
       set({
         available: status.available,
         projects: projects.projects,
         curricula: curricula.curricula,
+        entitlements,
         loadingHome: false,
       });
     } catch (e) {
@@ -92,7 +105,7 @@ export const useJanusStore = create<JanusState>((set, get) => ({
     try {
       const bundle = await createProject(title, question, curriculumId);
       set((s) => ({
-        bundle,
+        bundle: { ...bundle, insights: bundle.insights ?? [] },
         projects: [bundle.project, ...s.projects],
         openingId: null,
       }));
@@ -131,6 +144,7 @@ export const useJanusStore = create<JanusState>((set, get) => ({
               project: turn.project,
               messages: [...s.bundle.messages, turn.message],
               bibliography: turn.bibliography,
+              insights: s.bundle.insights,
             }
           : s.bundle,
         projects: s.projects.map((p) =>
@@ -143,6 +157,51 @@ export const useJanusStore = create<JanusState>((set, get) => ({
         error:
           e instanceof Error ? e.message : "The mentor turn failed. Try again.",
       });
+    }
+  },
+
+  setWatch: async (watch) => {
+    const { bundle } = get();
+    if (!bundle || get().watchBusy) return;
+    set({ watchBusy: true, error: null });
+    try {
+      const res = await toggleWatch(bundle.project.id, watch);
+      set((s) => ({
+        watchBusy: false,
+        bundle: s.bundle
+          ? {
+              ...s.bundle,
+              project: res.project,
+              insights: res.insights ?? s.bundle.insights,
+            }
+          : s.bundle,
+        projects: s.projects.map((p) =>
+          p.id === res.project.id ? res.project : p
+        ),
+      }));
+    } catch (e) {
+      set({
+        watchBusy: false,
+        error:
+          e instanceof Error ? e.message : "Couldn't change monitoring.",
+      });
+    }
+  },
+
+  dismiss: async (insightId) => {
+    // Optimistic removal; the row is only hidden, never deleted server-side.
+    set((s) => ({
+      bundle: s.bundle
+        ? {
+            ...s.bundle,
+            insights: s.bundle.insights.filter((i: Insight) => i.id !== insightId),
+          }
+        : s.bundle,
+    }));
+    try {
+      await dismissInsight(insightId);
+    } catch {
+      /* non-fatal: it reappears on next load if the call failed */
     }
   },
 

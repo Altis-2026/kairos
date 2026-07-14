@@ -50,10 +50,13 @@ async def lifespan(app: FastAPI):
     feed_store.init_db()
     feed_sweeper.start_scheduler()
 
-    # Janus mentor project memory (SQLite; see backend/janus/store.py).
+    # Janus mentor project memory (SQLite; see backend/janus/store.py) and
+    # the proactive monitoring scheduler (opt-in via JANUS_WATCH_ENABLED).
     from janus import store as janus_store
+    from janus import proactive as janus_proactive
 
     janus_store.init_db()
+    janus_proactive.start_scheduler()
     yield
 
 app = FastAPI(

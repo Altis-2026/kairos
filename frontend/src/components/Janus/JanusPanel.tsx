@@ -18,26 +18,43 @@ import {
   ChevronDown,
   ChevronLeft,
   ClipboardList,
+  Download,
   ExternalLink,
   Globe2,
   GraduationCap,
   Loader2,
+  Mic,
   Plus,
+  RadioTower,
+  Sparkles,
   ScrollText,
   Telescope,
   Trash2,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import { useJanusStore } from "../../stores/janusStore";
 import { applyResultToGlobe } from "../../lib/applyResult";
+import { downloadPack } from "../../api/janus";
 import { timeAgo } from "../../api/feed";
+import {
+  isSpeechSupported,
+  isTTSSupported,
+  speak,
+  startDictation,
+  stopSpeaking,
+} from "../../lib/voice";
 import type {
+  Insight,
   JanusMessage,
   JanusMode,
   JanusProject,
   StudyDesign,
   ToolEvent,
 } from "../../api/janus";
+
+const VOICE_OUT_KEY = "kairos_janus_voice_out";
 
 const STAGES: JanusProject["stage"][] = [
   "exploring",
@@ -294,20 +311,64 @@ function MessageBubble({ m }: { m: JanusMessage }) {
   );
 }
 
+function InsightBanner({
+  insight,
+  onAct,
+  onDismiss,
+}: {
+  insight: Insight;
+  onAct: (insight: Insight) => void;
+  onDismiss: (id: number) => void;
+}) {
+  return (
+    <div className="rounded-xl bg-amber/10 ring-1 ring-amber/40 px-3 py-2.5 space-y-2">
+      <div className="flex items-start gap-2">
+        <RadioTower size={13} className="mt-0.5 shrink-0 text-amber animate-pulse-soft" />
+        <div className="flex-1 text-[11px] leading-relaxed text-ink/90">
+          <span className="font-mono text-[9px] tracking-[0.18em] text-amber uppercase">
+            Janus noticed
+          </span>
+          <p className="mt-0.5">{insight.content}</p>
+        </div>
+        <button
+          onClick={() => onDismiss(insight.id)}
+          title="Dismiss"
+          className="shrink-0 text-dim hover:text-ink transition"
+        >
+          <X size={12} />
+        </button>
+      </div>
+      {insight.action?.label && (
+        <button
+          onClick={() => onAct(insight)}
+          className="w-full h-8 flex items-center justify-center gap-1.5 rounded-lg bg-amber text-bg text-[11px] font-medium hover:brightness-110 transition"
+        >
+          <Sparkles size={11} />
+          {insight.action.label}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function JanusPanel({ onClose }: { onClose: () => void }) {
   const {
     available,
+    entitlements,
     projects,
     curricula,
     bundle,
     loadingHome,
     openingId,
     sending,
+    watchBusy,
     error,
     loadHome,
     open,
     startProject,
     send,
+    setWatch,
+    dismiss,
     backToList,
     remove,
     clearError,
@@ -317,7 +378,22 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<JanusMode>("mentor");
   const [newQuestion, setNewQuestion] = useState("");
   const [showBiblio, setShowBiblio] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [voiceOut, setVoiceOut] = useState(() => {
+    try {
+      return localStorage.getItem(VOICE_OUT_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   const endRef = useRef<HTMLDivElement>(null);
+  const dictationRef = useRef<{ stop: () => void } | null>(null);
+  const spokenRef = useRef<number | null>(null);
+
+  const voiceInAvailable = isSpeechSupported();
+  const voiceOutAvailable = isTTSSupported();
+  const watched = !!bundle?.project.watched;
 
   useEffect(() => {
     if (!bundle) void loadHome();
@@ -328,11 +404,90 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [bundle?.messages.length, sending]);
 
+  // Read new mentor replies aloud when voice output is on. Guarded by message
+  // id so re-renders don't re-speak, and so we never speak the loaded history.
+  useEffect(() => {
+    if (!voiceOut || !bundle || sending) return;
+    const msgs = bundle.messages;
+    const last = msgs[msgs.length - 1];
+    if (!last || last.role !== "assistant") return;
+    if (spokenRef.current === last.id) return;
+    spokenRef.current = last.id;
+    speak(last.content);
+  }, [bundle?.messages, voiceOut, sending, bundle]);
+
+  // Stop any audio / mic when the panel unmounts.
+  useEffect(() => {
+    return () => {
+      stopSpeaking();
+      dictationRef.current?.stop();
+    };
+  }, []);
+
   function submit() {
     const text = draft.trim();
     if (!text || sending) return;
     setDraft("");
     void send(text, mode);
+  }
+
+  function toggleVoiceOut() {
+    const next = !voiceOut;
+    setVoiceOut(next);
+    if (!next) stopSpeaking();
+    try {
+      localStorage.setItem(VOICE_OUT_KEY, next ? "1" : "0");
+    } catch {
+      /* private mode */
+    }
+  }
+
+  function toggleMic() {
+    if (listening) {
+      dictationRef.current?.stop();
+      return;
+    }
+    stopSpeaking();
+    const handle = startDictation({
+      onInterim: (text) => setDraft(text),
+      onFinal: (text) => setDraft(text),
+      onError: () => setListening(false),
+      onEnd: () => {
+        setListening(false);
+        dictationRef.current = null;
+      },
+    });
+    if (handle) {
+      dictationRef.current = handle;
+      setListening(true);
+    }
+  }
+
+  async function exportPack() {
+    if (!bundle || exporting) return;
+    setExporting(true);
+    try {
+      await downloadPack(bundle.project.id, bundle.project.title);
+    } catch (e) {
+      useJanusStore.setState({
+        error: e instanceof Error ? e.message : "Export failed.",
+      });
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function actOnInsight(insight: Insight) {
+    const action = insight.action;
+    if (!action) return;
+    dismiss(insight.id);
+    // Keep the mentor in the loop: ask it to re-run and interpret, rather than
+    // silently dropping a raster on the globe. It has the params in context.
+    const label = action.label || "the suggested analysis";
+    void send(
+      `Yes, please ${label.toLowerCase()} and tell me what changed since last time.`,
+      "mentor"
+    );
   }
 
   function startFromQuestion() {
@@ -349,13 +504,23 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
         <Telescope size={13} className="text-amber" />
         JANUS · RESEARCH MENTOR
       </div>
-      <button
-        onClick={onClose}
-        className="text-dim hover:text-ink transition-colors"
-        title="Close"
-      >
-        <X size={15} />
-      </button>
+      <div className="flex items-center gap-2">
+        {entitlements && (
+          <span
+            title={entitlements.blurb}
+            className="rounded-md bg-amber/10 ring-1 ring-amber/30 px-1.5 py-0.5 font-mono text-[9px] tracking-wider text-amber"
+          >
+            {entitlements.tier_name.toUpperCase()}
+          </span>
+        )}
+        <button
+          onClick={onClose}
+          className="text-dim hover:text-ink transition-colors"
+          title="Close"
+        >
+          <X size={15} />
+        </button>
+      </div>
     </div>
   );
 
@@ -499,6 +664,39 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
               </div>
               <StagePips stage={bundle.project.stage} />
             </div>
+            <button
+              onClick={() => setWatch(!watched)}
+              disabled={watchBusy}
+              title={
+                watched
+                  ? "Monitoring on: Janus checks for new Sentinel-1 passes"
+                  : "Watch this study area for new satellite passes"
+              }
+              className={`flex items-center gap-1 rounded-lg px-2 py-1 font-mono text-[10px] ring-1 transition disabled:opacity-50 ${
+                watched
+                  ? "text-amber ring-amber/40 bg-amber/10"
+                  : "text-dim ring-line hover:text-ink"
+              }`}
+            >
+              {watchBusy ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <RadioTower size={11} />
+              )}
+              {watched ? "Watching" : "Watch"}
+            </button>
+            <button
+              onClick={exportPack}
+              disabled={exporting}
+              title="Export a reproducibility pack (Markdown)"
+              className="flex items-center gap-1 rounded-lg px-2 py-1 font-mono text-[10px] ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+            >
+              {exporting ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <Download size={11} />
+              )}
+            </button>
             {bundle.bibliography.length > 0 && (
               <button
                 onClick={() => setShowBiblio(!showBiblio)}
@@ -514,6 +712,19 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
               </button>
             )}
           </div>
+
+          {bundle.insights.length > 0 && (
+            <div className="space-y-2">
+              {bundle.insights.map((ins) => (
+                <InsightBanner
+                  key={ins.id}
+                  insight={ins}
+                  onAct={actOnInsight}
+                  onDismiss={dismiss}
+                />
+              ))}
+            </div>
+          )}
 
           <DesignCard design={bundle.project.design} />
 
@@ -568,7 +779,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
           )}
 
           <div className="space-y-2">
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
               {MODES.map((m) => (
                 <button
                   key={m.id}
@@ -583,8 +794,39 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                   {m.label.toUpperCase()}
                 </button>
               ))}
+              {voiceOutAvailable && (
+                <button
+                  onClick={toggleVoiceOut}
+                  title={
+                    voiceOut
+                      ? "Voice replies on: Janus reads answers aloud"
+                      : "Voice replies off"
+                  }
+                  className={`h-7 w-7 shrink-0 grid place-items-center rounded-lg ring-1 transition ${
+                    voiceOut
+                      ? "bg-amber/15 text-amber ring-amber/40"
+                      : "text-dim ring-line hover:text-ink"
+                  }`}
+                >
+                  {voiceOut ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                </button>
+              )}
             </div>
             <div className="flex items-end gap-2">
+              {voiceInAvailable && (
+                <button
+                  onClick={toggleMic}
+                  disabled={sending}
+                  title={listening ? "Stop dictation" : "Speak your message"}
+                  className={`h-9 w-9 shrink-0 grid place-items-center rounded-xl ring-1 transition disabled:opacity-50 ${
+                    listening
+                      ? "bg-[#FF3B5C]/15 text-[#FF3B5C] ring-[#FF3B5C]/40 animate-pulse-soft"
+                      : "text-dim ring-line hover:text-ink"
+                  }`}
+                >
+                  <Mic size={14} />
+                </button>
+              )}
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
@@ -595,7 +837,9 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                   }
                 }}
                 placeholder={
-                  mode === "design"
+                  listening
+                    ? "Listening…"
+                    : mode === "design"
                     ? "Describe what you want to study…"
                     : mode === "review"
                     ? "Paste a claim or draft for review…"
