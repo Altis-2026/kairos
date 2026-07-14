@@ -92,22 +92,50 @@ teach you how a scientist would answer it, then work with you until you have."
 - **Validation coach:** the mentor's `run_ground_truth_validation` tool +
   review mode already teach IoU/precision/recall against the benchmark suite.
 
-**Still v2 backlog:**
-- **Writing reviewer as a distinct surface** (review mode covers it
-  conversationally today; a dedicated draft-critique view is the next step).
-- **Custom pipelines:** guided authoring of new analysis recipes saved to
-  the user's account, riding on the AnalysisRegistry pattern.
-- **Premium neural voice** and proactive **push notifications** (email/web
-  push when a watched project gets a new insight, so Janus reaches out even
-  when the app is closed).
+### v3 — the research power tools (SHIPPED)
 
-### v3 — the moat
+The layer that pushes Janus from "a mentor" toward "can almost do anything"
+for satellite research. All in `backend/janus/*`, `backend/gee/confounders.py`,
+and the panel.
+
+- **Automated confounder analysis** (`gee/confounders.py`, `check_confounders`
+  tool): the honest-radar ethos made computational. After a detection, Janus
+  pulls the real environmental variables that drive each false positive —
+  CHIRPS rainfall, ERA5 wind, ESA WorldCover land cover — for the exact AOI
+  and dates, and judges whether a confounder is plausibly in play ("48 mm of
+  rain fell in the 5 days before your flood window", "wind was 2 m/s, calm
+  enough to mimic an oil slick without oil"). It TESTS the confounders it used
+  to only warn about.
+- **Reproducible code export** (`notebook.py`, `GET .../notebook`): emits a
+  runnable Python earthengine-api script that reproduces every analysis in the
+  project from scratch. A researcher pastes it into Colab, authenticates their
+  own EE account, and gets the same maps and numbers independently of Kairos —
+  the strongest form of "show your work".
+- **Research log / hypothesis tracker** (`hypotheses` table, `log_hypothesis`
+  / `update_hypothesis` tools): structured hypotheses with an evolving status
+  (open → supported / refuted / inconclusive) and the evidence tied to each.
+  The chat becomes a real research notebook; it feeds the pack and the review.
+- **Peer-review report** (`review_report.py`, `GET .../review`): a formal
+  mock-reviewer assessment of the WHOLE project against a fixed rubric
+  (summary, strengths, threats to validity, required/suggested revisions, a
+  verdict), generated from the facts on record and downloadable. Students
+  pressure-test their work before a human sees it. Deterministic checklist
+  fallback when no AI provider is set.
+- **Adaptive skills memory** (`skills` table, `record_skill` tool): a
+  per-student skills profile that persists across ALL their projects, injected
+  into every mentor turn so Janus teaches to the gaps and genuinely remembers
+  who it's working with — the "it knows me" upgrade.
+
+### v4 — the moat (next)
 - **Cohorts and classrooms:** teacher dashboards, assignment templates,
   team projects (school license revenue).
 - **Janus-reviewed public gallery:** finished student projects published with
   reproducible links; the marketing engine and the credibility engine.
 - **Cross-domain packs:** curricula and dataset bundles per field
   (public health, conservation, maritime, disaster risk).
+- **Proactive push notifications** and premium neural voice.
+- **Custom pipelines:** guided authoring of new analysis recipes saved to the
+  user's account, riding on the AnalysisRegistry pattern.
 
 ## 4. Architecture
 
