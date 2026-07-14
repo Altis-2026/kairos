@@ -1,7 +1,8 @@
 /** Tiny typed fetch wrapper for the Kairos API. */
 
-export const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+export const API_BASE = (
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+).replace(/\/+$/, "");
 
 export class ApiError extends Error {
   status: number;

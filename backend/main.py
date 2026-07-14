@@ -66,15 +66,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+def _normalize_origin(origin: str) -> str:
+    """CORS origin matching is exact; strip trailing slashes for consistency."""
+    return origin.strip().rstrip("/")
+
+
 allowed_origins = [
-    "http://localhost:5173",   # Vite dev server
-    "http://localhost:4173",   # Vite preview build
-    "https://openkairos.vercel.app/",
+    _normalize_origin("http://localhost:5173"),   # Vite dev server
+    _normalize_origin("http://localhost:4173"),   # Vite preview build
+    _normalize_origin("https://openkairos.vercel.app"),
 ]
 # Production frontend origin, set via env when deployed
 prod_origin = os.getenv("FRONTEND_ORIGIN")
 if prod_origin:
-    allowed_origins.append(prod_origin)
+    allowed_origins.append(_normalize_origin(prod_origin))
 
 app.add_middleware(
     CORSMiddleware,
