@@ -108,6 +108,51 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "literature_review",
+            "description": (
+                "Run a small systematic literature review: give 3-5 related "
+                "search angles and Janus pools, dedupes and ranks the real "
+                "papers, returning the corpus plus its year span and the most-"
+                "cited work. Use this (not single search_literature) when the "
+                "student needs a literature review or a 'what's been done / "
+                "where's the gap' synthesis. Cite ONLY papers it returns."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "queries": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "3-5 complementary search phrases",
+                    },
+                    "year_from": {"type": "integer"},
+                },
+                "required": ["queries"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "format_citations",
+            "description": (
+                "Format the project's saved bibliography as a paste-ready "
+                "reference list in APA, AGU or IEEE style."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "style": {
+                        "type": "string",
+                        "enum": ["apa", "agu", "ieee"],
+                    }
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "save_reference",
             "description": (
                 "Save a paper (found via search_literature) into the "
@@ -277,6 +322,104 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "check_confounders",
+            "description": (
+                "Actually test a detection's false-positive modes. Pulls real "
+                "rainfall (CHIRPS), wind (ERA5) and land cover (WorldCover) for "
+                "the AOI and dates and judges whether a confounder plausibly "
+                "explains the signal (e.g. did rain wet the ground before a "
+                "'flood', was wind too low so calm sea mimics an 'oil slick', is "
+                "it cropland whose harvest mimics 'clearing'). Run this whenever "
+                "you interpret a detection the student cares about. Slow (~20 s)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "analysis_type": {"type": "string"},
+                    "bbox": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "minItems": 4,
+                        "maxItems": 4,
+                    },
+                    "start_date": {"type": "string"},
+                    "end_date": {"type": "string"},
+                },
+                "required": ["analysis_type", "bbox", "start_date", "end_date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "log_hypothesis",
+            "description": (
+                "Record a hypothesis in the project's research log once the "
+                "student commits to one. Keep it a single falsifiable statement."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "statement": {"type": "string"},
+                    "evidence": {
+                        "type": "string",
+                        "description": "Optional initial note on evidence so far",
+                    },
+                },
+                "required": ["statement"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_hypothesis",
+            "description": (
+                "Update a logged hypothesis after evidence comes in: set its "
+                "status and add a note on what supported or undercut it. Use the "
+                "hypothesis id from the research log in project context."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "hypothesis_id": {"type": "integer"},
+                    "status": {
+                        "type": "string",
+                        "enum": ["open", "supported", "refuted", "inconclusive"],
+                    },
+                    "evidence": {"type": "string"},
+                },
+                "required": ["hypothesis_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "record_skill",
+            "description": (
+                "Note a research skill the student has just demonstrated or is "
+                "learning, so you can teach adaptively across all their "
+                "projects. Use sparingly, for real milestones (e.g. 'reading a "
+                "change-detection result', 'choosing a non-leaky baseline')."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "skill": {"type": "string"},
+                    "level": {
+                        "type": "string",
+                        "enum": ["learning", "practiced", "confident"],
+                    },
+                    "note": {"type": "string"},
+                },
+                "required": ["skill", "level"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_curriculum",
             "description": (
                 "Fetch a teaching curriculum (or the list of all curricula "
@@ -288,7 +431,12 @@ TOOL_SCHEMAS = [
                 "properties": {
                     "curriculum_id": {
                         "type": "string",
-                        "enum": ["sar-fundamentals", "question-to-study"],
+                        "enum": [
+                            "sar-fundamentals",
+                            "question-to-study",
+                            "air-quality-from-space",
+                            "forests-and-carbon",
+                        ],
                     }
                 },
             },
@@ -415,6 +563,44 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                 "papers": papers,
             }
 
+        if name == "literature_review":
+            review = literature.systematic_review(
+                args.get("queries") or [], year_from=args.get("year_from")
+            )
+            if review["paper_count"] == 0:
+                return (
+                    {"papers": [], "note": "No papers found; say so, don't invent."},
+                    {
+                        "tool": name,
+                        "label": "Literature review: no results",
+                        "status": "empty",
+                    },
+                )
+            span = review.get("year_span")
+            span_txt = f" ({span[0]}-{span[1]})" if span else ""
+            return review, {
+                "tool": name,
+                "label": (
+                    f"Reviewed {review['paper_count']} papers across "
+                    f"{len(review['queries'])} searches{span_txt}"
+                ),
+                "status": "ok",
+                "papers": review["papers"],
+            }
+
+        if name == "format_citations":
+            from janus.citations import format_bibliography
+
+            result = format_bibliography(project_id, style=args.get("style", "apa"))
+            return result, {
+                "tool": name,
+                "label": (
+                    f"Formatted {result['count']} references ({result['style'].upper()})"
+                ),
+                "status": "ok",
+                "citations": result,
+            }
+
         if name == "save_reference":
             added = store.add_reference(
                 project_id,
@@ -519,6 +705,60 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                 "label": "Study design updated",
                 "status": "ok",
                 "design": project["design"],
+            }
+
+        if name == "check_confounders":
+            from gee.confounders import analyze_confounders
+
+            report = analyze_confounders(
+                analysis_type=args["analysis_type"],
+                bbox=args["bbox"],
+                start_date=args["start_date"],
+                end_date=args["end_date"],
+            )
+            return report, {
+                "tool": name,
+                "label": (
+                    f"Confounder check: {report['overall_concern']} concern of "
+                    "a false-positive driver"
+                ),
+                "status": "ok",
+                "confounders": report,
+            }
+
+        if name == "log_hypothesis":
+            hyp = store.add_hypothesis(
+                project_id, args["statement"], evidence=args.get("evidence")
+            )
+            return {"hypothesis": hyp}, {
+                "tool": name,
+                "label": f"Logged hypothesis: {args['statement'][:70]}",
+                "status": "ok",
+                "hypothesis": hyp,
+            }
+
+        if name == "update_hypothesis":
+            hyp = store.update_hypothesis(
+                args["hypothesis_id"],
+                status=args.get("status"),
+                evidence=args.get("evidence"),
+            )
+            return {"hypothesis": hyp}, {
+                "tool": name,
+                "label": f"Hypothesis now: {hyp['status']}",
+                "status": "ok",
+                "hypothesis": hyp,
+            }
+
+        if name == "record_skill":
+            owner = store.get_project(project_id)["owner"]
+            saved = store.record_skill(
+                owner, args["skill"], args["level"], note=args.get("note")
+            )
+            return {"skill": saved}, {
+                "tool": name,
+                "label": f"Skill noted: {args['skill']} ({args['level']})",
+                "status": "ok",
             }
 
         if name == "get_curriculum":

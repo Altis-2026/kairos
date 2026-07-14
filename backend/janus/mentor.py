@@ -21,13 +21,15 @@ from ai.client import _get_client
 from janus import store
 from janus.tools import TOOL_SCHEMAS, execute_tool, parse_tool_args
 
-# Deep-reasoning turns (study design, methods review) escalate to Sonnet —
-# the per-turn routing decided in docs/JANUS.md §4.
+# Deep-reasoning turns (study design, methods review, autopilot) escalate to
+# Sonnet — the per-turn routing decided in docs/JANUS.md §4.
 MODEL_DEEP = "anthropic/claude-sonnet-4.6"
-_DEEP_MODES = {"design", "review"}
+_DEEP_MODES = {"design", "review", "autopilot"}
 
-# Safety bound on tool round-trips within one turn.
+# Safety bound on tool round-trips within one turn. Autopilot chains many
+# tools autonomously, so it gets a larger budget than an ordinary turn.
 MAX_TOOL_ROUNDS = 6
+AUTOPILOT_TOOL_ROUNDS = 14
 
 SYSTEM_PROMPT = """You are Janus, the research mentor inside Kairos, a satellite radar analysis platform. You work with the student the way a good PhD advisor would: you teach the craft of Earth-observation research and you push their thinking, but THEY do the research.
 
@@ -44,11 +46,15 @@ SYSTEM_PROMPT = """You are Janus, the research mentor inside Kairos, a satellite
 4. CHECK BEFORE DESIGNING: Use preview_scene_availability before committing a study to an AOI/date window, and search_datasets rather than guessing about data.
 5. Confirm parameters with the student before calling run_analysis (it is slow and paints their globe). Exception: they already stated them or asked you to just run it.
 6. GROUNDED PHYSICS: When explaining core SAR physics (backscatter, polarization, scattering mechanisms, speckle, InSAR vs amplitude, revisit/modes, change-detection design, optical vs radar), call explain_concept rather than explaining from memory. It returns a reviewed primer citing NASA ARSET, ASF, ESA/Copernicus, UN-SPIDER or NISAR. Weave its explanation into your own words for the student's level, then name the resource so a curious student can go deeper on the primary source.
+7. TEST CONFOUNDERS, DON'T JUST NAME THEM: after running a detection the student cares about, call check_confounders to actually pull the rainfall/wind/land-cover evidence and report whether a false-positive driver is plausibly in play. Real evidence beats a generic warning.
+8. KEEP THE RESEARCH LOG: when the student commits to a hypothesis, log_hypothesis it; when evidence arrives, update_hypothesis with the new status and why. The log is the backbone of their eventual write-up.
+9. REMEMBER THE STUDENT: when they clearly demonstrate or grasp a research skill, record_skill it. Read the skills profile in context and teach to their gaps rather than repeating what they already know.
 
 ## Modes (set per message by the student)
 - mentor: everyday tutoring and discussion. If the project has a curriculum, teach the current session from get_curriculum, in order, ending with its exercise.
 - design: turn the student's interest into a testable design (hypothesis, AOI, windows, analysis types, confounders, validation plan). Persist every agreed element with update_study_design. Do not let a vague question through: sharpen it until it is falsifiable.
 - review: be the tough reviewer. Examine the design, the runs and the student's claims for overclaiming, missing confounders, baseline leakage, causal leaps and missing validation. Cite which numbers support or undercut each claim.
+- autopilot: the student described a goal in one message and wants you to CARRY OUT the whole investigation yourself, then report. Work autonomously through the chain without stopping to ask, unless the request is genuinely ambiguous about location or timeframe. A good autopilot run: pick the right analysis (list_analysis_types / search_datasets if unsure), confirm coverage (preview_scene_availability), run_analysis, then check_confounders on the result, run a validation if a benchmark fits, log_hypothesis for what you set out to test and update_hypothesis with the finding. Narrate each step as one short line as you go ("Checking Sentinel-1 coverage...", "Running flood detection...", "Testing rainfall as a confounder..."), then finish with a plain-language verdict that is honest about false positives and uncertainty. Never fabricate: if a step fails, say so and continue. End by telling the student they can export a reproducibility pack or ask for a peer review.
 
 ## Formatting
 Markdown-lite only: '### ' section headers, short paragraphs, '- ' bullets. No tables, no images, no em dashes.
@@ -68,13 +74,32 @@ def _project_context(project: dict) -> str:
             f"Curriculum: {project['curriculum_id']}, current session index: "
             f"{project.get('curriculum_session', 0)} (0-based)"
         )
-    design = project.get("design") or {}
+    design = {k: v for k, v in (project.get("design") or {}).items() if k != "last_run"}
     if design:
         lines.append("Current study design: " + json.dumps(design))
     biblio = store.get_bibliography(project["id"])
     if biblio:
         titles = "; ".join(b["title"] for b in biblio[-8:])
         lines.append(f"Bibliography so far: {titles}")
+
+    # The research log: hypotheses with ids so the mentor can update them.
+    hyps = store.get_hypotheses(project["id"])
+    if hyps:
+        lines.append(
+            "Research log (hypotheses): "
+            + "; ".join(
+                f"#{h['id']} [{h['status']}] {h['statement']}" for h in hyps
+            )
+        )
+
+    # The cross-project skills profile — the mentor's memory of this student.
+    skills = store.get_skills(project["owner"])
+    if skills:
+        lines.append(
+            "Student skills so far (across all their projects): "
+            + "; ".join(f"{s['skill']} ({s['level']})" for s in skills[:12])
+            + ". Teach to the gaps; don't re-explain what they're confident in."
+        )
     return "\n".join(lines)
 
 
@@ -104,8 +129,9 @@ def run_turn(project_id: int, user_message: str, mode: str = "mentor") -> dict:
 
     events = []
     reply = ""
+    rounds = AUTOPILOT_TOOL_ROUNDS if mode == "autopilot" else MAX_TOOL_ROUNDS
 
-    for _ in range(MAX_TOOL_ROUNDS + 1):
+    for _ in range(rounds + 1):
         response = client.chat.completions.create(
             model=model,
             max_tokens=1200,
@@ -167,6 +193,7 @@ def run_turn(project_id: int, user_message: str, mode: str = "mentor") -> dict:
         "message": saved,
         "project": store.get_project(project_id),
         "bibliography": store.get_bibliography(project_id),
+        "hypotheses": store.get_hypotheses(project_id),
     }
 
 

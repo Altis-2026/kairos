@@ -61,6 +61,9 @@ export const ANALYSIS_COLORS: Record<string, string> = {
   urban_growth: "#E8A318",
   crop_monitoring: "#7BC043",
   land_disturbance: "#FF6B2C",
+  forest_biomass: "#2E8B3D",
+  methane: "#00BFA8",
+  air_quality: "#E8A318",
 };
 
 export function timeAgo(epochSeconds: number): string {

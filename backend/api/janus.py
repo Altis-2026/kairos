@@ -27,7 +27,14 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
-from janus import entitlements, proactive, reproducibility, store
+from janus import (
+    entitlements,
+    notebook,
+    proactive,
+    reproducibility,
+    review_report,
+    store,
+)
 from janus.curriculum import curricula_summary
 from janus.mentor import project_kickoff, run_turn
 
@@ -51,7 +58,9 @@ class UpdateProjectRequest(BaseModel):
 class ChatRequest(BaseModel):
     owner: str = Field(min_length=1, max_length=128)
     message: str = Field(min_length=1, max_length=4000)
-    mode: str = Field(default="mentor", pattern="^(mentor|design|review)$")
+    mode: str = Field(
+        default="mentor", pattern="^(mentor|design|review|autopilot)$"
+    )
 
 
 class WatchRequest(BaseModel):
@@ -71,13 +80,19 @@ def _owned_project(project_id: int, owner: str) -> dict:
 
 @router.get("/janus/status")
 def janus_status():
-    return {"available": bool(os.getenv("OPENROUTER_API_KEY"))}
+    from gee import earthdata
+
+    return {
+        "available": bool(os.getenv("OPENROUTER_API_KEY")),
+        "earthdata": earthdata.status(),
+    }
 
 
 @router.get("/janus/entitlements")
 def get_entitlements(owner: str = Query(..., min_length=1, max_length=128)):
     ent = entitlements.entitlements(owner)
     ent["unread_insights"] = store.unread_insight_count(owner)
+    ent["skills"] = store.get_skills(owner)
     return ent
 
 
@@ -114,7 +129,13 @@ def create_project(request: CreateProjectRequest):
     kickoff = store.add_message(
         project["id"], "assistant", project_kickoff(project), mode="mentor"
     )
-    return {"project": project, "messages": [kickoff], "bibliography": []}
+    return {
+        "project": project,
+        "messages": [kickoff],
+        "bibliography": [],
+        "insights": [],
+        "hypotheses": [],
+    }
 
 
 @router.get("/janus/projects")
@@ -132,6 +153,7 @@ def get_project(
         "messages": store.get_messages(project_id),
         "bibliography": store.get_bibliography(project_id),
         "insights": store.get_insights(project_id),
+        "hypotheses": store.get_hypotheses(project_id),
     }
 
 
@@ -167,6 +189,11 @@ def chat(project_id: int, request: ChatRequest):
                 "(OPENROUTER_API_KEY). The rest of Kairos works without it."
             ),
         )
+    if request.mode == "autopilot":
+        try:
+            entitlements.require(request.owner, "autopilot")
+        except entitlements.FeatureLocked as e:
+            raise HTTPException(status_code=402, detail=str(e))
     try:
         return run_turn(project_id, request.message, mode=request.mode)
     except HTTPException:
@@ -219,6 +246,59 @@ def download_pack(
         media_type="text/markdown; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/janus/projects/{project_id}/notebook", response_class=PlainTextResponse)
+def download_notebook(
+    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
+):
+    """A runnable Python Earth Engine script reproducing the project's analyses."""
+    project = _owned_project(project_id, owner)
+    try:
+        entitlements.require(owner, "reproducibility_pack")
+    except entitlements.FeatureLocked as e:
+        raise HTTPException(status_code=402, detail=str(e))
+
+    code = notebook.build_notebook(project_id)
+    filename = notebook.notebook_filename(project)
+    return PlainTextResponse(
+        content=code,
+        media_type="text/x-python; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/janus/projects/{project_id}/review")
+def peer_review(
+    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
+):
+    """
+    Generate a formal mock peer-review report of the whole project. Slow when
+    the AI provider is configured (one deep-model call); instant deterministic
+    checklist otherwise.
+    """
+    _owned_project(project_id, owner)
+    try:
+        entitlements.require(owner, "reproducibility_pack")
+    except entitlements.FeatureLocked as e:
+        raise HTTPException(status_code=402, detail=str(e))
+    try:
+        return {"markdown": review_report.build_review(project_id)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Review failed: {e}")
+
+
+@router.get("/janus/projects/{project_id}/citations")
+def citations(
+    project_id: int,
+    owner: str = Query(..., min_length=1, max_length=128),
+    style: str = Query(default="apa", pattern="^(apa|agu|ieee)$"),
+):
+    """The project's bibliography formatted in a chosen citation style."""
+    _owned_project(project_id, owner)
+    from janus.citations import format_bibliography
+
+    return format_bibliography(project_id, style=style)
 
 
 @router.post("/janus/insights/{insight_id}/dismiss")
