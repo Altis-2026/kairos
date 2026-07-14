@@ -20,12 +20,14 @@ import {
   ClipboardList,
   Download,
   ExternalLink,
+  FlaskConical,
   Globe2,
   GraduationCap,
   Loader2,
   Mic,
   Plus,
   RadioTower,
+  ShieldCheck,
   Sparkles,
   ScrollText,
   Telescope,
@@ -36,7 +38,7 @@ import {
 } from "lucide-react";
 import { useJanusStore } from "../../stores/janusStore";
 import { applyResultToGlobe } from "../../lib/applyResult";
-import { downloadPack } from "../../api/janus";
+import { downloadNotebook, downloadPack, fetchPeerReview } from "../../api/janus";
 import { timeAgo } from "../../api/feed";
 import {
   isSpeechSupported,
@@ -46,6 +48,8 @@ import {
   stopSpeaking,
 } from "../../lib/voice";
 import type {
+  ConfounderReport,
+  Hypothesis,
   Insight,
   JanusMessage,
   JanusMode,
@@ -68,6 +72,11 @@ const MODES: { id: JanusMode; label: string; hint: string }[] = [
   { id: "mentor", label: "Mentor", hint: "Teach me and think with me" },
   { id: "design", label: "Design", hint: "Lock down the study design" },
   { id: "review", label: "Review", hint: "Critique my work like a reviewer" },
+  {
+    id: "autopilot",
+    label: "Auto",
+    hint: "Describe a goal; Janus runs the whole investigation and reports back",
+  },
 ];
 
 /** Markdown-lite: ### headers, "- " bullets, blank-line paragraphs. */
@@ -191,9 +200,109 @@ function DesignCard({ design }: { design: StudyDesign }) {
   );
 }
 
+const HYP_TONE: Record<Hypothesis["status"], string> = {
+  open: "text-dim ring-line",
+  supported: "text-teal ring-teal/40 bg-teal/10",
+  refuted: "text-[#FF3B5C] ring-[#FF3B5C]/40 bg-[#FF3B5C]/10",
+  inconclusive: "text-amber ring-amber/40 bg-amber/10",
+};
+
+function ResearchLog({ hypotheses }: { hypotheses: Hypothesis[] }) {
+  const [open, setOpen] = useState(false);
+  if (hypotheses.length === 0) return null;
+  return (
+    <div className="rounded-xl bg-bg/70 ring-1 ring-line">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-3 py-2 text-left"
+      >
+        <span className="flex items-center gap-2 font-mono text-[9px] tracking-[0.18em] text-amber uppercase">
+          <ScrollText size={11} />
+          Research log · {hypotheses.length} hypothes
+          {hypotheses.length > 1 ? "es" : "is"}
+        </span>
+        <ChevronDown
+          size={12}
+          className={`text-dim transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="px-3 pb-2.5 space-y-2">
+          {hypotheses.map((h) => (
+            <div key={h.id} className="text-[11px] leading-snug">
+              <div className="flex items-start gap-1.5">
+                <span
+                  className={`shrink-0 rounded px-1 py-0.5 font-mono text-[8px] uppercase tracking-wider ring-1 ${
+                    HYP_TONE[h.status]
+                  }`}
+                >
+                  {h.status}
+                </span>
+                <span className="flex-1 text-ink/90">{h.statement}</span>
+              </div>
+              {h.evidence && (
+                <div className="mt-0.5 pl-1 text-dim">{h.evidence}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PeerReviewModal({
+  markdown,
+  loading,
+  onClose,
+}: {
+  markdown: string | null;
+  loading: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="absolute inset-0 z-50 grid place-items-center bg-bg/70 backdrop-blur-sm p-4 rounded-2xl"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-h-full flex flex-col rounded-xl bg-surface ring-1 ring-line shadow-panel"
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-line">
+          <span className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-amber">
+            <ShieldCheck size={13} />
+            PEER REVIEW
+          </span>
+          <button onClick={onClose} className="text-dim hover:text-ink transition">
+            <X size={14} />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          {loading ? (
+            <div className="flex items-center gap-2 text-dim text-xs py-6 justify-center">
+              <Loader2 size={14} className="animate-spin" />
+              Janus is reviewing the whole project…
+            </div>
+          ) : (
+            <div className="space-y-1.5">{renderMentorText(markdown || "")}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const CONCERN_TONE: Record<ConfounderReport["overall_concern"], string> = {
+  high: "text-[#FF3B5C] ring-[#FF3B5C]/30",
+  some: "text-amber ring-amber/30",
+  low: "text-teal ring-teal/30",
+};
+
 function EventChip({ event }: { event: ToolEvent }) {
   const [showPapers, setShowPapers] = useState(false);
   const [showConcept, setShowConcept] = useState(false);
+  const [showConf, setShowConf] = useState(false);
   const tone =
     event.status === "error"
       ? "text-[#FF3B5C] ring-[#FF3B5C]/30"
@@ -233,7 +342,32 @@ function EventChip({ event }: { event: ToolEvent }) {
             {showConcept ? "hide" : "view"}
           </button>
         )}
+        {event.confounders && (
+          <button
+            onClick={() => setShowConf(!showConf)}
+            className="shrink-0 rounded-md bg-raised px-1.5 py-0.5 text-dim hover:text-ink transition"
+          >
+            {showConf ? "hide" : "view"}
+          </button>
+        )}
       </div>
+      {showConf && event.confounders && (
+        <div
+          className={`rounded-lg bg-bg/60 ring-1 px-2.5 py-2 space-y-1.5 ${
+            CONCERN_TONE[event.confounders.overall_concern]
+          }`}
+        >
+          <div className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.16em] uppercase">
+            <FlaskConical size={11} />
+            {event.confounders.overall_concern} concern of a false-positive driver
+          </div>
+          {event.confounders.findings.map((f, i) => (
+            <div key={i} className="text-[11px] leading-relaxed text-ink/90">
+              {f.finding}
+            </div>
+          ))}
+        </div>
+      )}
       {showConcept && event.concept && (
         <div className="rounded-lg bg-bg/60 ring-1 ring-line px-2.5 py-2 space-y-1.5">
           <div className="text-[11px] leading-relaxed text-ink/90">
@@ -379,6 +513,10 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
   const [newQuestion, setNewQuestion] = useState("");
   const [showBiblio, setShowBiblio] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingNb, setExportingNb] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewText, setReviewText] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [voiceOut, setVoiceOut] = useState(() => {
     try {
@@ -477,6 +615,37 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     }
   }
 
+  async function exportNotebook() {
+    if (!bundle || exportingNb) return;
+    setExportingNb(true);
+    try {
+      await downloadNotebook(bundle.project.id, bundle.project.title);
+    } catch (e) {
+      useJanusStore.setState({
+        error: e instanceof Error ? e.message : "Export failed.",
+      });
+    } finally {
+      setExportingNb(false);
+    }
+  }
+
+  async function runPeerReview() {
+    if (!bundle || reviewLoading) return;
+    setReviewOpen(true);
+    setReviewLoading(true);
+    setReviewText(null);
+    try {
+      const res = await fetchPeerReview(bundle.project.id);
+      setReviewText(res.markdown);
+    } catch (e) {
+      setReviewText(
+        `### Review failed\n${e instanceof Error ? e.message : "Try again."}`
+      );
+    } finally {
+      setReviewLoading(false);
+    }
+  }
+
   function actOnInsight(insight: Insight) {
     const action = insight.action;
     if (!action) return;
@@ -547,6 +716,36 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
             craft, designs studies with you, runs real analyses mid-sentence,
             and pushes back on weak reasoning.
           </p>
+
+          {entitlements && entitlements.skills.length > 0 && (
+            <div className="rounded-xl bg-bg/70 ring-1 ring-line px-3 py-2.5">
+              <div className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.18em] text-amber uppercase">
+                <GraduationCap size={11} />
+                What Janus knows you can do
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {entitlements.skills.slice(0, 10).map((s) => (
+                  <span
+                    key={s.skill}
+                    title={s.note || undefined}
+                    className={`rounded-md px-1.5 py-0.5 text-[10px] ring-1 ${
+                      s.level === "confident"
+                        ? "text-teal ring-teal/40 bg-teal/10"
+                        : s.level === "practiced"
+                        ? "text-amber ring-amber/30"
+                        : "text-dim ring-line"
+                    }`}
+                  >
+                    {s.skill}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-[10px] leading-snug text-dim">
+                Janus remembers this across every project and teaches to your
+                gaps.
+              </p>
+            </div>
+          )}
 
           {loadingHome && (
             <div className="flex items-center gap-2 text-dim text-xs">
@@ -685,18 +884,6 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
               )}
               {watched ? "Watching" : "Watch"}
             </button>
-            <button
-              onClick={exportPack}
-              disabled={exporting}
-              title="Export a reproducibility pack (Markdown)"
-              className="flex items-center gap-1 rounded-lg px-2 py-1 font-mono text-[10px] ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
-            >
-              {exporting ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <Download size={11} />
-              )}
-            </button>
             {bundle.bibliography.length > 0 && (
               <button
                 onClick={() => setShowBiblio(!showBiblio)}
@@ -727,6 +914,51 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
           )}
 
           <DesignCard design={bundle.project.design} />
+
+          <ResearchLog hypotheses={bundle.hypotheses} />
+
+          {/* Deliverables: the artifacts a researcher takes away. */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={exportPack}
+              disabled={exporting}
+              title="Reproducibility pack: a Markdown methods report"
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+            >
+              {exporting ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <Download size={11} />
+              )}
+              PACK
+            </button>
+            <button
+              onClick={exportNotebook}
+              disabled={exportingNb}
+              title="Runnable Python Earth Engine script that reproduces every analysis"
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+            >
+              {exportingNb ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <ScrollText size={11} />
+              )}
+              CODE
+            </button>
+            <button
+              onClick={runPeerReview}
+              disabled={reviewLoading}
+              title="Generate a formal peer-review report of the whole project"
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-amber/30 text-amber hover:bg-amber/10 transition disabled:opacity-50"
+            >
+              {reviewLoading ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <ShieldCheck size={11} />
+              )}
+              REVIEW
+            </button>
+          </div>
 
           {showBiblio && (
             <div className="max-h-36 overflow-y-auto rounded-xl bg-bg/70 ring-1 ring-line p-2.5 space-y-2">
@@ -762,7 +994,9 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
             {sending && (
               <div className="flex justify-start">
                 <div className="relative overflow-hidden scanline rounded-xl bg-bg/80 ring-1 ring-amber/30 px-3 py-2 font-mono text-[10px] text-amber">
-                  Janus is working — it may run analyses or search literature…
+                  {mode === "autopilot"
+                    ? "Autopilot running the full investigation — this can take a minute…"
+                    : "Janus is working — it may run analyses or search literature…"}
                 </div>
               </div>
             )}
@@ -843,6 +1077,8 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                     ? "Describe what you want to study…"
                     : mode === "review"
                     ? "Paste a claim or draft for review…"
+                    : mode === "autopilot"
+                    ? "Describe a goal — e.g. “check if there was flooding near Dhaka last month and whether it's real”…"
                     : "Ask, answer, or think out loud…"
                 }
                 rows={2}
@@ -869,6 +1105,14 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
               </div>
             )}
           </div>
+
+          {reviewOpen && (
+            <PeerReviewModal
+              markdown={reviewText}
+              loading={reviewLoading}
+              onClose={() => setReviewOpen(false)}
+            />
+          )}
         </>
       )}
     </motion.aside>

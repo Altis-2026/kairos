@@ -20,6 +20,8 @@ import {
   TrendingDown,
   Sprout,
   Pickaxe,
+  Wind,
+  Factory,
   Loader2,
   Zap,
   X,

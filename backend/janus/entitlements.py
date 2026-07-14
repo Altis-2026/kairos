@@ -21,10 +21,11 @@ FEATURES = {
     "grounded_knowledge",   # NASA/ESA-cited SAR primers
     "study_design",         # persisted study designs
     "deep_reasoning",       # Sonnet-tier design/review turns
-    "reproducibility_pack", # exportable methods report
+    "reproducibility_pack", # exportable methods report (+ code + peer review)
     "proactive_monitoring", # autonomous new-pass watching
     "unlimited_projects",   # no cap on active projects
     "voice",                # voice mode (client-side today; premium TTS later)
+    "autopilot",            # describe-it-and-Janus-runs-the-whole-investigation
     "priority_compute",     # jump the GEE queue (hook for later)
 }
 
@@ -70,6 +71,7 @@ TIERS = {
             "reproducibility_pack",
             "proactive_monitoring",
             "voice",
+            "autopilot",
         },
         "project_cap": 10,
     },

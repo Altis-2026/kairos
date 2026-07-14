@@ -83,3 +83,41 @@ def search_literature(query: str, year_from: int = None, limit: int = 5) -> list
             }
         )
     return papers
+
+
+def _dedupe(papers: list) -> list:
+    """Drop duplicate papers across query results, keyed by normalized title."""
+    seen, unique = set(), []
+    for p in papers:
+        key = "".join(c for c in (p.get("title") or "").lower() if c.isalnum())
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(p)
+    return unique
+
+
+def systematic_review(queries: list, year_from: int = None, per_query: int = 6) -> dict:
+    """
+    A small systematic-review pass: run several related queries, pool and
+    dedupe the results, and return the corpus sorted by citation impact plus a
+    coverage summary. The mentor synthesizes the narrative and gap statement
+    from this; every paper here is real and carries its DOI.
+
+    Returns: {queries, paper_count, papers, most_cited, newest}
+    """
+    pooled = []
+    for q in queries[:5]:
+        pooled.extend(search_literature(q, year_from=year_from, limit=per_query))
+    papers = _dedupe(pooled)
+    papers.sort(key=lambda p: (p.get("cited_by") or 0), reverse=True)
+
+    with_year = [p for p in papers if p.get("year")]
+    newest = max((p["year"] for p in with_year), default=None)
+    oldest = min((p["year"] for p in with_year), default=None)
+    return {
+        "queries": queries[:5],
+        "paper_count": len(papers),
+        "papers": papers[:20],
+        "most_cited": papers[0] if papers else None,
+        "year_span": [oldest, newest] if with_year else None,
+    }

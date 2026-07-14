@@ -181,6 +181,130 @@ CURRICULA = {
             },
         ],
     },
+    "air-quality-from-space": {
+        "id": "air-quality-from-space",
+        "title": "Air Quality from Space",
+        "audience": (
+            "Anyone curious about pollution and climate gases. Modeled on NASA "
+            "ARSET's air-quality training track."
+        ),
+        "outcome": (
+            "You can map NO2 and methane from Sentinel-5P, read a column "
+            "measurement honestly, and separate a real emission signal from "
+            "weather and coverage artifacts."
+        ),
+        "sessions": [
+            {
+                "title": "What a satellite spectrometer measures",
+                "goals": [
+                    "Column vs surface concentration: what TROPOMI actually sees",
+                    "Why ~7 km resolution finds regions, not smokestacks",
+                    "NO2 as a combustion marker; methane as a climate gas",
+                ],
+                "exercise": {
+                    "prompt": (
+                        "Run air_quality (NO2) over a major city the student "
+                        "picks and have them explain why the pattern traces "
+                        "roads and industry, not political boundaries."
+                    ),
+                    "analysis_type": "air_quality",
+                },
+            },
+            {
+                "title": "Methane and emission hotspots",
+                "goals": [
+                    "Sources: oil and gas, landfills, wetlands, agriculture",
+                    "Enhancement over background vs absolute column",
+                    "Why short windows are noisy (quality/cloud filtering)",
+                ],
+                "exercise": {
+                    "prompt": (
+                        "Run methane over a known oil and gas basin (e.g. the "
+                        "Permian, bbox around [-103.5, 31.3, -102.0, 32.3]) over "
+                        "a multi-week window and interpret the enhancement zones."
+                    ),
+                    "analysis_type": "methane",
+                },
+            },
+            {
+                "title": "Confounders and honest reporting",
+                "goals": [
+                    "Wind transports plumes: a hotspot may be downwind",
+                    "Seasonality and coverage gaps",
+                    "Stating what a column measurement can and cannot claim",
+                ],
+                "exercise": {
+                    "prompt": (
+                        "Re-run the city NO2 for a weekday-heavy vs a holiday "
+                        "period and have the student reason about the difference."
+                    ),
+                    "analysis_type": "air_quality",
+                },
+            },
+        ],
+    },
+    "forests-and-carbon": {
+        "id": "forests-and-carbon",
+        "title": "Forests and Carbon",
+        "audience": (
+            "Students interested in forests, carbon and conservation. Modeled "
+            "on ARSET's land-cover and forest-monitoring themes."
+        ),
+        "outcome": (
+            "You can estimate forest biomass by fusing L-band radar with "
+            "optical, explain why C-band alone cannot, and reason about the "
+            "limits of a backscatter biomass proxy."
+        ),
+        "sessions": [
+            {
+                "title": "Why L-band sees the forest, not just the canopy top",
+                "goals": [
+                    "Wavelength vs penetration: C-band vs L-band",
+                    "Volume scattering from trunks and branches",
+                    "Why HV (cross-pol) tracks woody biomass",
+                ],
+                "exercise": {
+                    "prompt": (
+                        "Run forest_biomass over an intact tropical forest AOI "
+                        "and have the student explain the high HV return in terms "
+                        "of volume scattering."
+                    ),
+                    "analysis_type": "forest_biomass",
+                },
+            },
+            {
+                "title": "Fusing radar with optical",
+                "goals": [
+                    "Why radar-only biomass is fooled by rough/urban surfaces",
+                    "NDVI as a live-vegetation gate",
+                    "What the fusion buys you and what it still cannot fix",
+                ],
+                "exercise": {
+                    "prompt": (
+                        "Run forest_biomass over an area mixing forest and city, "
+                        "and have the student see how the optical mask removes "
+                        "bright non-forest pixels."
+                    ),
+                    "analysis_type": "forest_biomass",
+                },
+            },
+            {
+                "title": "Saturation, limits and honest carbon claims",
+                "goals": [
+                    "L-band saturates over dense forest: the proxy under-reads",
+                    "Backscatter proxy vs calibrated field inventory",
+                    "Pairing with a deforestation run to see change over time",
+                ],
+                "exercise": {
+                    "prompt": (
+                        "Run deforestation and forest_biomass over the same AOI "
+                        "and have the student connect biomass loss to clearing."
+                    ),
+                    "analysis_type": "forest_biomass",
+                },
+            },
+        ],
+    },
 }
 
 
