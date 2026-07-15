@@ -47,6 +47,7 @@ import {
   startDictation,
   stopSpeaking,
 } from "../../lib/voice";
+import { panelShellFlex } from "../../lib/responsive";
 import type {
   ConfounderReport,
   Hypothesis,
@@ -697,7 +698,9 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     <motion.aside
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
-      className="absolute right-20 top-20 bottom-24 z-40 w-[26rem] max-w-[calc(100vw-7rem)] rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 flex flex-col gap-3"
+      className={`${panelShellFlex(
+        "lg:right-20 lg:left-auto lg:top-20 lg:bottom-24 lg:w-[26rem] lg:max-w-[calc(100vw-7rem)]"
+      )} gap-3`}
     >
       {header}
 

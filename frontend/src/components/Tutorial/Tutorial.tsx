@@ -237,7 +237,7 @@ export default function Tutorial() {
             exit={{ opacity: 0, y: 16, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 260, damping: 26 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-lg rounded-3xl bg-surface ring-1 ring-line shadow-panel overflow-hidden"
+            className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-3xl bg-surface ring-1 ring-line shadow-panel"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-6 pt-5">

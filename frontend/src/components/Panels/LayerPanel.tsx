@@ -4,6 +4,7 @@ import { AlertTriangle, Eye, EyeOff, Loader2, Trash2, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { useMapStore } from "../../stores/mapStore";
 import { fetchHistoricalEvents, eventsToFeatureCollection } from "../../api/events";
+import { panelShell } from "../../lib/responsive";
 
 const EVENTS_LAYER_ID = "historical-events";
 
@@ -64,7 +65,9 @@ export default function LayerPanel({ onClose }: { onClose: () => void }) {
     <motion.aside
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
-      className="absolute right-20 top-1/2 -translate-y-1/2 z-30 w-80 rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-4"
+      className={`${panelShell(
+        "lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-80"
+      )} space-y-4`}
     >
       <div className="flex items-center justify-between">
         <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
