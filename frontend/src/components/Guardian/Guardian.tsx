@@ -140,8 +140,9 @@ export default function Guardian() {
         </div>
       </div>
 
-      {/* Zone list */}
-      <aside className="absolute right-5 top-5 z-30 w-80 max-h-[88vh] rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3 overflow-hidden flex flex-col">
+      {/* Zone list: a bottom sheet below the header on phones/tablets, the
+          original top-right floating card on desktop. */}
+      <aside className="absolute inset-x-3 top-32 bottom-3 z-30 rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3 overflow-hidden flex flex-col lg:inset-x-auto lg:left-auto lg:right-5 lg:top-5 lg:bottom-auto lg:w-80 lg:max-h-[88vh]">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
             WATCH ZONES
@@ -223,7 +224,7 @@ export default function Guardian() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
-            className="absolute left-5 bottom-5 z-40 w-[22rem] rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3"
+            className="absolute inset-x-3 top-32 bottom-3 z-40 overflow-y-auto rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3 lg:inset-x-auto lg:top-auto lg:bottom-5 lg:left-5 lg:right-auto lg:w-[22rem] lg:overflow-visible"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
