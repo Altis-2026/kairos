@@ -19,17 +19,19 @@ export default function SuggestionChips({
   if (hasMessages) return null;
 
   return (
-    <div className="flex flex-wrap justify-center gap-2 pointer-events-auto">
-      {SUGGESTIONS.map((s) => (
-        <button
-          key={s}
-          disabled={loading}
-          onClick={() => onPick(s)}
-          className="h-9 px-4 rounded-full bg-surface/90 backdrop-blur ring-1 ring-line text-xs text-dim hover:text-ink hover:ring-teal/50 transition-colors disabled:opacity-50"
-        >
-          {s}
-        </button>
-      ))}
+    <div className="w-full max-w-full overflow-x-auto pointer-events-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex justify-center sm:flex-wrap gap-2 px-1 w-max sm:w-full mx-auto">
+        {SUGGESTIONS.map((s) => (
+          <button
+            key={s}
+            disabled={loading}
+            onClick={() => onPick(s)}
+            className="h-9 px-4 rounded-full bg-surface/90 backdrop-blur ring-1 ring-line text-xs text-dim hover:text-ink hover:ring-teal/50 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+          >
+            {s}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

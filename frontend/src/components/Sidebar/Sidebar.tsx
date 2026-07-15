@@ -5,6 +5,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, X } from "lucide-react";
 import { STEP_ORDER, useSidebarStore } from "../../stores/sidebarStore";
+import { panelShellFlex } from "../../lib/responsive";
 import StepIndicator from "./StepIndicator";
 import SelectTask from "./steps/SelectTask";
 import DefineAOI from "./steps/DefineAOI";
@@ -35,7 +36,9 @@ export default function Sidebar() {
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: -420, opacity: 0 }}
           transition={{ type: "spring", stiffness: 320, damping: 32 }}
-          className="absolute left-5 top-20 bottom-24 z-40 w-[360px] flex flex-col rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel"
+          className={panelShellFlex(
+            "lg:left-5 lg:right-auto lg:bottom-24 lg:w-[360px]"
+          )}
         >
           <div className="p-4 pb-3 space-y-3 border-b border-line">
             <div className="flex items-center justify-between">

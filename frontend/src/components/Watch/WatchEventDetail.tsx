@@ -152,7 +152,7 @@ export default function WatchEventDetail({
       initial={{ opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 24 }}
-      className="absolute right-5 bottom-5 z-40 w-80 max-h-[70vh] overflow-y-auto rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3"
+      className="absolute inset-x-3 top-24 bottom-3 z-40 overflow-y-auto rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3 lg:inset-x-auto lg:top-auto lg:bottom-5 lg:left-auto lg:right-5 lg:w-80 lg:max-h-[70vh]"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
