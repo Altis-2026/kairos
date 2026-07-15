@@ -82,8 +82,9 @@ export default function LiveWatch() {
         </div>
       </div>
 
-      {/* Event list */}
-      <aside className="absolute right-5 top-1/2 -translate-y-1/2 z-30 w-80 max-h-[80vh] rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3 overflow-hidden flex flex-col">
+      {/* Event list: a bottom sheet below the header on phones/tablets, the
+          original top-right floating card on desktop. */}
+      <aside className="absolute inset-x-3 top-24 bottom-3 z-30 rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3 overflow-hidden flex flex-col lg:inset-x-auto lg:left-auto lg:right-5 lg:top-1/2 lg:-translate-y-1/2 lg:bottom-auto lg:w-80 lg:max-h-[80vh]">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
             {status === "ok" ? `${events.length} ACTIVE EVENTS` : "LIVE WATCH"}

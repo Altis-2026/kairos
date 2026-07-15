@@ -31,6 +31,7 @@ import { fetchRegistry } from "../../api/registry";
 import { runAnalyze } from "../../api/analyze";
 import { useMapStore } from "../../stores/mapStore";
 import { applyResultToGlobe } from "../../lib/applyResult";
+import { panelShell } from "../../lib/responsive";
 import type { AnalysisType } from "../../types/analysis";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -111,7 +112,7 @@ export default function QuickAnalysisPanel() {
       initial={{ opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 24 }}
-      className="absolute right-20 top-20 z-40 w-80 rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-4"
+      className={`${panelShell("lg:right-20 lg:left-auto lg:w-80")} space-y-4`}
     >
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-amber">

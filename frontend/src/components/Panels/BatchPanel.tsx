@@ -25,6 +25,7 @@ import {
   runBatch,
   type BatchRow,
 } from "../../lib/batch";
+import { panelShell } from "../../lib/responsive";
 
 const STATUS_STYLE: Record<string, string> = {
   pending: "text-dim",
@@ -123,7 +124,9 @@ export default function BatchPanel({ onClose }: { onClose: () => void }) {
     <motion.aside
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
-      className="absolute right-20 top-1/2 -translate-y-1/2 z-30 w-96 rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3"
+      className={`${panelShell(
+        "lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-96"
+      )} space-y-3`}
     >
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-dim">
