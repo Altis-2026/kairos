@@ -20,12 +20,15 @@ import {
   ClipboardList,
   Download,
   ExternalLink,
+  FileText,
   FlaskConical,
   Globe2,
   GraduationCap,
+  Image as ImageIcon,
   Loader2,
   Mic,
   Plus,
+  Quote,
   RadioTower,
   ShieldCheck,
   Sparkles,
@@ -38,7 +41,18 @@ import {
 } from "lucide-react";
 import { useJanusStore } from "../../stores/janusStore";
 import { applyResultToGlobe } from "../../lib/applyResult";
-import { downloadNotebook, downloadPack, fetchPeerReview } from "../../api/janus";
+import {
+  downloadBibtex,
+  downloadFigure,
+  downloadGoogleDoc,
+  downloadLatex,
+  downloadNotebook,
+  downloadPack,
+  downloadRis,
+  fetchFigures,
+  fetchPeerReview,
+  figureUrl,
+} from "../../api/janus";
 import { timeAgo } from "../../api/feed";
 import {
   isSpeechSupported,
@@ -518,6 +532,11 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewText, setReviewText] = useState<string | null>(null);
+  // Researcher-tool exports + publication figures.
+  const [busyExport, setBusyExport] = useState<string | null>(null);
+  const [figuresOpen, setFiguresOpen] = useState(false);
+  const [figuresList, setFiguresList] = useState<string[] | null>(null);
+  const [figuresLoading, setFiguresLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceOut, setVoiceOut] = useState(() => {
     try {
@@ -562,6 +581,23 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
       dictationRef.current?.stop();
     };
   }, []);
+
+  // Figures depend on the project and its runs. When either changes, drop the
+  // cached list so it regenerates from current data; refetch immediately if the
+  // section is open. The preview <img> is cache-busted by run count below.
+  const projectId = bundle?.project.id;
+  const runCount = bundle?.messages.length;
+  useEffect(() => {
+    setFiguresList(null);
+    if (figuresOpen && projectId) {
+      setFiguresLoading(true);
+      fetchFigures(projectId)
+        .then((res) => setFiguresList(res.figures))
+        .catch(() => setFiguresList([]))
+        .finally(() => setFiguresLoading(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, runCount]);
 
   function submit() {
     const text = draft.trim();
@@ -644,6 +680,40 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
       );
     } finally {
       setReviewLoading(false);
+    }
+  }
+
+  // Researcher-tool exports share one busy flag (only one download at a time).
+  async function runExport(
+    kind: string,
+    fn: (id: number, title: string) => Promise<void>
+  ) {
+    if (!bundle || busyExport) return;
+    setBusyExport(kind);
+    try {
+      await fn(bundle.project.id, bundle.project.title);
+    } catch (e) {
+      useJanusStore.setState({
+        error: e instanceof Error ? e.message : "Export failed.",
+      });
+    } finally {
+      setBusyExport(null);
+    }
+  }
+
+  async function toggleFigures() {
+    const next = !figuresOpen;
+    setFiguresOpen(next);
+    if (next && figuresList === null && bundle) {
+      setFiguresLoading(true);
+      try {
+        const res = await fetchFigures(bundle.project.id);
+        setFiguresList(res.figures);
+      } catch {
+        setFiguresList([]);
+      } finally {
+        setFiguresLoading(false);
+      }
     }
   }
 
@@ -961,6 +1031,123 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
               )}
               REVIEW
             </button>
+          </div>
+
+          {/* Finish in the tools researchers actually use. */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => runExport("latex", downloadLatex)}
+              disabled={busyExport !== null}
+              title="Overleaf-ready LaTeX manuscript (.tex) with figures and bibliography"
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+            >
+              {busyExport === "latex" ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <FileText size={11} />
+              )}
+              LaTeX
+            </button>
+            <button
+              onClick={() => runExport("doc", downloadGoogleDoc)}
+              disabled={busyExport !== null}
+              title="A formatted document you can open or paste straight into Google Docs"
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+            >
+              {busyExport === "doc" ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <FileText size={11} />
+              )}
+              DOCS
+            </button>
+            <button
+              onClick={() => runExport("bibtex", downloadBibtex)}
+              disabled={busyExport !== null}
+              title="Bibliography as BibTeX (.bib) — Zotero, Mendeley, LaTeX"
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+            >
+              {busyExport === "bibtex" ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <Quote size={11} />
+              )}
+              .BIB
+            </button>
+            <button
+              onClick={() => runExport("ris", downloadRis)}
+              disabled={busyExport !== null}
+              title="Bibliography as RIS (.ris) — Zotero, Mendeley, EndNote import"
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+            >
+              {busyExport === "ris" ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <Quote size={11} />
+              )}
+              .RIS
+            </button>
+          </div>
+
+          {/* Publication figures — real charts/maps from the analysis results. */}
+          <div>
+            <button
+              onClick={toggleFigures}
+              title="Publication-quality figures generated from this project's results"
+              className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition"
+            >
+              <span className="flex items-center gap-1.5">
+                <ImageIcon size={11} />
+                PUBLICATION FIGURES
+              </span>
+              <ChevronDown
+                size={12}
+                className={`transition-transform ${figuresOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+            {figuresOpen && (
+              <div className="mt-2 space-y-2">
+                {figuresLoading && (
+                  <div className="flex items-center gap-2 text-[11px] text-dim">
+                    <Loader2 size={12} className="animate-spin" /> Generating…
+                  </div>
+                )}
+                {!figuresLoading &&
+                  figuresList !== null &&
+                  figuresList.length === 0 && (
+                    <p className="text-[11px] text-dim leading-snug">
+                      Figures appear once you've run an analysis or defined a
+                      study area. Ask Janus to run one, then reopen this.
+                    </p>
+                  )}
+                {!figuresLoading &&
+                  (figuresList || []).map((kind) => (
+                    <div
+                      key={kind}
+                      className="rounded-xl bg-white ring-1 ring-line overflow-hidden"
+                    >
+                      <img
+                        src={`${figureUrl(bundle.project.id, kind)}&v=${runCount}`}
+                        alt={`${kind} figure`}
+                        className="w-full block"
+                      />
+                      <button
+                        onClick={() =>
+                          downloadFigure(
+                            bundle.project.id,
+                            kind,
+                            bundle.project.title
+                          )
+                        }
+                        className="flex w-full items-center justify-center gap-1 py-1.5 font-mono text-[9px] tracking-wider text-dim hover:text-ink bg-surface transition"
+                      >
+                        <Download size={10} />
+                        {kind.replace(/_/g, " ").toUpperCase()} · SVG
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
 
           {showBiblio && (

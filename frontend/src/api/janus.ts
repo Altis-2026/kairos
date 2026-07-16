@@ -323,3 +323,61 @@ export function fetchPeerReview(projectId: number): Promise<{ markdown: string }
     `/janus/projects/${projectId}/review?owner=${encodeURIComponent(janusOwner())}`
   );
 }
+
+/** Download the Overleaf-ready LaTeX manuscript. */
+export function downloadLatex(projectId: number, title: string) {
+  return downloadDoc(
+    `/janus/projects/${projectId}/latex`,
+    `kairos-manuscript-${slugify(title)}.tex`
+  );
+}
+
+/** Download the bibliography as BibTeX (Zotero / Mendeley / LaTeX). */
+export function downloadBibtex(projectId: number, title: string) {
+  return downloadDoc(
+    `/janus/projects/${projectId}/bibtex`,
+    `kairos-references-${slugify(title)}.bib`
+  );
+}
+
+/** Download the bibliography as RIS (Zotero / Mendeley / EndNote). */
+export function downloadRis(projectId: number, title: string) {
+  return downloadDoc(
+    `/janus/projects/${projectId}/ris`,
+    `kairos-references-${slugify(title)}.ris`
+  );
+}
+
+/** Download a Google Docs-importable HTML document. */
+export function downloadGoogleDoc(projectId: number, title: string) {
+  return downloadDoc(
+    `/janus/projects/${projectId}/gdoc`,
+    `kairos-doc-${slugify(title)}.html`
+  );
+}
+
+/** Which publication figures have data for this project. */
+export function fetchFigures(projectId: number): Promise<{ figures: string[] }> {
+  return apiFetch(
+    `/janus/projects/${projectId}/figures?owner=${encodeURIComponent(janusOwner())}`
+  );
+}
+
+/** The URL of a figure SVG (for inline <img> preview). */
+export function figureUrl(projectId: number, kind: string): string {
+  return `${API_BASE}/janus/projects/${projectId}/figure/${kind}?owner=${encodeURIComponent(
+    janusOwner()
+  )}`;
+}
+
+/** Download a publication figure as SVG. */
+export function downloadFigure(
+  projectId: number,
+  kind: string,
+  title: string
+) {
+  return downloadDoc(
+    `/janus/projects/${projectId}/figure/${kind}?download=true`,
+    `kairos-${kind.replace(/_/g, "-")}-${slugify(title)}.svg`
+  );
+}
