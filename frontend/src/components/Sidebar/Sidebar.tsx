@@ -37,7 +37,7 @@ export default function Sidebar() {
           exit={{ x: -420, opacity: 0 }}
           transition={{ type: "spring", stiffness: 320, damping: 32 }}
           className={panelShellFlex(
-            "lg:left-5 lg:right-auto lg:bottom-24 lg:w-[360px]"
+            "lg:left-5 lg:right-auto lg:top-20 lg:bottom-24 lg:w-[360px]"
           )}
         >
           <div className="p-4 pb-3 space-y-3 border-b border-line">
