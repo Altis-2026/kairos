@@ -9,8 +9,8 @@ export default function AnalyticsPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <motion.aside
-      initial={{ opacity: 0, x: 16 }}
-      animate={{ opacity: 1, x: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       className={`${panelShell(
         "lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-80"
       )} space-y-4`}
