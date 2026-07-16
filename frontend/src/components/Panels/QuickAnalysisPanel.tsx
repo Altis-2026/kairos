@@ -112,7 +112,7 @@ export default function QuickAnalysisPanel() {
       initial={{ opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 24 }}
-      className={`${panelShell("lg:right-20 lg:left-auto lg:w-80")} space-y-4`}
+      className={`${panelShell("lg:right-20 lg:left-auto lg:top-20 lg:w-80")} space-y-4`}
     >
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-amber">
