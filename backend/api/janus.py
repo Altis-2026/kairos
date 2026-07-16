@@ -24,11 +24,13 @@ an anonymous browser id. Real auth arrives with the paid tier.
 import os
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
 from janus import (
     entitlements,
+    exports,
+    figures,
     notebook,
     proactive,
     reproducibility,
@@ -265,6 +267,110 @@ def download_notebook(
         content=code,
         media_type="text/x-python; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/janus/projects/{project_id}/figures")
+def list_figures(
+    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
+):
+    """Which publication figures have data to render for this project."""
+    _owned_project(project_id, owner)
+    return {"figures": figures.available_figures(project_id)}
+
+
+@router.get("/janus/projects/{project_id}/figure/{kind}")
+def download_figure(
+    project_id: int,
+    kind: str,
+    owner: str = Query(..., min_length=1, max_length=128),
+    download: bool = Query(default=False),
+):
+    """A single publication figure as an SVG (vector, paper-ready)."""
+    project = _owned_project(project_id, owner)
+    try:
+        entitlements.require(owner, "reproducibility_pack")
+    except entitlements.FeatureLocked as e:
+        raise HTTPException(status_code=402, detail=str(e))
+    if kind not in figures.FIGURE_KINDS:
+        raise HTTPException(status_code=404, detail=f"Unknown figure: {kind}")
+    try:
+        svg = figures.build_figure(project_id, kind)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    headers = {}
+    if download:
+        headers["Content-Disposition"] = (
+            f'attachment; filename="{figures.figure_filename(project, kind)}"'
+        )
+    return Response(content=svg, media_type="image/svg+xml", headers=headers)
+
+
+def _attachment(content: str, filename: str, media_type: str) -> PlainTextResponse:
+    return PlainTextResponse(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/janus/projects/{project_id}/latex", response_class=PlainTextResponse)
+def download_latex(
+    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
+):
+    """An Overleaf-ready LaTeX manuscript for the project."""
+    project = _owned_project(project_id, owner)
+    try:
+        entitlements.require(owner, "reproducibility_pack")
+    except entitlements.FeatureLocked as e:
+        raise HTTPException(status_code=402, detail=str(e))
+    return _attachment(
+        exports.build_latex(project_id),
+        exports.latex_filename(project),
+        "application/x-tex; charset=utf-8",
+    )
+
+
+@router.get("/janus/projects/{project_id}/bibtex", response_class=PlainTextResponse)
+def download_bibtex(
+    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
+):
+    """The project bibliography as a BibTeX .bib (Zotero / Mendeley / LaTeX)."""
+    project = _owned_project(project_id, owner)
+    return _attachment(
+        exports.build_bibtex(project_id),
+        exports.bibtex_filename(project),
+        "application/x-bibtex; charset=utf-8",
+    )
+
+
+@router.get("/janus/projects/{project_id}/ris", response_class=PlainTextResponse)
+def download_ris(
+    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
+):
+    """The project bibliography as RIS (Zotero / Mendeley / EndNote import)."""
+    project = _owned_project(project_id, owner)
+    return _attachment(
+        exports.build_ris(project_id),
+        exports.ris_filename(project),
+        "application/x-research-info-systems; charset=utf-8",
+    )
+
+
+@router.get("/janus/projects/{project_id}/gdoc", response_class=PlainTextResponse)
+def download_gdoc(
+    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
+):
+    """A Google Docs-importable HTML document for the project."""
+    project = _owned_project(project_id, owner)
+    try:
+        entitlements.require(owner, "reproducibility_pack")
+    except entitlements.FeatureLocked as e:
+        raise HTTPException(status_code=402, detail=str(e))
+    return _attachment(
+        exports.build_gdoc_html(project_id),
+        exports.gdoc_filename(project),
+        "text/html; charset=utf-8",
     )
 
 
