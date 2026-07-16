@@ -162,7 +162,35 @@ and lets a user just describe a goal and have it carried out.
   path for future Sentinel-1 SLC / InSAR is wired; the interferometric
   processor on dedicated compute remains the separate infrastructure build.
 
-### v5 — the moat (next)
+### v5 — close the loop into a real deliverable (SHIPPED)
+The output no longer stops one step short of "paste into your actual paper."
+
+- **Publication figures from results, not just tile URLs** (`janus/figures.py`).
+  Every project renders paper-ready figures straight from its stored runs:
+  a **results chart** (headline metric per analysis, with uncertainty whiskers;
+  bars are scaled *within* each unit and only share a numeric axis when every
+  run shares one unit, so magnitudes are never compared dishonestly), a
+  **study-area map** (the AOI drawn to scale with lon/lat ticks, a km scale bar,
+  extent/area facts, and a global locator), and a **validation chart**
+  (IoU / precision / recall / F1 per benchmark). All emitted as standalone
+  **SVG** — vector, zero plotting dependency, identical in dev and on Cloud Run,
+  and drops into LaTeX (`\includesvg`), Google Docs, and HTML. Previewed inline
+  in the Janus panel and downloadable per figure.
+  `GET /janus/projects/{id}/figures`, `GET …/figure/{kind}`.
+- **Finish in the tools researchers actually use** (`janus/exports.py`):
+  - **LaTeX / Overleaf** — a complete, compilable `.tex` manuscript (title,
+    question, study design, methods, a results table + figures, validation,
+    honest limitations, and a `thebibliography`). `GET …/latex`.
+  - **Zotero / Mendeley / EndNote** — the bibliography as **BibTeX** (`.bib`)
+    and **RIS** (`.ris`), with author strings parsed for both the literature
+    pipeline's "First Last, First Last" and hand-entered "Last, First and …".
+    `GET …/bibtex`, `GET …/ris`.
+  - **Google Docs** — a clean, self-contained HTML document whose headings map
+    onto Docs styles, so File → Open lands a structured doc. `GET …/gdoc`.
+  All export/figure endpoints reuse the existing ownership check and the
+  `reproducibility_pack` entitlement.
+
+### v6 — the moat (next)
 - **True InSAR:** a compute backend (SNAP/ISCE on Cloud Batch) pulling SLC
   from ASF with the Earthdata token — the one item that needs real
   infrastructure spend, not just a key.
