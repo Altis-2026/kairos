@@ -73,6 +73,8 @@ export interface StudyDesign {
   analysis_types?: string[];
   confounders?: string[];
   validation_plan?: string;
+  /** True on the per-user always-on companion chat (hidden from lists). */
+  companion?: boolean;
 }
 
 export interface JanusPaper {
@@ -430,4 +432,12 @@ export function deleteDataset(
     )}`,
     { method: "DELETE" }
   );
+}
+
+/** Open (or create) the always-on companion chat — no project setup needed. */
+export function fetchCompanion(): Promise<ProjectBundle> {
+  return apiFetch("/janus/companion", {
+    method: "POST",
+    body: JSON.stringify({ owner: janusOwner() }),
+  });
 }

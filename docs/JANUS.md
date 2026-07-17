@@ -243,6 +243,26 @@ processing infrastructure. That is exactly the v7 InSAR item, and Janus's
 `coherence-vs-amplitude` concept teaches users the difference rather than
 pretending.
 
+### v6.5 — the always-on companion (SHIPPED)
+- **"Ask Janus anything"** — a persistent, project-less chat, one tap from
+  the Janus home screen. Backed by a hidden per-owner companion project so
+  memory, tool-running, voice (mic in, spoken replies out) and history all
+  work identically to project chats; never counts against the plan's
+  project cap, never appears in the project list. Behavior shifts to a
+  friendly general guide: any topic, light Socratic pressure, runs analyses
+  on request ("check the Sundarbans for flooding" just runs), and suggests
+  graduating to a real project when a research thread emerges.
+- **Janus can now teach the app itself** — the system prompt carries a
+  compact operating map of the whole Kairos UI (chat bar, wizard, AOI
+  tools, quick-pin, every right-toolbar panel, Live Watch/Guardian, PWA
+  install), so "how do I…?" questions about Kairos get accurate answers.
+- **My data upload UI** — GeoJSON/CSV upload lives in the panel (companion
+  included), listing datasets with delete; pairs with
+  validate_against_my_data.
+- **Guide refreshed** — 13 steps: the companion + voice step, a
+  bring-your-own-data step, 21 analyses, Signal & Trend, provenance tip,
+  and install-to-home-screen.
+
 ### v7 — the moat (next)
 - **True InSAR:** a compute backend (SNAP/ISCE on Cloud Batch) pulling SLC
   from ASF with the Earthdata token — the one item that needs real
