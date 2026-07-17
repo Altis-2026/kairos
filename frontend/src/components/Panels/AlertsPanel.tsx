@@ -18,6 +18,13 @@ import {
   markAlertChecked,
 } from "../../lib/alerts";
 import { checkAlert } from "../../api/alerts";
+import {
+  deleteWebhook,
+  getWebhook,
+  saveWebhook,
+  testWebhook,
+} from "../../api/research";
+import { janusOwner } from "../../api/janus";
 import { applyResultToGlobe } from "../../lib/applyResult";
 import { panelShell } from "../../lib/responsive";
 
@@ -167,6 +174,108 @@ export default function AlertsPanel({ onClose }: { onClose: () => void }) {
           ))}
         </ul>
       )}
+
+      <WebhookSection />
     </motion.aside>
+  );
+}
+
+/**
+ * Outbound webhook: push watch findings to Slack (incoming webhook) or any
+ * JSON endpoint, so alerts reach the user's own systems instead of only
+ * living in this panel.
+ */
+function WebhookSection() {
+  const [url, setUrl] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    getWebhook(janusOwner())
+      .then((res) => {
+        if (res.url) {
+          setUrl(res.url);
+          setSaved(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function run(kind: string, fn: () => Promise<void>) {
+    setBusy(kind);
+    setNote(null);
+    try {
+      await fn();
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="space-y-2 border-t border-line pt-3">
+      <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
+        Outbound webhook
+      </h3>
+      <p className="text-[10px] text-dim leading-snug">
+        Watch findings POST here — paste a Slack incoming-webhook URL or any
+        JSON endpoint.
+      </p>
+      <input
+        value={url}
+        onChange={(e) => {
+          setUrl(e.target.value);
+          setSaved(false);
+        }}
+        placeholder="https://hooks.slack.com/services/…"
+        className="w-full h-9 rounded-lg bg-bg/70 ring-1 ring-line px-3 text-[11px] text-ink placeholder-dim outline-none focus:ring-teal/50"
+      />
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() =>
+            run("save", async () => {
+              await saveWebhook(janusOwner(), url.trim());
+              setSaved(true);
+              setNote("Saved.");
+            })
+          }
+          disabled={!url.trim() || busy !== null}
+          className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-teal/40 text-teal hover:bg-teal/10 transition disabled:opacity-50"
+        >
+          {busy === "save" ? <Loader2 size={11} className="animate-spin" /> : null}
+          SAVE
+        </button>
+        <button
+          onClick={() =>
+            run("test", async () => {
+              await testWebhook(janusOwner());
+              setNote("Test event delivered — check the destination.");
+            })
+          }
+          disabled={!saved || busy !== null}
+          className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+        >
+          {busy === "test" ? <Loader2 size={11} className="animate-spin" /> : null}
+          TEST
+        </button>
+        <button
+          onClick={() =>
+            run("clear", async () => {
+              await deleteWebhook(janusOwner());
+              setUrl("");
+              setSaved(false);
+              setNote("Removed.");
+            })
+          }
+          disabled={!saved || busy !== null}
+          className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+        >
+          CLEAR
+        </button>
+      </div>
+      {note && <p className="text-[10px] text-teal leading-snug">{note}</p>}
+    </div>
   );
 }

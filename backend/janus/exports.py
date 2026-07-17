@@ -73,7 +73,14 @@ def _cite_key(ref: dict, index: int) -> str:
 # --------------------------------------------------------------------------- #
 # LaTeX.
 # --------------------------------------------------------------------------- #
-def build_latex(project_id: int) -> str:
+
+# Journal-flavoured document setups. "article" is the neutral default;
+# "ieee" targets IEEE TGRS/JSTARS-style submissions (IEEEtran is bundled with
+# every TeX distribution and on Overleaf).
+LATEX_JOURNALS = ("article", "ieee")
+
+
+def build_latex(project_id: int, journal: str = "article") -> str:
     project = store.get_project(project_id)
     design = project.get("design") or {}
     runs = figures.collect_runs(project_id)
@@ -81,6 +88,7 @@ def build_latex(project_id: int) -> str:
     biblio = store.get_bibliography(project_id)
     avail = figures.available_figures(project_id)
     slug = _slug(project)
+    journal = journal if journal in LATEX_JOURNALS else "article"
 
     L: list[str] = []
     add = L.append
@@ -88,8 +96,11 @@ def build_latex(project_id: int) -> str:
     add(r"% Generated " + date.today().isoformat() + r" by Janus, the Kairos research mentor.")
     add(r"% Figures: download the SVGs Janus exports for this project and place")
     add(r"%   them next to this .tex file. Names are referenced below.")
-    add(r"\documentclass[11pt]{article}")
-    add(r"\usepackage[margin=1in]{geometry}")
+    if journal == "ieee":
+        add(r"\documentclass[journal]{IEEEtran}")
+    else:
+        add(r"\documentclass[11pt]{article}")
+        add(r"\usepackage[margin=1in]{geometry}")
     add(r"\usepackage{graphicx}")
     add(r"\usepackage{svg}          % renders the Kairos figure SVGs (Overleaf: on)")
     add(r"\usepackage{booktabs}")
@@ -487,3 +498,118 @@ def ris_filename(project: dict) -> str:
 
 def gdoc_filename(project: dict) -> str:
     return f"kairos-doc-{_slug(project)}.html"
+
+
+# --------------------------------------------------------------------------- #
+# Policy brief — the non-academic deliverable.
+# --------------------------------------------------------------------------- #
+def build_policy_brief_html(project_id: int) -> str:
+    """
+    A one-page decision-maker brief: headline finding, what was measured, why
+    it matters, recommended next steps, and an honesty box. Deliberately free
+    of jargon — the audience is an NGO programme lead, an emergency manager or
+    a local official, not a reviewer. Opens cleanly in Google Docs / Word.
+    """
+    project = store.get_project(project_id)
+    design = project.get("design") or {}
+    runs = figures.collect_runs(project_id)
+    vals = figures.collect_validations(project_id)
+
+    css = (
+        "body{font-family:Arial,Helvetica,sans-serif;max-width:7.5in;margin:0 auto;"
+        "color:#111;line-height:1.5}"
+        "h1{font-size:20pt;margin-bottom:2px}"
+        ".kicker{color:#0a7d6f;font-weight:bold;letter-spacing:1px;font-size:9pt}"
+        ".headline{background:#eef7f5;border-left:4px solid #0a7d6f;padding:12px 16px;"
+        "font-size:13pt;margin:14px 0}"
+        "h2{font-size:12pt;text-transform:uppercase;letter-spacing:1px;color:#444;"
+        "margin-top:20px}"
+        ".honesty{background:#fdf6e7;border-left:4px solid #c8871a;padding:10px 14px;"
+        "font-size:10pt}"
+        ".muted{color:#666;font-size:9pt}"
+        "td,th{font-size:10.5pt;padding:4px 10px;border:1px solid #ccc}"
+        "table{border-collapse:collapse}"
+    )
+    P = [
+        "<!doctype html><html><head><meta charset='utf-8'>",
+        f"<title>Brief: {_h(project.get('title'))}</title><style>{css}</style></head><body>",
+        "<div class='kicker'>SATELLITE EVIDENCE BRIEF · KAIROS</div>",
+        f"<h1>{_h(project.get('title', 'Untitled'))}</h1>",
+        f"<p class='muted'>{date.today().strftime('%B %d, %Y')} · prepared with Kairos + Janus "
+        "· free Copernicus Sentinel satellite data</p>",
+    ]
+
+    # Headline: the strongest single number we actually have.
+    if runs:
+        lead = runs[-1]
+        val = (
+            f"{figures._fmt(lead['value'])} {lead['unit']}".strip()
+            if lead["value"] is not None
+            else "see results table"
+        )
+        conf = ""
+        if lead["confidence"] is not None and lead["confidence"] <= 1:
+            conf = f" (model confidence {int(round(lead['confidence'] * 100))}%)"
+        P.append(
+            f"<div class='headline'><b>{_h(lead['label'])}: {_h(val)}</b>{conf}, "
+            f"measured from satellite imagery of {_h(design.get('place') or 'the study area')}"
+            f" as of {_h(lead['data_date'] or 'the latest pass')}.</div>"
+        )
+    else:
+        P.append(
+            "<div class='headline'>No completed measurements yet — this brief "
+            "updates automatically once analyses run.</div>"
+        )
+
+    P.append("<h2>What was measured</h2>")
+    P.append(
+        "<p>Radar satellites (Sentinel-1) image this area every 6–12 days, day or "
+        "night, through cloud. Kairos compared recent passes against the area's "
+        "own historical baseline to detect change on the ground.</p>"
+    )
+    if runs:
+        P.append("<table><tr><th>Measurement</th><th>Result</th><th>Imagery date</th></tr>")
+        for r in runs:
+            v = f"{figures._fmt(r['value'])} {r['unit']}".strip() if r["value"] is not None else ""
+            P.append(
+                f"<tr><td>{_h(r['display_name'])}</td><td>{_h(v)}</td>"
+                f"<td>{_h(r['data_date'] or '')}</td></tr>"
+            )
+        P.append("</table>")
+
+    if vals:
+        P.append("<h2>How reliable is this?</h2>")
+        v = vals[0]
+        f1 = v.get("f1")
+        P.append(
+            "<p>The same method was scored against an independently mapped real "
+            f"event ({_h(v['region'])})"
+            + (
+                f", where it reached an F1 accuracy of {figures._fmt(f1)} "
+                "(1.0 = perfect)."
+                if f1 is not None
+                else "."
+            )
+            + "</p>"
+        )
+
+    P.append("<h2>Suggested next steps</h2><ul>")
+    P.append("<li>Treat mapped areas as priorities for ground verification, not as ground truth.</li>")
+    P.append("<li>Re-run after the next satellite pass (6–12 days) to track change.</li>")
+    P.append("<li>Request the full methods report for technical review or funding submissions.</li>")
+    P.append("</ul>")
+
+    P.append(
+        "<div class='honesty'><b>Honest limits.</b> Radar measures surface "
+        "change, not causes; wet ground can resemble flooding and cleared "
+        "fields can resemble damage. Confidence percentages are model "
+        "estimates, not guarantees. Every number above can be independently "
+        "reproduced — the methods trail is attached to this project.</div>"
+    )
+    P.append("<p class='muted'>Generated by Janus, the Kairos research mentor.</p>")
+    P.append("</body></html>")
+    return "\n".join(P)
+
+
+def policy_brief_filename(project: dict) -> str:
+    return f"kairos-brief-{_slug(project)}.html"

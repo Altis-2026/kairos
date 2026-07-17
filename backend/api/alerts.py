@@ -64,3 +64,72 @@ def alert_check(req: AlertCheckRequest):
         # Only ship the full (heavier) result when there's actually something new.
         "result": result if is_new else None,
     }
+
+
+# --- outbound webhooks -------------------------------------------------------
+
+from pydantic import BaseModel, Field  # noqa: E402
+
+
+class WebhookRequest(BaseModel):
+    owner: str = Field(min_length=1, max_length=128)
+    url: str = Field(min_length=8, max_length=500)
+
+
+class WebhookOwner(BaseModel):
+    owner: str = Field(min_length=1, max_length=128)
+
+
+@router.post("/alerts/webhook")
+def set_webhook(req: WebhookRequest):
+    """
+    Register (or replace) the owner's outbound webhook. Watch findings are
+    POSTed here — Slack incoming webhooks get Slack formatting automatically;
+    any other URL receives the raw JSON event.
+    """
+    import notify
+    from janus import store as janus_store
+
+    try:
+        notify.validate_webhook_url(req.url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    janus_store.set_webhook(req.owner, req.url)
+    return {"saved": True}
+
+
+@router.get("/alerts/webhook")
+def get_webhook(owner: str):
+    from janus import store as janus_store
+
+    return {"url": janus_store.get_webhook(owner)}
+
+
+@router.delete("/alerts/webhook")
+def delete_webhook(owner: str):
+    from janus import store as janus_store
+
+    janus_store.delete_webhook(owner)
+    return {"deleted": True}
+
+
+@router.post("/alerts/webhook/test")
+def test_webhook(req: WebhookOwner):
+    """Send a sample event so the user can prove their webhook works."""
+    import notify
+
+    ok = notify.notify_owner(
+        req.owner,
+        {
+            "title": "Kairos: webhook test",
+            "summary": "If you can read this, your Kairos alerts are wired up.",
+            "kind": "test",
+        },
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=400,
+            detail="Delivery failed — no webhook registered, or the URL did "
+            "not accept the POST.",
+        )
+    return {"delivered": True}

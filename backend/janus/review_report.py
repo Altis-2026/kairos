@@ -31,6 +31,15 @@ _RUBRIC = (
     "### Weaknesses and threats to validity\n'- ' bullets. Be specific: baseline "
     "leakage, unaddressed confounders, overclaiming, missing validation, "
     "coarse-vs-fine resolution mismatches.\n"
+    "Also press the questions real SAR reviewers ask: Was incidence-angle / "
+    "orbit-geometry variation between compared scenes accounted for? What is "
+    "the minimum mapping unit, and are quoted areas more precise than 10 m "
+    "pixels justify? How are mixed boundary pixels handled? Could layover, "
+    "foreshortening or radar shadow contaminate detections in steep terrain? "
+    "Is the claimed change statistically distinguishable from speckle and "
+    "seasonal variation (a trend test or uncertainty range), or merely "
+    "visually different? Are Sentinel-1/PALSAR data properly cited with the "
+    "processing level (GRD amplitude, not coherence) stated?\n"
     "### Required revisions\nNumbered, concrete, each doable in Kairos/Janus.\n"
     "### Suggested revisions\nNumbered, optional improvements.\n"
     "### Verdict\nOne of: Accept, Minor revisions, Major revisions, Reject — with "
@@ -116,6 +125,14 @@ def _deterministic(project_id: int) -> str:
         for msg in store.get_messages(project_id)
         for ev in (msg.get("tool_events") or [])
     )
+    has_uncertainty = any(
+        any(k.endswith("_low_km2") for k in (ev.get("result") or {}))
+        for ev in runs
+    )
+    has_optical_check = any(
+        (ev.get("result") or {}).get("optical_agreement_pct") is not None
+        for ev in runs
+    )
     checks = [
         ("A falsifiable question is stated", bool(project.get("question"))),
         ("A hypothesis is recorded", bool(design.get("hypothesis"))),
@@ -124,6 +141,8 @@ def _deterministic(project_id: int) -> str:
         ("Confounders are listed", bool(design.get("confounders"))),
         ("A validation was run against ground truth", has_validation),
         ("A validation plan is written", bool(design.get("validation_plan"))),
+        ("Results carry uncertainty ranges, not single numbers", has_uncertainty),
+        ("An independent (optical) cross-check was obtained", has_optical_check),
     ]
     lines = [
         f"# Peer-review checklist: {project['title']}",
