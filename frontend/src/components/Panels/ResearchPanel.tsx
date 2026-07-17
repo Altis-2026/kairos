@@ -35,8 +35,10 @@ import {
   fetchCompare,
   fetchOptical,
   fetchPopulationDensity,
+  fetchSignal,
   fetchTimeSeries,
   type AnalysisRef,
+  type SignalResponse,
 } from "../../api/research";
 import { fetchImpact } from "../../api/impact";
 import { buildEmbedSnippet } from "../../lib/embed";
@@ -391,6 +393,8 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
             />
           </div>
 
+          <SignalSection aoi={ref} />
+
           <div className="space-y-2">
             <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
               Human impact
@@ -624,6 +628,149 @@ function ToolRow({
         </span>
       </button>
       {error && <p className="text-[10px] text-amber leading-snug px-1">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Signal & trend: per-scene time series of a chosen variable over the current
+ * AOI, with formal trend statistics — the "Figure 3" of a remote-sensing
+ * paper, generated server-side (chart arrives as publication SVG).
+ */
+function SignalSection({ aoi }: { aoi: AnalysisRef | null }) {
+  const [variable, setVariable] = useState("VV");
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<SignalResponse | null>(null);
+
+  if (!aoi) return null;
+
+  async function run() {
+    if (!aoi || running) return;
+    setRunning(true);
+    setError(null);
+    setResult(null);
+    try {
+      // Widen to a year ending at the analysis window so a trend is visible.
+      const end = aoi.end_date;
+      const start = new Date(
+        new Date(end).getTime() - 365 * 24 * 3600 * 1000
+      )
+        .toISOString()
+        .slice(0, 10);
+      const res = await fetchSignal({
+        bbox: aoi.bbox,
+        start_date: start,
+        end_date: end,
+        variable,
+      });
+      setResult(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Signal extraction failed.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  function downloadCsv() {
+    if (!result) return;
+    const blob = new Blob([result.csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kairos-${result.variable.toLowerCase()}-series.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadChart() {
+    if (!result) return;
+    const blob = new Blob([result.chart_svg], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kairos-${result.variable.toLowerCase()}-series.svg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="space-y-2">
+      <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
+        Signal &amp; trend
+      </h3>
+      <div className="flex items-center gap-1.5">
+        {["VV", "VH", "NDVI", "NDWI", "NDSI"].map((v) => (
+          <button
+            key={v}
+            onClick={() => setVariable(v)}
+            className={`flex-1 rounded-lg px-1.5 py-1.5 font-mono text-[9px] tracking-wider ring-1 transition ${
+              variable === v
+                ? "bg-raised text-teal ring-teal/50"
+                : "text-dim ring-line hover:text-ink"
+            }`}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={run}
+        disabled={running}
+        className="w-full flex items-center gap-2.5 rounded-xl ring-1 ring-line bg-bg/70 px-3 py-2.5 text-left text-dim hover:text-ink transition disabled:opacity-60"
+        title="Every usable observation over the last year, plus OLS and Mann-Kendall trend tests"
+      >
+        <span className="text-dim">
+          {running ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Timer size={14} />
+          )}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-xs text-ink">
+            Extract {variable} time series
+          </span>
+          <span className="block text-[10px] text-dim leading-tight">
+            1-year series over this AOI + trend statistics
+          </span>
+        </span>
+      </button>
+      {error && <p className="text-[10px] text-amber leading-snug px-1">{error}</p>}
+      {result && (
+        <div className="space-y-2">
+          <div className="rounded-xl bg-white ring-1 ring-line overflow-hidden">
+            <img
+              src={`data:image/svg+xml;utf8,${encodeURIComponent(result.chart_svg)}`}
+              alt={`${result.variable} time series`}
+              className="w-full block"
+            />
+          </div>
+          {result.trend && (
+            <p className="text-[10px] text-dim leading-snug px-1">
+              {result.trend.summary}
+            </p>
+          )}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={downloadCsv}
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition"
+            >
+              <Download size={11} /> CSV · {result.count} OBS
+            </button>
+            <button
+              onClick={downloadChart}
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition"
+            >
+              <Download size={11} /> CHART · SVG
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -79,13 +79,32 @@ def check_project(project: dict) -> bool:
         "end_date": new_date,
         "label": f"Re-run {name} on the {new_date} pass",
     }
-    return store.add_insight(
+    created = store.add_insight(
         project["id"],
         kind="new_pass",
         content=content,
         dedupe_key=f"new_pass:{new_date}",
         action=action,
     )
+    if created:
+        # Push to the owner's webhook too (Slack/Discord/custom). Never fatal,
+        # and only for genuinely new insights so retries can't spam.
+        try:
+            import notify
+
+            notify.notify_owner(
+                project["owner"],
+                {
+                    "title": f"Kairos: new satellite pass over “{project['title']}”",
+                    "summary": content,
+                    "project_id": project["id"],
+                    "kind": "new_pass",
+                    "data_date": new_date,
+                },
+            )
+        except Exception:
+            pass
+    return created
 
 
 def run_cycle() -> dict:
