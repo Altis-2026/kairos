@@ -7,6 +7,7 @@ import {
   createProject,
   deleteProject,
   dismissInsight,
+  fetchCompanion,
   fetchCurricula,
   fetchEntitlements,
   fetchJanusStatus,
@@ -37,6 +38,7 @@ interface JanusState {
 
   loadHome: () => Promise<void>;
   open: (id: number) => Promise<void>;
+  openCompanion: () => Promise<void>;
   startProject: (
     title: string,
     question: string,
@@ -96,6 +98,26 @@ export const useJanusStore = create<JanusState>((set, get) => ({
       set({
         openingId: null,
         error: e instanceof Error ? e.message : "Couldn't open the project.",
+      });
+    }
+  },
+
+  openCompanion: async () => {
+    set({ openingId: -2, error: null });
+    try {
+      const bundle = await fetchCompanion();
+      set({
+        bundle: {
+          ...bundle,
+          insights: bundle.insights ?? [],
+          hypotheses: bundle.hypotheses ?? [],
+        },
+        openingId: null,
+      });
+    } catch (e) {
+      set({
+        openingId: null,
+        error: e instanceof Error ? e.message : "Couldn't open the chat.",
       });
     }
   },
