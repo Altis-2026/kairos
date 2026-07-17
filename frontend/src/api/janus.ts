@@ -381,3 +381,53 @@ export function downloadFigure(
     `kairos-${kind.replace(/_/g, "-")}-${slugify(title)}.svg`
   );
 }
+
+/** Download the one-page plain-language policy/decision brief. */
+export function downloadPolicyBrief(projectId: number, title: string) {
+  return downloadDoc(
+    `/janus/projects/${projectId}/brief`,
+    `kairos-brief-${slugify(title)}.html`
+  );
+}
+
+export interface ProjectDataset {
+  id: number;
+  name: string;
+  feature_count: number;
+  bbox: [number, number, number, number] | null;
+  created_at: number;
+}
+
+/** List the user's uploaded datasets on a project. */
+export function listDatasets(
+  projectId: number
+): Promise<{ datasets: ProjectDataset[] }> {
+  return apiFetch(
+    `/janus/projects/${projectId}/datasets?owner=${encodeURIComponent(janusOwner())}`
+  );
+}
+
+/** Upload field data (GeoJSON object or CSV text) to a project. */
+export function uploadDataset(
+  projectId: number,
+  name: string,
+  payload: { geojson?: unknown; csv?: string }
+): Promise<{ dataset: ProjectDataset }> {
+  return apiFetch(`/janus/projects/${projectId}/datasets`, {
+    method: "POST",
+    body: JSON.stringify({ owner: janusOwner(), name, ...payload }),
+  });
+}
+
+/** Remove an uploaded dataset. */
+export function deleteDataset(
+  projectId: number,
+  datasetId: number
+): Promise<{ deleted: boolean }> {
+  return apiFetch(
+    `/janus/projects/${projectId}/datasets/${datasetId}?owner=${encodeURIComponent(
+      janusOwner()
+    )}`,
+    { method: "DELETE" }
+  );
+}

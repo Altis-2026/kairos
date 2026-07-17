@@ -185,6 +185,107 @@ CONCEPTS = {
             {"name": "USGS Landsat Missions", "url": "https://www.usgs.gov/landsat-missions"},
         ],
     },
+    "geometric-artifacts": {
+        "title": "Layover, foreshortening and radar shadow",
+        "explanation": (
+            "SAR measures distance, not angle, so terrain distorts the image "
+            "in ways optical users don't expect. Foreshortening: slopes "
+            "facing the sensor are compressed and read unnaturally bright — "
+            "a mountainside can shrink to a bright sliver. Layover: when a "
+            "slope is steeper than the radar's incidence angle, the mountain "
+            "TOP is closer to the satellite than its base, so the peak is "
+            "imaged on the wrong side — the mountain folds over itself. "
+            "Shadow: behind steep terrain the radar simply cannot see, and "
+            "those pixels contain no data at all (not 'dark ground' — "
+            "nothing). Any detection inside layover or shadow zones is "
+            "unreliable, which is why mountainous AOIs deserve extra "
+            "scepticism and why ascending vs descending orbit passes see "
+            "different sides of the same ridge."
+        ),
+        "resources": [
+            {"name": "ASF: SAR image distortions", "url": "https://asf.alaska.edu/information/sar-information/what-is-sar/"},
+            {"name": "NASA ARSET: SAR fundamentals training", "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset"},
+        ],
+    },
+    "incidence-angle": {
+        "title": "Incidence angle",
+        "explanation": (
+            "The angle between the radar beam and the vertical at the ground "
+            "— roughly 30-46 degrees across a Sentinel-1 IW swath. The same "
+            "field can read several dB brighter at the near edge of the "
+            "swath than the far edge, purely from geometry. This matters "
+            "whenever you compare scenes: two passes with different "
+            "geometries over the same spot are not directly comparable "
+            "pixel-for-pixel. Kairos's change detections mitigate this by "
+            "compositing multiple scenes per window, but a careful study "
+            "notes it, and a reviewer WILL ask. Filtering to a single "
+            "relative orbit is the rigorous fix when precision matters."
+        ),
+        "resources": [
+            {"name": "ESA Sentinel-1 acquisition modes", "url": "https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-1-sar/acquisition-modes"},
+        ],
+    },
+    "coherence-vs-amplitude": {
+        "title": "Coherence vs amplitude (and what Kairos can/can't do)",
+        "explanation": (
+            "Amplitude is how much energy comes back; coherence is whether "
+            "the PHASE relationship between two passes stays stable. "
+            "Coherence-based change detection is exquisitely sensitive — a "
+            "field being ploughed or a building collapsing destroys phase "
+            "stability before the amplitude changes much. But coherence "
+            "requires SLC (single-look complex) products that keep the phase, "
+            "and interferometric processing. The free Sentinel-1 archive in "
+            "Earth Engine is GRD — amplitude only, phase discarded — so "
+            "Kairos's detections are amplitude-based, and honest about it. "
+            "True coherence/InSAR (millimetre deformation, earthquake "
+            "damage proxies) needs SLC processing infrastructure — it is on "
+            "the Kairos roadmap as exactly that."
+        ),
+        "resources": [
+            {"name": "ASF: InSAR introduction", "url": "https://asf.alaska.edu/information/sar-information/what-is-insar/"},
+            {"name": "ESA InSAR principles", "url": "https://www.esa.int/Applications/Observing_the_Earth/"},
+        ],
+    },
+    "l-band-penetration": {
+        "title": "L-band penetration: seeing under sand and canopy",
+        "explanation": (
+            "Penetration scales with wavelength. C-band (~5.5 cm, Sentinel-1) "
+            "interacts with leaves and the upper canopy; L-band (~24 cm, "
+            "ALOS PALSAR, NISAR) passes through foliage to trunks and ground, "
+            "and in hyper-arid sand can reach metres below the surface — "
+            "SIR-A famously imaged buried paleochannels under the Sahara in "
+            "1982, and L-band archaeology has mapped features invisible on "
+            "the ground since. The catch: penetration in soil requires "
+            "EXTREMELY dry conditions (moisture kills it), and 'seeing "
+            "under canopy' means the return mixes ground and trunk signals, "
+            "not that you get a clean picture of the floor. Kairos's "
+            "Archaeology Mode and biomass analysis both ride on PALSAR "
+            "L-band mosaics for exactly these reasons."
+        ),
+        "resources": [
+            {"name": "JAXA ALOS PALSAR", "url": "https://www.eorc.jaxa.jp/ALOS/en/dataset/palsar_e.htm"},
+            {"name": "NASA NISAR mission", "url": "https://nisar.jpl.nasa.gov/"},
+        ],
+    },
+    "minimum-mapping-unit": {
+        "title": "Minimum mapping unit and mixed pixels",
+        "explanation": (
+            "A 10 m Sentinel-1 pixel covers 100 m². A detection smaller than "
+            "a few pixels is indistinguishable from speckle, which is why "
+            "honest SAR mapping states a minimum mapping unit — the smallest "
+            "feature the method can reliably claim — typically several times "
+            "the pixel area after speckle filtering. Mixed pixels (half "
+            "water, half field) return intermediate values that threshold "
+            "methods assign arbitrarily, so area estimates carry an inherent "
+            "boundary uncertainty proportional to the perimeter. Reviewers "
+            "ask about both; Kairos's uncertainty ranges (threshold "
+            "ensembles) are one honest answer, and quoting area to the "
+            "nearest 0.01 km² from 10 m pixels is the classic mistake."
+        ),
+        "resources": [
+            {"name": "NASA ARSET: SAR for land applications", "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset"},
+        ],
+    },
 }
 
 RESOURCE_DIRECTORY = [

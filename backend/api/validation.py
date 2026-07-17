@@ -41,3 +41,15 @@ def run_validation(request: ValidationRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Validation failed: {e}")
+
+
+@router.get("/scoreboard")
+def public_scoreboard():
+    """
+    The public accuracy scoreboard: aggregated skill (IoU/precision/recall/F1)
+    per benchmark across every validation run ever executed. No auth — being
+    public is the point.
+    """
+    import scoreboard
+
+    return scoreboard.summary()

@@ -16,14 +16,19 @@ from fastapi import APIRouter, HTTPException
 
 from models.requests import (
     AnalyzeRequest,
+    CompareAnalysesRequest,
     OpticalRequest,
     PopulationRequest,
+    SignalRequest,
     TimeSeriesRequest,
 )
+import stats
 from gee import common
 from gee.optical import optical_image
 from gee.impact import population_density_tile
 from gee.registry import ANALYSIS_REGISTRY
+from gee.signal import extract_series
+from janus.figures import comparison_figure_svg, timeseries_figure_svg
 
 router = APIRouter()
 
@@ -207,3 +212,162 @@ def timeseries(req: TimeSeriesRequest):
         "metric": frames[-1]["label"],
         "unit": frames[-1]["unit"],
     }
+
+
+@router.post("/research/signal")
+def signal(req: SignalRequest):
+    """
+    Per-scene signal time series over the AOI (the researcher's "Figure 3"):
+    every usable observation of the chosen variable, plus formal trend
+    statistics (OLS with exact t-test p-value, Mann-Kendall + Sen's slope),
+    a ready-to-download CSV, and a publication SVG chart.
+    """
+    try:
+        series = extract_series(
+            req.bbox, req.start_date, req.end_date, req.variable, req.source
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Signal extraction failed: {e}")
+
+    trend = None
+    if len(series["points"]) >= 4:
+        try:
+            trend = stats.trend_report(series["points"])
+        except ValueError:
+            trend = None
+
+    csv_lines = ["date,value"] + [
+        f'{p["date"]},{p["value"]}' for p in series["points"]
+    ]
+    chart = timeseries_figure_svg(
+        series["points"],
+        series["variable"],
+        series["unit"],
+        series["source"],
+        trend,
+    )
+
+    return {
+        **series,
+        "trend": trend,
+        "csv": "\n".join(csv_lines),
+        "chart_svg": chart,
+    }
+
+
+@router.post("/research/compare_analyses")
+def compare_analyses(req: CompareAnalysesRequest):
+    """
+    The same analysis run on two sites (place-vs-place) or two windows
+    (time-vs-time), returned side by side with the delta and a comparison
+    figure — the shape a comparative case study needs.
+    """
+    if req.analysis_type not in ANALYSIS_REGISTRY:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown analysis type '{req.analysis_type}'."
+        )
+    cfg = ANALYSIS_REGISTRY[req.analysis_type]
+    fn = cfg["function"]
+
+    results = {}
+    for side, spec in (("a", req.a), ("b", req.b)):
+        try:
+            raw = fn(
+                bbox=spec.bbox,
+                start_date=spec.start_date,
+                end_date=spec.end_date,
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400, detail=f"Side {side.upper()}: {e}"
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Side {side.upper()} failed: {e}"
+            )
+        raw.pop("result_image", None)
+        results[side] = raw
+
+    hs_a = results["a"].get("headline_stat", {})
+    hs_b = results["b"].get("headline_stat", {})
+    label_a = req.a.label or f"A · {req.a.start_date}"
+    label_b = req.b.label or f"B · {req.b.start_date}"
+
+    delta = None
+    delta_pct = None
+    try:
+        va, vb = float(hs_a.get("value")), float(hs_b.get("value"))
+        delta = round(vb - va, 3)
+        delta_pct = round(100 * (vb - va) / va, 1) if va else None
+    except (TypeError, ValueError):
+        pass
+
+    figure = comparison_figure_svg(
+        {"label": label_a, "value": float(hs_a.get("value") or 0)},
+        {"label": label_b, "value": float(hs_b.get("value") or 0)},
+        hs_a.get("label") or cfg["display_name"],
+        hs_a.get("unit") or "",
+    )
+
+    return {
+        "analysis_type": req.analysis_type,
+        "display_name": cfg["display_name"],
+        "a": {"label": label_a, **results["a"]},
+        "b": {"label": label_b, **results["b"]},
+        "delta": delta,
+        "delta_pct": delta_pct,
+        "figure_svg": figure,
+    }
+
+
+@router.post("/research/cog_preview")
+def cog_preview(body: dict):
+    """
+    Bring-your-own-imagery (beta): preview a Cloud-Optimized GeoTIFF the user
+    hosts on Google Cloud Storage (gs://bucket/path.tif) as a map layer, via
+    ee.Image.loadGeoTIFF. The asset must be publicly readable or readable by
+    the Kairos service account. First step toward full commercial-imagery
+    support (Capella/ICEYE/Maxar exports are COGs).
+    """
+    import ee
+    from gee import common as gee_common
+
+    uri = (body.get("uri") or "").strip()
+    if not uri.startswith("gs://"):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide a gs:// URI to a Cloud-Optimized GeoTIFF. (Other "
+            "hosts aren't supported yet — GEE's loadGeoTIFF reads from GCS.)",
+        )
+    try:
+        img = ee.Image.loadGeoTIFF(uri)
+        band_names = img.bandNames().getInfo()
+        band = body.get("band") or band_names[0]
+        # Percentile stretch over the image footprint for a sane default view.
+        pct = img.select(band).reduceRegion(
+            reducer=ee.Reducer.percentile([2, 98]),
+            geometry=img.geometry(),
+            scale=body.get("scale", 60),
+            maxPixels=1e9,
+            bestEffort=True,
+        ).getInfo()
+        vmin = body.get("min", pct.get(f"{band}_p2", 0))
+        vmax = body.get("max", pct.get(f"{band}_p98", 1))
+        url = gee_common.tile_url(img.select(band), {"min": vmin, "max": vmax})
+        return {
+            "tile_url": url,
+            "bands": band_names,
+            "band": band,
+            "stretch": {"min": vmin, "max": vmax},
+            "note": "Rendered directly from your COG — nothing was copied or ingested.",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Could not load that COG: {e}. Check the URI and that the "
+            "Kairos service account (or allUsers) can read it.",
+        )

@@ -192,6 +192,11 @@ def run_benchmark(benchmark_id: str) -> dict:
         ref.selfMask(), {"palette": ["#E8A318"], "min": 0, "max": 1}
     )
 
+    # Every real run feeds the public accuracy scoreboard (never fatal).
+    import scoreboard
+
+    scoreboard.log_run(bm, metrics)
+
     return {
         "benchmark": {k: v for k, v in bm.items()},
         "metrics": metrics,
