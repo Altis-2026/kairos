@@ -190,10 +190,66 @@ The output no longer stops one step short of "paste into your actual paper."
   All export/figure endpoints reuse the existing ownership check and the
   `reproducibility_pack` entitlement.
 
-### v6 — the moat (next)
+### v6 — the researcher's workbench (SHIPPED)
+Everything on the "buildable now" list, live and verified against real GEE:
+
+- **Five new analyses** (21 total): surface soil moisture (per-pixel VV
+  change-detection against its own 12-month dry/wet envelope), flooded
+  forest/mangrove (double-bounce brightening under canopy — a SAR-only
+  capability), wet-snow melt extent (Nagler ratio method + melt elevation
+  band, verified at 96% optical NDSI agreement in the Alps), flood consensus
+  (SAR + optical agreement classes; verified at 69% agreement on the 2024
+  Valencia DANA floods, and it honestly REFUSES when clouds block optical),
+  and Archaeology Mode (L-band PALSAR texture anomalies under sand/canopy,
+  framed as survey candidates, never discoveries).
+- **Signal & trend workbench**: per-scene time series of VV/VH/NDVI/NDWI/NDSI
+  over any AOI (Sentinel-2 or HLS/Landsat optical), with OLS regression
+  (exact Student-t p-values, no scipy) and Mann-Kendall + Sen's slope,
+  CSV export, and a publication SVG chart. In the Research panel and as the
+  `extract_time_series` Janus tool.
+- **A/B comparison**: same analysis, two sites or two windows, with delta and
+  a comparison figure (`/research/compare_analyses` + `compare_analyses` tool).
+- **Provenance signing**: every /analyze result carries a SHA-256 + HMAC
+  provenance block; `POST /verify` proves a result untampered (presentation
+  changes don't break it; changing one number does).
+- **Public accuracy scoreboard** (`GET /scoreboard`): every ground-truth
+  validation run ever executed, aggregated per benchmark, shown in Analytics.
+- **Outbound webhooks**: watch findings POST to the user's Slack/JSON
+  endpoint (SSRF-guarded registration, test button in Alerts).
+- **Policy brief export**: a one-page plain-language decision-maker brief
+  (headline, reliability, next steps, honest-limits box) alongside the
+  academic exports; LaTeX export gained an IEEEtran journal option.
+- **Bring-your-own-data v1**: upload GeoJSON/CSV field data to a project,
+  use it as AOI or as private ground truth — `validate_against_my_data`
+  scores any detector against YOUR polygons with the benchmark machinery.
+  Plus `POST /research/cog_preview` renders a user's own Cloud-Optimized
+  GeoTIFF (gs://) as map tiles (beta path to commercial imagery).
+- **Shared projects**: owners invite members (PI + students); members get
+  full working access, owner keeps delete/share rights.
+- **API keys + docs** (`docs/API.md`): mint/revoke keys, `X-API-Key`
+  metering middleware, per-owner usage summaries.
+- **Portfolio monitoring**: register up to 50 sites, one digest call flags
+  which have fresh (<3 days) imagery worth analyzing now.
+- **Janus expertise pack**: five new grounded concepts (layover/shadow,
+  incidence angle, coherence-vs-amplitude, L-band penetration, minimum
+  mapping unit), SAR-reviewer pushback baked into peer review (incidence
+  angle, MMU, mixed pixels, speckle-vs-significance), two new rigor checks,
+  and a Radar Archaeology curriculum track.
+
+**Honest scope notes:** true coherence change detection and full-pol
+decompositions (Pauli, Cloude-Pottier, Freeman-Durden) are NOT possible from
+the GRD amplitude archive GEE carries — they need SLC/full-pol data and real
+processing infrastructure. That is exactly the v7 InSAR item, and Janus's
+`coherence-vs-amplitude` concept teaches users the difference rather than
+pretending.
+
+### v7 — the moat (next)
 - **True InSAR:** a compute backend (SNAP/ISCE on Cloud Batch) pulling SLC
   from ASF with the Earthdata token — the one item that needs real
   infrastructure spend, not just a key.
+- **GPU hydrodynamic flood simulation** (Inunda-class): predictive flood
+  wave modeling fused with SAR detection for correction — also real compute
+  spend.
 - **Cohorts and classrooms:** teacher dashboards, assignment templates,
   team projects (school license revenue).
 - **Janus-reviewed public gallery:** finished student projects published with

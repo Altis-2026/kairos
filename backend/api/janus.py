@@ -71,12 +71,26 @@ class WatchRequest(BaseModel):
 
 
 def _owned_project(project_id: int, owner: str) -> dict:
+    """Owner OR invited member may work on a project (shared projects)."""
+    try:
+        project = store.get_project(project_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if project["owner"] != owner and not store.is_member(project_id, owner):
+        raise HTTPException(status_code=403, detail="Not your project.")
+    return project
+
+
+def _strictly_owned(project_id: int, owner: str) -> dict:
+    """Destructive/administrative actions stay owner-only."""
     try:
         project = store.get_project(project_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     if project["owner"] != owner:
-        raise HTTPException(status_code=403, detail="Not your project.")
+        raise HTTPException(
+            status_code=403, detail="Only the project owner can do that."
+        )
     return project
 
 
@@ -175,9 +189,52 @@ def update_project(project_id: int, request: UpdateProjectRequest):
 def delete_project(
     project_id: int, owner: str = Query(..., min_length=1, max_length=128)
 ):
-    _owned_project(project_id, owner)
+    _strictly_owned(project_id, owner)
     store.delete_project(project_id)
     return {"deleted": True}
+
+
+# --- shared projects ----------------------------------------------------------
+
+
+class MemberRequest(BaseModel):
+    owner: str = Field(min_length=1, max_length=128)
+    member: str = Field(min_length=1, max_length=128)
+
+
+@router.post("/janus/projects/{project_id}/members")
+def add_member(project_id: int, req: MemberRequest):
+    """Share the project with another account (PI adds a student, etc.)."""
+    _strictly_owned(project_id, req.owner)
+    if req.member == req.owner:
+        raise HTTPException(status_code=400, detail="You already own this project.")
+    store.add_member(project_id, req.member)
+    return {"members": store.list_members(project_id)}
+
+
+@router.get("/janus/projects/{project_id}/members")
+def project_members(
+    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
+):
+    _owned_project(project_id, owner)
+    return {"members": store.list_members(project_id)}
+
+
+@router.delete("/janus/projects/{project_id}/members/{member}")
+def remove_member(
+    project_id: int,
+    member: str,
+    owner: str = Query(..., min_length=1, max_length=128),
+):
+    _strictly_owned(project_id, owner)
+    store.remove_member(project_id, member)
+    return {"members": store.list_members(project_id)}
+
+
+@router.get("/janus/shared")
+def shared_projects(owner: str = Query(..., min_length=1, max_length=128)):
+    """Projects other people have shared with this account."""
+    return {"projects": store.shared_with(owner)}
 
 
 @router.post("/janus/projects/{project_id}/chat")
@@ -316,18 +373,37 @@ def _attachment(content: str, filename: str, media_type: str) -> PlainTextRespon
 
 @router.get("/janus/projects/{project_id}/latex", response_class=PlainTextResponse)
 def download_latex(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
+    project_id: int,
+    owner: str = Query(..., min_length=1, max_length=128),
+    journal: str = Query(default="article", pattern="^(article|ieee)$"),
 ):
-    """An Overleaf-ready LaTeX manuscript for the project."""
+    """An Overleaf-ready LaTeX manuscript (generic article or IEEEtran)."""
     project = _owned_project(project_id, owner)
     try:
         entitlements.require(owner, "reproducibility_pack")
     except entitlements.FeatureLocked as e:
         raise HTTPException(status_code=402, detail=str(e))
     return _attachment(
-        exports.build_latex(project_id),
+        exports.build_latex(project_id, journal=journal),
         exports.latex_filename(project),
         "application/x-tex; charset=utf-8",
+    )
+
+
+@router.get("/janus/projects/{project_id}/brief", response_class=PlainTextResponse)
+def download_policy_brief(
+    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
+):
+    """A one-page plain-language policy/decision brief (opens in Google Docs)."""
+    project = _owned_project(project_id, owner)
+    try:
+        entitlements.require(owner, "reproducibility_pack")
+    except entitlements.FeatureLocked as e:
+        raise HTTPException(status_code=402, detail=str(e))
+    return _attachment(
+        exports.build_policy_brief_html(project_id),
+        exports.policy_brief_filename(project),
+        "text/html; charset=utf-8",
     )
 
 
@@ -411,3 +487,57 @@ def citations(
 def dismiss_insight(insight_id: int):
     store.dismiss_insight(insight_id)
     return {"dismissed": True}
+
+
+# --- bring-your-own-data (v1) ------------------------------------------------
+
+
+class DatasetUpload(BaseModel):
+    owner: str = Field(min_length=1, max_length=128)
+    name: str = Field(min_length=1, max_length=120)
+    geojson: dict | None = None
+    csv: str | None = Field(default=None, max_length=1_000_000)
+
+
+@router.post("/janus/projects/{project_id}/datasets")
+def upload_dataset(project_id: int, req: DatasetUpload):
+    """
+    Attach the student's own data to a project: GeoJSON (points/polygons) or
+    a CSV with lon/lat columns. Used as AOIs and as private ground truth.
+    """
+    from janus import datasets
+
+    _owned_project(project_id, req.owner)
+    if not req.geojson and not req.csv:
+        raise HTTPException(
+            status_code=400, detail="Provide either 'geojson' or 'csv'."
+        )
+    try:
+        gj = req.geojson or datasets.csv_to_geojson(req.csv)
+        saved = datasets.add_dataset(project_id, req.name, gj)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"dataset": saved}
+
+
+@router.get("/janus/projects/{project_id}/datasets")
+def project_datasets(
+    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
+):
+    from janus import datasets
+
+    _owned_project(project_id, owner)
+    return {"datasets": datasets.list_datasets(project_id)}
+
+
+@router.delete("/janus/projects/{project_id}/datasets/{dataset_id}")
+def remove_dataset(
+    project_id: int,
+    dataset_id: int,
+    owner: str = Query(..., min_length=1, max_length=128),
+):
+    from janus import datasets
+
+    _owned_project(project_id, owner)
+    datasets.delete_dataset(dataset_id, project_id)
+    return {"deleted": True}

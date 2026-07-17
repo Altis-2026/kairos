@@ -508,6 +508,128 @@ def validation_figure_svg(project_id: int) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Standalone figures (no project store needed) — used by the research API.
+# --------------------------------------------------------------------------- #
+def timeseries_figure_svg(
+    points: list, variable: str, unit: str, source: str, trend: dict = None,
+    title: str = "",
+) -> str:
+    """
+    Publication line chart of an extracted signal series ([{date, value}...]),
+    with the OLS trend line overlaid when trend stats are provided.
+    """
+    W, H = 900, 420
+    pad_l, pad_r, pad_t, pad_b = 80, 40, 96, 60
+    out = _svg_open(W, H, f"{variable} time series")
+    out.append(_text(48, 46, title or f"{variable} over time", 20, INK, "700"))
+    out.append(_text(48, 70, f"{source} · {len(points)} observations", 13, DIM))
+
+    values = [p["value"] for p in points]
+    vmin, vmax = min(values), max(values)
+    span = (vmax - vmin) or 1.0
+    vmin -= span * 0.1
+    vmax += span * 0.1
+
+    from datetime import datetime as _dt
+
+    ts = [_dt.strptime(p["date"], "%Y-%m-%d") for p in points]
+    t0, t1 = ts[0], ts[-1]
+    trange = max((t1 - t0).days, 1)
+
+    plot_w = W - pad_l - pad_r
+    plot_h = H - pad_t - pad_b
+    x_at = lambda t: pad_l + (t - t0).days / trange * plot_w
+    y_at = lambda v: pad_t + (vmax - v) / (vmax - vmin) * plot_h
+
+    # Horizontal gridlines + y labels.
+    for g in range(5):
+        v = vmin + g * (vmax - vmin) / 4
+        y = y_at(v)
+        out.append(
+            f'<line x1="{pad_l}" y1="{y:.1f}" x2="{W - pad_r}" y2="{y:.1f}" '
+            f'stroke="{GRID}" stroke-width="1"/>'
+        )
+        out.append(_text(pad_l - 10, y + 4, _fmt(v), 11, DIM, anchor="end"))
+    # X labels: first, middle, last date.
+    for t in (t0, ts[len(ts) // 2], t1):
+        out.append(
+            _text(x_at(t), H - pad_b + 22, t.strftime("%Y-%m-%d"), 11, DIM,
+                  anchor="middle")
+        )
+
+    # OLS trend line under the data.
+    if trend and trend.get("ols"):
+        ols = trend["ols"]
+        y_start = ols["intercept"]
+        y_end = ols["intercept"] + ols["slope_per_year"] * (trange / 365.25)
+        out.append(
+            f'<line x1="{pad_l}" y1="{y_at(y_start):.1f}" '
+            f'x2="{W - pad_r}" y2="{y_at(y_end):.1f}" '
+            f'stroke="{AMBER}" stroke-width="2" stroke-dasharray="6 4"/>'
+        )
+
+    # The series itself.
+    path = " ".join(
+        f'{"M" if i == 0 else "L"}{x_at(t):.1f},{y_at(v):.1f}'
+        for i, (t, v) in enumerate(zip(ts, values))
+    )
+    out.append(
+        f'<path d="{path}" fill="none" stroke="{TEAL}" stroke-width="2"/>'
+    )
+    for t, v in zip(ts, values):
+        out.append(
+            f'<circle cx="{x_at(t):.1f}" cy="{y_at(v):.1f}" r="3" '
+            f'fill="{TEAL_DK}"/>'
+        )
+
+    out.append(
+        _text(pad_l, H - 16,
+              f"{variable} ({unit})"
+              + (f" — {trend['summary']}" if trend and trend.get("summary") else ""),
+              10, DIM)
+    )
+    out.append("</svg>")
+    return "\n".join(out)
+
+
+def comparison_figure_svg(a: dict, b: dict, metric_label: str, unit: str) -> str:
+    """
+    Two labelled bars for an A/B comparison (two sites or two periods) of the
+    same analysis: a = {"label", "value"}, b likewise.
+    """
+    W, H = 900, 320
+    pad_l = 260
+    out = _svg_open(W, H, "Comparison")
+    out.append(_text(48, 46, f"{metric_label} — comparison", 20, INK, "700"))
+
+    vmax = max(a["value"], b["value"]) or 1.0
+    plot_w = (W - pad_l - 60) * 0.8
+    rows = [(a, TEAL), (b, AMBER)]
+    for i, (r, color) in enumerate(rows):
+        y = 100 + i * 80
+        label = r["label"] if len(r["label"]) <= 30 else r["label"][:29] + "…"
+        out.append(_text(pad_l - 16, y + 26, label, 14, INK, "600", "end"))
+        bw = max(1.0, r["value"] / vmax * plot_w)
+        out.append(
+            f'<rect x="{pad_l}" y="{y}" width="{bw:.1f}" height="40" rx="4" '
+            f'fill="{color}"/>'
+        )
+        out.append(
+            _text(pad_l + bw + 12, y + 26,
+                  f'{_fmt(r["value"])} {unit}'.strip(), 13, INK, "700")
+        )
+
+    if a["value"] > 0:
+        delta_pct = round(100 * (b["value"] - a["value"]) / a["value"], 1)
+        sign = "+" if delta_pct >= 0 else ""
+        out.append(
+            _text(48, H - 20, f"B relative to A: {sign}{delta_pct}%", 12, DIM)
+        )
+    out.append("</svg>")
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- #
 # Dispatch.
 # --------------------------------------------------------------------------- #
 _BUILDERS = {

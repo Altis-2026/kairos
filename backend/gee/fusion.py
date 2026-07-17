@@ -28,6 +28,10 @@ _CS_CLEAR = 0.6
 _NDWI_WATER = 0.0
 # dNBR above ~0.27 is moderate-or-worse burn severity (Key & Benson, FIREMON).
 _DNBR_BURN = 0.27
+# NDVI drop of more than 0.2 between windows reads as vegetation loss.
+_NDVI_LOSS = 0.2
+# NDSI above 0.4 is the standard optical snow test (Dozier).
+_NDSI_SNOW = 0.4
 
 
 def _masked_composite(geometry: ee.Geometry, start_date: str, end_date: str) -> ee.Image:
@@ -115,6 +119,55 @@ def confirm_water(
     stats = _agreement_stats(sar_mask, optical_water, valid, geometry)
     return {
         "optical_confirmation": "Sentinel-2 NDWI",
+        "optical_coverage_pct": stats["coverage_pct"],
+        "optical_agreement_pct": stats["agreement_pct"],
+    }
+
+
+def confirm_vegetation_loss(
+    sar_mask: ee.Image,
+    geometry: ee.Geometry,
+    start_date: str,
+    end_date: str,
+    pre_start: str,
+    pre_end: str,
+) -> dict:
+    """
+    Confirm a SAR vegetation-loss mask (deforestation, land disturbance)
+    against a Sentinel-2 NDVI drop between the pre and post windows.
+    """
+    post = _masked_composite(geometry, start_date, end_date)
+    pre = _masked_composite(geometry, pre_start, pre_end)
+
+    ndvi_post = post.normalizedDifference(["B8", "B4"])
+    ndvi_pre = pre.normalizedDifference(["B8", "B4"])
+    optical_loss = ndvi_pre.subtract(ndvi_post).gt(_NDVI_LOSS)
+    valid = post.select("B8").mask().And(pre.select("B8").mask())
+
+    stats = _agreement_stats(sar_mask, optical_loss, valid, geometry)
+    return {
+        "optical_confirmation": "Sentinel-2 NDVI change",
+        "optical_coverage_pct": stats["coverage_pct"],
+        "optical_agreement_pct": stats["agreement_pct"],
+    }
+
+
+def confirm_snow(
+    sar_mask: ee.Image, geometry: ee.Geometry, start_date: str, end_date: str
+) -> dict:
+    """
+    Confirm a SAR wet-snow mask against the Sentinel-2 NDSI snow test in the
+    same window. Optical sees ALL snow (wet or dry) so agreement here means
+    "the melt zone is at least snow-covered", not "the snow is wet".
+    """
+    composite = _masked_composite(geometry, start_date, end_date)
+    ndsi = composite.normalizedDifference(["B3", "B11"])
+    optical_snow = ndsi.gt(_NDSI_SNOW)
+    valid = composite.select("B3").mask()
+
+    stats = _agreement_stats(sar_mask, optical_snow, valid, geometry)
+    return {
+        "optical_confirmation": "Sentinel-2 NDSI",
         "optical_coverage_pct": stats["coverage_pct"],
         "optical_agreement_pct": stats["agreement_pct"],
     }

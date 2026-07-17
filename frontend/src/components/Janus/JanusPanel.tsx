@@ -48,6 +48,7 @@ import {
   downloadLatex,
   downloadNotebook,
   downloadPack,
+  downloadPolicyBrief,
   downloadRis,
   fetchFigures,
   fetchPeerReview,
@@ -1086,6 +1087,19 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                 <Quote size={11} />
               )}
               .RIS
+            </button>
+            <button
+              onClick={() => runExport("brief", downloadPolicyBrief)}
+              disabled={busyExport !== null}
+              title="One-page plain-language brief for decision makers (NGO, government, press)"
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-amber/30 text-amber hover:bg-amber/10 transition disabled:opacity-50"
+            >
+              {busyExport === "brief" ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <FileText size={11} />
+              )}
+              BRIEF
             </button>
           </div>
 

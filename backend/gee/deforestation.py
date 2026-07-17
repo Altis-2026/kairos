@@ -11,7 +11,7 @@ Data source: Sentinel-1 GRD, IW mode, VH polarization time series.
 """
 
 from datetime import datetime, timedelta
-from gee import common
+from gee import common, fusion
 
 
 def detect_deforestation(bbox: list, start_date: str, end_date: str) -> dict:
@@ -49,7 +49,7 @@ def detect_deforestation(bbox: list, start_date: str, end_date: str) -> dict:
     loss_km2 = common.area_km2(loss, geometry, band="VH", scale=30)
     data_date = common.latest_image_date(current)
 
-    return {
+    result = {
         "tile_url": url,
         "result_image": loss,
         "forest_loss_km2": loss_km2,
@@ -59,3 +59,34 @@ def detect_deforestation(bbox: list, start_date: str, end_date: str) -> dict:
         "baseline_images_used": baseline_count,
         "headline_stat": {"label": "Forest loss", "value": loss_km2, "unit": "km²"},
     }
+
+    # Optical cross-check: an NDVI drop over the same pixels is independent
+    # evidence of canopy loss. Clouds are normal — SAR result stands alone.
+    try:
+        result.update(
+            fusion.confirm_vegetation_loss(
+                loss,
+                geometry,
+                start_date,
+                end_date,
+                base_start.strftime("%Y-%m-%d"),
+                base_end.strftime("%Y-%m-%d"),
+            )
+        )
+        result["confidence"] = round(
+            min(
+                0.95,
+                max(
+                    0.2,
+                    result["confidence"]
+                    + fusion.confidence_adjustment(
+                        result.get("optical_agreement_pct"),
+                        result.get("optical_coverage_pct", 0),
+                    ),
+                ),
+            ),
+            2,
+        )
+    except Exception:
+        result["optical_confirmation"] = None
+    return result

@@ -442,6 +442,112 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "extract_time_series",
+            "description": (
+                "Extract a per-scene signal time series over an AOI — every "
+                "usable observation of VV/VH backscatter or an optical index "
+                "(NDVI, NDWI, NDSI) — with formal trend statistics (OLS with "
+                "exact p-value, Mann-Kendall + Sen's slope). THE tool for "
+                "'is this changing over time?' questions. Slow-ish (10-30 s)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "bbox": {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "minItems": 4,
+                        "maxItems": 4,
+                    },
+                    "start_date": {"type": "string"},
+                    "end_date": {"type": "string"},
+                    "variable": {
+                        "type": "string",
+                        "enum": ["VV", "VH", "NDVI", "NDWI", "NDSI"],
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": ["S2", "HLS"],
+                        "description": "Optical source; HLS deepens the archive via Landsat.",
+                    },
+                },
+                "required": ["bbox", "start_date", "end_date", "variable"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "compare_analyses",
+            "description": (
+                "Run the SAME analysis on two sites (place-vs-place) or two "
+                "time windows (time-vs-time) and get both results plus the "
+                "delta — the shape a comparative case study needs. Slow "
+                "(two full analyses)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "analysis_type": {"type": "string"},
+                    "a_label": {"type": "string"},
+                    "a_bbox": {
+                        "type": "array", "items": {"type": "number"},
+                        "minItems": 4, "maxItems": 4,
+                    },
+                    "a_start_date": {"type": "string"},
+                    "a_end_date": {"type": "string"},
+                    "b_label": {"type": "string"},
+                    "b_bbox": {
+                        "type": "array", "items": {"type": "number"},
+                        "minItems": 4, "maxItems": 4,
+                    },
+                    "b_start_date": {"type": "string"},
+                    "b_end_date": {"type": "string"},
+                },
+                "required": [
+                    "analysis_type",
+                    "a_bbox", "a_start_date", "a_end_date",
+                    "b_bbox", "b_start_date", "b_end_date",
+                ],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_project_datasets",
+            "description": (
+                "List the datasets (GeoJSON/CSV field data) the student has "
+                "uploaded to this project. Fast and free."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "validate_against_my_data",
+            "description": (
+                "Score a Kairos analysis against one of the student's own "
+                "uploaded polygon datasets as ground truth — same "
+                "IoU/precision/recall/F1 machinery as the public benchmarks, "
+                "run over the dataset's own extent. Slow (a full analysis)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "dataset_id": {"type": "integer"},
+                    "analysis_type": {"type": "string"},
+                    "start_date": {"type": "string"},
+                    "end_date": {"type": "string"},
+                },
+                "required": ["dataset_id", "analysis_type", "start_date", "end_date"],
+            },
+        },
+    },
 ]
 
 
@@ -773,6 +879,112 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                 "tool": name,
                 "label": "Listed curricula",
                 "status": "ok",
+            }
+
+        if name == "extract_time_series":
+            import stats as trend_stats
+            from gee.signal import extract_series
+
+            series = extract_series(
+                args["bbox"],
+                args["start_date"],
+                args["end_date"],
+                args.get("variable", "VV"),
+                args.get("source"),
+            )
+            trend = None
+            if len(series["points"]) >= 4:
+                try:
+                    trend = trend_stats.trend_report(series["points"])
+                except ValueError:
+                    trend = None
+            payload = {
+                "variable": series["variable"],
+                "unit": series["unit"],
+                "source": series["source"],
+                "count": series["count"],
+                "first": series["points"][0],
+                "last": series["points"][-1],
+                # A thinned series keeps the prompt small but the shape visible.
+                "points": series["points"][:: max(1, len(series["points"]) // 40)],
+                "trend": trend,
+            }
+            return payload, {
+                "tool": name,
+                "label": (
+                    f"{series['variable']} series: {series['count']} obs"
+                    + (f" — {trend['mann_kendall']['trend']}" if trend else "")
+                ),
+                "status": "ok",
+                "series": series,
+                "trend": trend,
+            }
+
+        if name == "compare_analyses":
+            from api.analyze import run_analysis
+
+            sides = {}
+            for side in ("a", "b"):
+                result = run_analysis(
+                    analysis_type=args["analysis_type"],
+                    bbox=args[f"{side}_bbox"],
+                    start_date=args[f"{side}_start_date"],
+                    end_date=args[f"{side}_end_date"],
+                )
+                sides[side] = result
+            hs_a = sides["a"]["headline_stat"]
+            hs_b = sides["b"]["headline_stat"]
+            delta = None
+            try:
+                delta = round(float(hs_b["value"]) - float(hs_a["value"]), 3)
+            except (TypeError, ValueError):
+                pass
+            payload = {
+                "analysis_type": args["analysis_type"],
+                "a": {"label": args.get("a_label") or "A", **_slim_result(sides["a"])},
+                "b": {"label": args.get("b_label") or "B", **_slim_result(sides["b"])},
+                "delta": delta,
+                "unit": hs_a.get("unit"),
+            }
+            return payload, {
+                "tool": name,
+                "label": (
+                    f"Compared {args['analysis_type']}: "
+                    f"{hs_a.get('value')} vs {hs_b.get('value')} {hs_a.get('unit', '')}"
+                ),
+                "status": "ok",
+                "results": [sides["a"], sides["b"]],
+            }
+
+        if name == "list_project_datasets":
+            from janus import datasets
+
+            ds = datasets.list_datasets(project_id)
+            return {"datasets": ds}, {
+                "tool": name,
+                "label": f"{len(ds)} dataset(s) on this project",
+                "status": "ok",
+            }
+
+        if name == "validate_against_my_data":
+            from janus import datasets
+
+            report = datasets.validate_against_dataset(
+                dataset_id=args["dataset_id"],
+                project_id=project_id,
+                analysis_type=args["analysis_type"],
+                start_date=args["start_date"],
+                end_date=args["end_date"],
+            )
+            m = report["metrics"]
+            return report, {
+                "tool": name,
+                "label": (
+                    f"Validated vs '{report['dataset']['name']}': "
+                    f"F1 {m.get('f1')}"
+                ),
+                "status": "ok",
+                "validation": report,
             }
 
         return {"error": f"Unknown tool '{name}'."}, {

@@ -1,8 +1,10 @@
-"""POST /analyze — run a SAR analysis for a bbox + date range."""
+"""POST /analyze — run a SAR analysis for a bbox + date range.
+POST /verify — check the provenance signature of a previously issued result."""
 
 from fastapi import APIRouter, HTTPException
 from models.requests import AnalyzeRequest
 from gee.registry import ANALYSIS_REGISTRY
+import provenance
 
 router = APIRouter()
 
@@ -67,21 +69,23 @@ def run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: str)
         if k not in TOP_LEVEL_KEYS and k not in NON_SERIALIZED_KEYS
     }
 
-    return {
-        "analysis_type": analysis_type,
-        "display_name": config["display_name"],
-        "bbox": bbox,
-        "start_date": start_date,
-        "end_date": end_date,
-        "tile_url": raw["tile_url"],
-        "data_date": raw["data_date"],
-        "confidence": raw.get("confidence", 0.8),
-        "headline_stat": raw.get(
-            "headline_stat", {"label": "Result", "value": 0, "unit": ""}
-        ),
-        "context_layers": _context_layers(analysis_type, bbox),
-        "stats": stats,
-    }
+    return provenance.stamp(
+        {
+            "analysis_type": analysis_type,
+            "display_name": config["display_name"],
+            "bbox": bbox,
+            "start_date": start_date,
+            "end_date": end_date,
+            "tile_url": raw["tile_url"],
+            "data_date": raw["data_date"],
+            "confidence": raw.get("confidence", 0.8),
+            "headline_stat": raw.get(
+                "headline_stat", {"label": "Result", "value": 0, "unit": ""}
+            ),
+            "context_layers": _context_layers(analysis_type, bbox),
+            "stats": stats,
+        }
+    )
 
 
 @router.post("/analyze")
@@ -104,3 +108,13 @@ def analyze(request: AnalyzeRequest):
     except Exception as e:
         # Server-side: GEE failure, timeout, quota
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
+
+
+@router.post("/verify")
+def verify_result(result: dict):
+    """
+    Verify a previously issued analysis result's provenance: recomputes the
+    content hash over the scientific fields and checks the HMAC signature.
+    Never raises — the verdict says exactly what (if anything) is wrong.
+    """
+    return provenance.verify(result)

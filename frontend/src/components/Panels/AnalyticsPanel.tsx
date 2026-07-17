@@ -1,11 +1,24 @@
-/** Headline stats, confidence, and data provenance for the latest result. */
-import { X } from "lucide-react";
+/** Headline stats, confidence, and data provenance for the latest result —
+ * plus the public accuracy scoreboard (real validation runs, aggregated). */
+import { useEffect, useState } from "react";
+import { Loader2, ShieldCheck, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { useSidebarStore } from "../../stores/sidebarStore";
+import { fetchScoreboard, type ScoreboardEntry } from "../../api/research";
 import { panelShell } from "../../lib/responsive";
 
 export default function AnalyticsPanel({ onClose }: { onClose: () => void }) {
   const result = useSidebarStore((s) => s.result);
+  const [board, setBoard] = useState<ScoreboardEntry[] | null>(null);
+  const [boardLoading, setBoardLoading] = useState(false);
+
+  useEffect(() => {
+    setBoardLoading(true);
+    fetchScoreboard()
+      .then((res) => setBoard(res.entries))
+      .catch(() => setBoard(null))
+      .finally(() => setBoardLoading(false));
+  }, []);
 
   return (
     <motion.aside
@@ -78,6 +91,52 @@ export default function AnalyticsPanel({ onClose }: { onClose: () => void }) {
           </div>
         </>
       )}
+
+      {/* Public accuracy scoreboard: every validation run ever executed,
+          aggregated per benchmark. Renders with or without a result. */}
+      <div className="space-y-2">
+        <h3 className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
+          <ShieldCheck size={12} className="text-teal" />
+          Accuracy scoreboard
+        </h3>
+        {boardLoading && (
+          <div className="flex items-center gap-2 text-[11px] text-dim">
+            <Loader2 size={12} className="animate-spin" /> Loading…
+          </div>
+        )}
+        {!boardLoading && board !== null && board.length === 0 && (
+          <p className="text-[11px] text-dim leading-snug">
+            No validation runs logged yet. Run a benchmark from the validation
+            tools — every real run lands here, publicly.
+          </p>
+        )}
+        {!boardLoading && board && board.length > 0 && (
+          <div className="rounded-xl bg-bg/70 ring-1 ring-line divide-y divide-line">
+            {board.map((e) => (
+              <div key={e.benchmark_id} className="p-2.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] text-ink truncate">
+                    {e.region || e.benchmark_id}
+                  </span>
+                  <span className="font-mono text-[11px] text-teal shrink-0">
+                    F1 {e.mean_f1 ?? "—"}
+                  </span>
+                </div>
+                <div className="mt-0.5 font-mono text-[9px] text-dim">
+                  {e.analysis_type} · {e.runs} run{e.runs === 1 ? "" : "s"} ·
+                  IoU {e.mean_iou ?? "—"} · P {e.mean_precision ?? "—"} · R{" "}
+                  {e.mean_recall ?? "—"}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {!boardLoading && board === null && (
+          <p className="text-[11px] text-dim leading-snug">
+            Scoreboard unavailable — backend offline.
+          </p>
+        )}
+      </div>
     </motion.aside>
   );
 }
