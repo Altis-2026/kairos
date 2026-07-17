@@ -305,6 +305,70 @@ CURRICULA = {
             },
         ],
     },
+    "radar-archaeology": {
+        "id": "radar-archaeology",
+        "title": "Radar Archaeology: Seeing Under Sand and Canopy",
+        "audience": (
+            "History-curious students and researchers; no remote-sensing "
+            "background needed, some SAR Fundamentals helps."
+        ),
+        "outcome": (
+            "You can explain why L-band penetrates where optical and C-band "
+            "cannot, run an anomaly survey over a candidate landscape, and — "
+            "crucially — argue why a given anomaly is probably NOT a lost city."
+        ),
+        "sessions": [
+            {
+                "title": "The physics of seeing under the surface",
+                "goals": [
+                    "Wavelength vs penetration: why L-band (24 cm) reaches where C-band (5.5 cm) stops",
+                    "The 1982 SIR-A Sahara paleochannels — the founding result",
+                    "The dryness requirement: why moisture kills penetration",
+                ],
+                "exercise": {
+                    "prompt": (
+                        "Ask Janus to explain the l-band-penetration concept, then "
+                        "run Archaeology Mode over Egypt's Western Desert "
+                        "[30.5, 29.7, 30.9, 30.1] and inspect the anomaly pattern."
+                    ),
+                    "analysis_type": "archaeology",
+                },
+            },
+            {
+                "title": "Anomalies are not discoveries",
+                "goals": [
+                    "What a texture anomaly is (deviation from the local pattern)",
+                    "Modern lookalikes: field boundaries, tracks, pipelines, irrigation",
+                    "The candidate-to-survey pipeline real archaeologists use",
+                ],
+                "exercise": {
+                    "prompt": (
+                        "Run Archaeology Mode over an area with known modern "
+                        "agriculture and have the student classify five anomalies "
+                        "as likely-modern vs worth-a-closer-look, with reasons."
+                    ),
+                    "analysis_type": "archaeology",
+                },
+            },
+            {
+                "title": "Cross-checking with optical and elevation",
+                "goals": [
+                    "Pairing L-band anomalies with optical imagery for context",
+                    "Why crop marks and soil marks corroborate radar anomalies",
+                    "Writing up a survey candidate honestly (no 'lost city' headlines)",
+                ],
+                "exercise": {
+                    "prompt": (
+                        "Take the strongest anomaly from the previous session, pull "
+                        "the optical view of the same area, and have the student "
+                        "write a three-sentence survey-candidate note that a real "
+                        "archaeologist could act on."
+                    ),
+                    "analysis_type": "archaeology",
+                },
+            },
+        ],
+    },
 }
 
 

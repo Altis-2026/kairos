@@ -24,6 +24,11 @@ from gee.agriculture import monitor_crops
 from gee.mining import detect_land_disturbance
 from gee.biomass import estimate_biomass
 from gee.atmosphere import detect_methane, monitor_air_quality
+from gee.soil_moisture import estimate_soil_moisture
+from gee.flooded_forest import detect_flooded_forest
+from gee.snow import detect_wet_snow
+from gee.consensus import flood_consensus
+from gee.archaeology import detect_anomalies
 
 ANALYSIS_REGISTRY = {
     "flood_extent": {
@@ -319,6 +324,100 @@ ANALYSIS_REGISTRY = {
         "icon": "factory",
         "sar_polarization": None,
         "instrument_mode": "TROPOMI",
+    },
+    "soil_moisture": {
+        "function": estimate_soil_moisture,
+        "display_name": "Surface Soil Moisture",
+        "description": (
+            "Relative surface soil moisture from Sentinel-1 change detection: "
+            "each pixel's VV backscatter is placed between its own 12-month "
+            "dry and wet extremes (0 = driest observed, 1 = wettest). Masked "
+            "where dense forest, cities, water or snow break the physics. A "
+            "relative index of the top ~5 cm, not volumetric ground truth."
+        ),
+        "category": "Agriculture",
+        "data_sources": ["S1"],
+        "estimated_seconds": 25,
+        "output_type": "raster",
+        "color_palette": ["#8B5A2B", "#00BFA8"],
+        "icon": "droplets",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "flooded_forest": {
+        "function": detect_flooded_forest,
+        "display_name": "Flooded Forest / Mangrove",
+        "description": (
+            "Finds water standing UNDER tree canopy — invisible to optical "
+            "satellites — via the double-bounce brightening (VV rise > +3 dB) "
+            "that flooded trunks produce. Runs only inside WorldCover tree and "
+            "mangrove pixels. The complement of open-water flood mapping."
+        ),
+        "category": "Disaster Response",
+        "data_sources": ["S1"],
+        "estimated_seconds": 25,
+        "output_type": "raster",
+        "color_palette": ["#00BFA8"],
+        "icon": "trees",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "wet_snow": {
+        "function": detect_wet_snow,
+        "display_name": "Wet Snow / Melt Extent",
+        "description": (
+            "Maps melting snow with the Nagler ratio method: liquid water in "
+            "the snowpack absorbs C-band radar, so wet snow sits >3 dB below a "
+            "frozen mid-winter reference. Reports melt extent and its elevation "
+            "band. Extent only — C-band cannot measure depth or snow water "
+            "equivalent."
+        ),
+        "category": "Environmental",
+        "data_sources": ["S1"],
+        "estimated_seconds": 25,
+        "output_type": "raster",
+        "color_palette": ["#7FD8FF"],
+        "icon": "snowflake",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "flood_consensus": {
+        "function": flood_consensus,
+        "display_name": "Flood Consensus (SAR + Optical)",
+        "description": (
+            "Runs two independent flood methods — Sentinel-1 backscatter drop "
+            "and Sentinel-2 NDWI — and maps where they agree (teal), where only "
+            "radar sees water (amber) and where only optical does (blue). "
+            "Needs a usable cloud-free optical share; refuses to fake a "
+            "consensus when clouds block it."
+        ),
+        "category": "Disaster Response",
+        "data_sources": ["S1", "S2"],
+        "estimated_seconds": 40,
+        "output_type": "raster",
+        "color_palette": ["#E8A318", "#3BA7FF", "#00BFA8"],
+        "icon": "layers",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "archaeology": {
+        "function": detect_anomalies,
+        "display_name": "Archaeology Mode (L-band anomalies)",
+        "description": (
+            "L-band radar (ALOS PALSAR) penetrates dry sand and forest canopy, "
+            "so buried or vegetation-hidden structure can surface as texture "
+            "anomalies against the natural neighbourhood pattern. Produces "
+            "CANDIDATE targets for ground survey — modern tracks and field "
+            "boundaries look identical from orbit."
+        ),
+        "category": "Research",
+        "data_sources": ["PALSAR"],
+        "estimated_seconds": 30,
+        "output_type": "raster",
+        "color_palette": ["#E8A318"],
+        "icon": "landmark",
+        "sar_polarization": "HV",
+        "instrument_mode": "ScanSAR mosaic",
     },
 }
 

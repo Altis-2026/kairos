@@ -334,3 +334,56 @@ class QueryRequest(BaseModel):
         if v and len(v) > 12:
             return v[-12:]
         return v
+
+
+class SignalRequest(BaseModel):
+    """POST /research/signal — per-scene signal time series over an AOI."""
+
+    bbox: List[float]
+    start_date: str
+    end_date: str
+    variable: str = "VV"        # VV | VH | NDVI | NDWI | NDSI
+    source: Optional[str] = None  # optical only: S2 (default) | HLS
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+    @field_validator("start_date")
+    @classmethod
+    def validate_start(cls, v):
+        return _validate_date(v, "start_date")
+
+    @field_validator("end_date")
+    @classmethod
+    def validate_end(cls, v):
+        return _validate_date(v, "end_date")
+
+    @model_validator(mode="after")
+    def validate_order(self):
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be before end_date")
+        return self
+
+
+class ComparisonSide(BaseModel):
+    """One side of an A/B analysis comparison."""
+
+    label: str = ""
+    bbox: List[float]
+    start_date: str
+    end_date: str
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+
+class CompareAnalysesRequest(BaseModel):
+    """POST /research/compare_analyses — same analysis, two sites or periods."""
+
+    analysis_type: str
+    a: ComparisonSide
+    b: ComparisonSide

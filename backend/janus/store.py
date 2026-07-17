@@ -135,6 +135,15 @@ def init_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS webhooks (
+                owner TEXT PRIMARY KEY,
+                url TEXT NOT NULL,
+                created_at REAL NOT NULL
+            )
+            """
+        )
         # v2: monitoring flag added to an existing table — migrate in place.
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(projects)")}
         if "watched" not in cols:
@@ -442,6 +451,107 @@ def set_tier(owner: str, tier: str):
             "updated_at = excluded.updated_at",
             (owner, tier, time.time()),
         )
+        conn.commit()
+
+
+# --- shared projects (members) ----------------------------------------------
+
+
+def _init_members():
+    with _lock, _connect() as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS members (
+                project_id INTEGER NOT NULL,
+                member TEXT NOT NULL,
+                added_at REAL NOT NULL,
+                PRIMARY KEY (project_id, member)
+            )
+            """
+        )
+        conn.commit()
+
+
+def add_member(project_id: int, member: str):
+    _init_members()
+    with _lock, _connect() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO members (project_id, member, added_at) "
+            "VALUES (?, ?, ?)",
+            (project_id, member, time.time()),
+        )
+        conn.commit()
+
+
+def remove_member(project_id: int, member: str):
+    _init_members()
+    with _lock, _connect() as conn:
+        conn.execute(
+            "DELETE FROM members WHERE project_id = ? AND member = ?",
+            (project_id, member),
+        )
+        conn.commit()
+
+
+def list_members(project_id: int) -> list:
+    _init_members()
+    with _lock, _connect() as conn:
+        rows = conn.execute(
+            "SELECT member, added_at FROM members WHERE project_id = ? "
+            "ORDER BY added_at",
+            (project_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def is_member(project_id: int, who: str) -> bool:
+    _init_members()
+    with _lock, _connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM members WHERE project_id = ? AND member = ?",
+            (project_id, who),
+        ).fetchone()
+    return row is not None
+
+
+def shared_with(member: str) -> list:
+    """Projects shared TO this account (id + title), newest first."""
+    _init_members()
+    with _lock, _connect() as conn:
+        rows = conn.execute(
+            "SELECT p.id, p.title, p.owner, p.updated_at FROM projects p "
+            "JOIN members m ON m.project_id = p.id WHERE m.member = ? "
+            "ORDER BY p.updated_at DESC",
+            (member,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# --- outbound webhooks -------------------------------------------------------
+
+
+def set_webhook(owner: str, url: str):
+    with _lock, _connect() as conn:
+        conn.execute(
+            "INSERT INTO webhooks (owner, url, created_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(owner) DO UPDATE SET url = excluded.url, "
+            "created_at = excluded.created_at",
+            (owner, url, time.time()),
+        )
+        conn.commit()
+
+
+def get_webhook(owner: str) -> str | None:
+    with _lock, _connect() as conn:
+        row = conn.execute(
+            "SELECT url FROM webhooks WHERE owner = ?", (owner,)
+        ).fetchone()
+    return row["url"] if row else None
+
+
+def delete_webhook(owner: str):
+    with _lock, _connect() as conn:
+        conn.execute("DELETE FROM webhooks WHERE owner = ?", (owner,))
         conn.commit()
 
 

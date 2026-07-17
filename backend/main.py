@@ -104,6 +104,8 @@ from api.feed import router as feed_router  # noqa: E402
 from api.validation import router as validation_router  # noqa: E402
 from api.waitlist import router as waitlist_router  # noqa: E402
 from api.janus import router as janus_router  # noqa: E402
+from api.keys import router as keys_router  # noqa: E402
+from api.portfolio import router as portfolio_router  # noqa: E402
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -120,6 +122,25 @@ app.include_router(feed_router)
 app.include_router(validation_router)
 app.include_router(waitlist_router)
 app.include_router(janus_router)
+app.include_router(keys_router)
+app.include_router(portfolio_router)
+
+
+@app.middleware("http")
+async def api_key_metering(request, call_next):
+    """
+    Programmatic access metering: when a request carries X-API-Key, resolve it
+    to an owner and log the call. Purely additive today (identity + usage for
+    future quotas); unauthenticated requests pass through untouched.
+    """
+    key = request.headers.get("x-api-key")
+    if key:
+        import apikeys
+
+        owner = apikeys.resolve(key)
+        if owner:
+            apikeys.log_usage(owner, request.url.path)
+    return await call_next(request)
 
 
 @app.get("/health")
