@@ -156,7 +156,68 @@ def create_project(request: CreateProjectRequest):
 
 @router.get("/janus/projects")
 def list_projects(owner: str = Query(..., min_length=1, max_length=128)):
-    return {"projects": store.list_projects(owner)}
+    # The companion chat is reached through its own card, not the project list.
+    return {
+        "projects": [
+            p
+            for p in store.list_projects(owner)
+            if not (p.get("design") or {}).get("companion")
+        ]
+    }
+
+
+_COMPANION_KICKOFF = (
+    "### Hey — I'm Janus\n"
+    "This chat is always here, no project needed. Ask me anything:\n"
+    "- how Kairos works (\"how do I run a flood analysis?\", \"what's the "
+    "lightning-bolt tool?\")\n"
+    "- any question about the Earth, satellites, or radar — or genuinely "
+    "anything you're curious about\n"
+    "- or just tell me what you want DONE (\"check the Sundarbans for "
+    "flooding this month\") and I'll run it for real.\n\n"
+    "There's a mic button below if you'd rather talk, and the speaker "
+    "toggle makes me talk back. When a conversation grows into real "
+    "research, I'll suggest spinning it into its own project so nothing "
+    "gets lost."
+)
+
+
+class CompanionRequest(BaseModel):
+    owner: str = Field(min_length=1, max_length=128)
+
+
+@router.post("/janus/companion")
+def open_companion(request: CompanionRequest):
+    """
+    The always-on Janus chat: no project setup, just talk. Backed by a
+    persistent per-owner companion project under the hood so memory, tools,
+    voice and history all work exactly like everywhere else. Created on
+    first use; never counts against the plan's project cap.
+    """
+    for p in store.list_projects(request.owner):
+        if (p.get("design") or {}).get("companion"):
+            return {
+                "project": p,
+                "messages": store.get_messages(p["id"]),
+                "bibliography": store.get_bibliography(p["id"]),
+                "insights": store.get_insights(p["id"]),
+                "hypotheses": store.get_hypotheses(p["id"]),
+            }
+
+    project = store.create_project(
+        owner=request.owner, title="Ask Janus", question=""
+    )
+    project = store.update_project(project["id"], design={"companion": True})
+    kickoff = store.add_message(
+        project["id"], "assistant", _COMPANION_KICKOFF, mode="mentor"
+    )
+    return {
+        "project": project,
+        "messages": [kickoff],
+        "bibliography": [],
+        "insights": [],
+        "hypotheses": [],
+    }
 
 
 @router.get("/janus/projects/{project_id}")

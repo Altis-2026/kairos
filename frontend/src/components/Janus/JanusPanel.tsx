@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ClipboardList,
+  Database,
   Download,
   ExternalLink,
   FileText,
@@ -42,6 +43,7 @@ import {
 import { useJanusStore } from "../../stores/janusStore";
 import { applyResultToGlobe } from "../../lib/applyResult";
 import {
+  deleteDataset,
   downloadBibtex,
   downloadFigure,
   downloadGoogleDoc,
@@ -53,6 +55,9 @@ import {
   fetchFigures,
   fetchPeerReview,
   figureUrl,
+  listDatasets,
+  uploadDataset,
+  type ProjectDataset,
 } from "../../api/janus";
 import { timeAgo } from "../../api/feed";
 import {
@@ -515,6 +520,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     error,
     loadHome,
     open,
+    openCompanion,
     startProject,
     send,
     setWatch,
@@ -538,6 +544,11 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
   const [figuresOpen, setFiguresOpen] = useState(false);
   const [figuresList, setFiguresList] = useState<string[] | null>(null);
   const [figuresLoading, setFiguresLoading] = useState(false);
+  // Bring-your-own-data: uploaded field datasets on this project.
+  const [dataOpen, setDataOpen] = useState(false);
+  const [datasets, setDatasets] = useState<ProjectDataset[] | null>(null);
+  const [dataBusy, setDataBusy] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [voiceOut, setVoiceOut] = useState(() => {
     try {
@@ -588,8 +599,13 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
   // section is open. The preview <img> is cache-busted by run count below.
   const projectId = bundle?.project.id;
   const runCount = bundle?.messages.length;
+  // The companion chat hides the research chrome (design card, deliverables,
+  // figures) — it's for talking, not writing papers. My data stays.
+  const isCompanion = !!bundle?.project.design?.companion;
   useEffect(() => {
     setFiguresList(null);
+    setDatasets(null);
+    setDataOpen(false);
     if (figuresOpen && projectId) {
       setFiguresLoading(true);
       fetchFigures(projectId)
@@ -718,6 +734,52 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     }
   }
 
+  async function toggleData() {
+    const next = !dataOpen;
+    setDataOpen(next);
+    if (next && datasets === null && bundle) {
+      try {
+        const res = await listDatasets(bundle.project.id);
+        setDatasets(res.datasets);
+      } catch {
+        setDatasets([]);
+      }
+    }
+  }
+
+  async function onDataFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file || !bundle || dataBusy) return;
+    setDataBusy(true);
+    setDataError(null);
+    try {
+      const text = await file.text();
+      const name = file.name.replace(/\.(geojson|json|csv)$/i, "");
+      const payload = /\.csv$/i.test(file.name)
+        ? { csv: text }
+        : { geojson: JSON.parse(text) };
+      const res = await uploadDataset(bundle.project.id, name, payload);
+      setDatasets((d) => [res.dataset, ...(d ?? [])]);
+    } catch (err) {
+      setDataError(
+        err instanceof Error ? err.message : "Upload failed — check the file."
+      );
+    } finally {
+      setDataBusy(false);
+    }
+  }
+
+  async function removeDataset(id: number) {
+    if (!bundle) return;
+    try {
+      await deleteDataset(bundle.project.id, id);
+      setDatasets((d) => (d ?? []).filter((x) => x.id !== id));
+    } catch {
+      /* leave the row; next open refreshes */
+    }
+  }
+
   function actOnInsight(insight: Insight) {
     const action = insight.action;
     if (!action) return;
@@ -790,6 +852,30 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
             craft, designs studies with you, runs real analyses mid-sentence,
             and pushes back on weak reasoning.
           </p>
+
+          {/* The always-on chat: no project needed, just talk (or speak). */}
+          <button
+            onClick={() => void openCompanion()}
+            disabled={openingId !== null}
+            className="w-full rounded-xl bg-amber/10 ring-1 ring-amber/40 px-3.5 py-3 text-left hover:bg-amber/15 transition disabled:opacity-60"
+          >
+            <div className="flex items-center gap-2">
+              {openingId === -2 ? (
+                <Loader2 size={15} className="animate-spin text-amber shrink-0" />
+              ) : (
+                <Sparkles size={15} className="text-amber shrink-0" />
+              )}
+              <span className="text-sm text-ink font-medium">
+                Ask Janus anything
+              </span>
+              <Mic size={12} className="ml-auto text-amber/70 shrink-0" />
+            </div>
+            <p className="mt-1 text-[11px] leading-snug text-dim">
+              No project needed. How Kairos works, any question at all, or
+              &ldquo;check the Sundarbans for flooding&rdquo; &mdash; it runs
+              things for real. Voice in, voice out.
+            </p>
+          </button>
 
           {entitlements && entitlements.skills.length > 0 && (
             <div className="rounded-xl bg-bg/70 ring-1 ring-line px-3 py-2.5">
@@ -987,6 +1073,8 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
+          {!isCompanion && (
+            <>
           <DesignCard design={bundle.project.design} />
 
           <ResearchLog hypotheses={bundle.hypotheses} />
@@ -1160,6 +1248,80 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                       </button>
                     </div>
                   ))}
+              </div>
+            )}
+          </div>
+
+            </>
+          )}
+
+          {/* Bring-your-own-data: field polygons / CSV points as private
+              ground truth Janus can validate against. */}
+          <div>
+            <button
+              onClick={() => void toggleData()}
+              title="Upload your own GeoJSON or CSV — use it as ground truth"
+              className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition"
+            >
+              <span className="flex items-center gap-1.5">
+                <Database size={11} />
+                MY DATA
+                {datasets && datasets.length > 0 ? ` · ${datasets.length}` : ""}
+              </span>
+              <ChevronDown
+                size={12}
+                className={`transition-transform ${dataOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+            {dataOpen && (
+              <div className="mt-2 space-y-2">
+                <label className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed border-line px-2 py-2 font-mono text-[9px] tracking-wider text-dim hover:text-ink hover:border-amber/40 transition">
+                  {dataBusy ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    <Plus size={11} />
+                  )}
+                  UPLOAD .GEOJSON / .CSV
+                  <input
+                    type="file"
+                    accept=".geojson,.json,.csv"
+                    className="hidden"
+                    onChange={(e) => void onDataFile(e)}
+                    disabled={dataBusy}
+                  />
+                </label>
+                {dataError && (
+                  <p className="text-[10px] text-amber leading-snug">{dataError}</p>
+                )}
+                {datasets !== null && datasets.length === 0 && !dataError && (
+                  <p className="text-[11px] text-dim leading-snug">
+                    Field plots, flood outlines, survey points — upload them
+                    and Janus can score any analysis against YOUR data
+                    (&ldquo;validate the flood run against my polygons&rdquo;).
+                    CSV needs lon/lat columns.
+                  </p>
+                )}
+                {(datasets || []).map((d) => (
+                  <div
+                    key={d.id}
+                    className="flex items-center gap-2 rounded-lg bg-bg/70 ring-1 ring-line px-2.5 py-2"
+                  >
+                    <Database size={11} className="text-amber shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[11px] text-ink">{d.name}</div>
+                      <div className="font-mono text-[9px] text-dim">
+                        {d.feature_count} feature{d.feature_count === 1 ? "" : "s"}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => void removeDataset(d.id)}
+                      title="Remove dataset"
+                      className="text-dim hover:text-ink shrink-0"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
