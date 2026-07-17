@@ -100,11 +100,13 @@ const STEPS: Step[] = [
   {
     icon: <Layers size={20} />,
     chip: "Analysis",
-    title: "Seven ways to read the planet",
+    title: "21 ways to read the planet",
     body:
-      "Floods, ship detection, wildfire burn scars, oil spills, deforestation, " +
-      "sea-ice extent, and surface change/deformation. Each uses a different radar " +
-      "signature. Kairos picks the right one, or you choose from the task list.",
+      "Floods (even under forest canopy), ships, burn scars, oil spills, " +
+      "deforestation, sea ice, soil moisture, snow melt, biomass, methane, " +
+      "even L-band archaeology — each reads a different radar signature. " +
+      "Flood Consensus cross-checks radar against optical and maps where the " +
+      "two independent methods agree.",
     action: { label: "Browse analysis types", run: openSidebar },
   },
   {
@@ -123,9 +125,10 @@ const STEPS: Step[] = [
     chip: "Go deeper",
     title: "Research tools",
     body:
-      "Cross-check any result: view the raw radar backscatter, overlay true-colour " +
-      "optical imagery, cross-fade before/after, scrub a time-series, or estimate " +
-      "the population and built-up area inside the footprint.",
+      "Cross-check any result: raw radar backscatter, true-colour optical, " +
+      "before/after cross-fade, animated time-series, population impact — and " +
+      "Signal & Trend: extract a full year of real observations over your area " +
+      "with proper trend statistics, a publication chart, and a CSV download.",
     action: { label: "Open research tools", run: () => openPanel("research") },
   },
   {
@@ -149,14 +152,27 @@ const STEPS: Step[] = [
   },
   {
     icon: <Telescope size={20} />,
-    chip: "Mentor",
-    title: "Janus: research with a mentor",
+    chip: "Janus",
+    title: "Talk to Janus — about anything",
     body:
-      "Open the telescope icon to meet Janus. Bring it any question about the " +
-      "Earth and it works with you like a PhD advisor: it teaches the skills, " +
-      "designs the study with you, runs real analyses mid-conversation, finds " +
-      "actual papers, and pushes back on weak reasoning.",
-    tip: "Try a course like SAR Fundamentals, or start straight from your own question.",
+      "The telescope icon opens Janus. Hit “Ask Janus anything” to just chat: " +
+      "how Kairos works, any question you're curious about, or tell it what " +
+      "you want done (“check the Sundarbans for flooding”) and it runs real " +
+      "analyses for you. Use the mic to speak and the speaker toggle to hear " +
+      "it answer back.",
+    tip: "For serious work, start a project — Janus mentors like a PhD advisor and everything exports to LaTeX, Docs, figures, even a policy brief.",
+    action: { label: "Open Janus", run: () => openPanel("janus") },
+  },
+  {
+    icon: <FileSpreadsheet size={20} />,
+    chip: "Your data",
+    title: "Bring your own data",
+    body:
+      "Inside any Janus project, open “My data” and upload your field polygons " +
+      "(GeoJSON) or survey points (CSV with lon/lat). Then just ask Janus to " +
+      "validate an analysis against YOUR data — it scores the detection with " +
+      "the same rigor as its public benchmarks, on your ground truth.",
+    tip: "Every analysis result is also cryptographically signed, so you can prove it's untampered later.",
     action: { label: "Open Janus", run: () => openPanel("janus") },
   },
   {
@@ -173,11 +189,12 @@ const STEPS: Step[] = [
   {
     icon: <Radio size={20} />,
     chip: "Share",
-    title: "Share & Live Watch",
+    title: "Share, Live Watch & take it with you",
     body:
-      "Copy a reproducible link or an embeddable widget of any result. Or open the " +
-      "public Live Watch dashboard, a login-free map of active natural disasters " +
-      "worldwide. You're ready to explore.",
+      "Copy a reproducible link or an embeddable widget of any result. Open the " +
+      "public Live Watch dashboard — a login-free map of active disasters " +
+      "worldwide. And Kairos installs straight to your phone or iPad home " +
+      "screen from the browser's Share → Add to Home Screen. You're ready.",
     action: { label: "Open Live Watch", run: openLiveWatch },
   },
 ];
