@@ -8,6 +8,7 @@ Run locally:
 """
 
 import os
+import threading
 from contextlib import asynccontextmanager
 
 import ee
@@ -15,21 +16,21 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+import gee_ready
+
 load_dotenv()
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Initialize Google Earth Engine once at startup."""
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
-    if not project_id:
-        raise RuntimeError(
-            "GOOGLE_CLOUD_PROJECT is not set. Copy .env.example to backend/.env "
-            "and fill in your GCP project ID."
-        )
+
+def _init_gee_in_background(project_id: str, ee_creds: str | None) -> None:
+    """
+    Runs off the FastAPI startup path (see lifespan below) so a Cloud Run
+    cold start opens the port and answers /health immediately instead of
+    blocking on this network call to Google's servers. gee_ready.wait()
+    is the handshake any GEE-touching code path uses to wait for this to
+    finish, without holding up unrelated routes.
+    """
     try:
-        ee_creds = os.getenv("EE_CREDENTIALS")
         if ee_creds:
-            import json
             creds_path = os.path.expanduser("~/.config/earthengine/credentials")
             os.makedirs(os.path.dirname(creds_path), exist_ok=True)
             with open(creds_path, "w") as f:
@@ -37,9 +38,27 @@ async def lifespan(app: FastAPI):
         ee.Initialize(project=project_id)
         print(f"[kairos] Google Earth Engine initialized — project: {project_id}")
     except Exception as e:
+        gee_ready.error = str(e)
         print(f"[kairos] GEE initialization FAILED: {e}")
         print("[kairos] Run: earthengine authenticate")
-        raise
+    finally:
+        gee_ready.ready.set()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Kick off Earth Engine init in the background; don't block startup on it."""
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+    if not project_id:
+        raise RuntimeError(
+            "GOOGLE_CLOUD_PROJECT is not set. Copy .env.example to backend/.env "
+            "and fill in your GCP project ID."
+        )
+    threading.Thread(
+        target=_init_gee_in_background,
+        args=(project_id, os.getenv("EE_CREDENTIALS")),
+        daemon=True,
+    ).start()
 
     # Autonomous sweep: on a schedule, run analyses over active disaster zones
     # (NASA EONET) and a global watchlist, and store noteworthy findings for
