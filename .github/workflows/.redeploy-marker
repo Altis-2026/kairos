@@ -1,1 +1,1 @@
-Retriggered again 2026-07-19 after enabling cloudresourcemanager, firebase, firebasehosting, serviceusage APIs.
+Retriggered again 2026-07-19 after granting Firebase Hosting Admin role to the FIREBASE_SA_KEY service account.
