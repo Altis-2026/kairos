@@ -29,6 +29,18 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      - name: Ensure the Artifact Registry repo exists
+        run: |
+          gcloud artifacts repositories describe kairos \
+            --location=us-central1 \
+            --project="${{ secrets.GCP_PROJECT_ID }}" \
+            || gcloud artifacts repositories create kairos \
+            --repository-format=docker \
+            --location=us-central1 \
+            --project="${{ secrets.GCP_PROJECT_ID }}" \
+            --description="Kairos backend container images" \
+            --quiet
+
       - name: Build and push image
         run: |
           gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
