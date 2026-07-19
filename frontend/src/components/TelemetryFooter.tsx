@@ -9,9 +9,13 @@ import { useMapStore } from "../stores/mapStore";
 // Steady-state poll once healthy. Before that, retry fast (2s/4s/8s/16s) so
 // a Cloud Run cold start — the backend waking up, not actually broken —
 // resolves within seconds instead of sitting on a scary "OFFLINE" state for
-// up to a full 30s poll cycle.
+// up to a full 30s poll cycle. But "waking up" is an optimistic guess, not a
+// promise: if it's still failing after this many fast retries (~30s), it
+// stops guessing and calls it what it is — actually offline — instead of
+// saying "WAKING UP" forever.
 const STEADY_INTERVAL_MS = 30000;
 const COLD_START_RETRY_MS = [2000, 4000, 8000, 16000];
+const MAX_WAKING_ATTEMPTS = 6;
 
 export default function TelemetryFooter() {
   const coords = useMapStore((s) => s.coords);
@@ -45,10 +49,12 @@ export default function TelemetryFooter() {
         .catch(() => {
           if (cancelled) return;
           setApiUp(false);
-          // Only the "still waking up" framing before we've ever seen it up —
-          // a backend that goes down AFTER working is a real outage, not a
-          // cold start, and should read as OFFLINE straight away.
-          setWaking(!everUp);
+          // "Still waking up" only before we've ever seen it up, and only for
+          // a bounded number of attempts. A backend that goes down AFTER
+          // working is a real outage, not a cold start, and reads as OFFLINE
+          // immediately; one that never comes up after ~30s of fast retries
+          // stops getting the benefit of the doubt too — it's actually down.
+          setWaking(!everUp && attempt < MAX_WAKING_ATTEMPTS);
           attempt++;
           scheduleNext();
         });
