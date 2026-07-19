@@ -332,8 +332,10 @@ def cog_preview(body: dict):
     support (Capella/ICEYE/Maxar exports are COGs).
     """
     import ee
+    import gee_ready
     from gee import common as gee_common
 
+    gee_ready.wait()
     uri = (body.get("uri") or "").strip()
     if not uri.startswith("gs://"):
         raise HTTPException(

@@ -6,21 +6,58 @@ import { useEffect, useState } from "react";
 import { API_BASE } from "../api/client";
 import { useMapStore } from "../stores/mapStore";
 
+// Steady-state poll once healthy. Before that, retry fast (2s/4s/8s/16s) so
+// a Cloud Run cold start — the backend waking up, not actually broken —
+// resolves within seconds instead of sitting on a scary "OFFLINE" state for
+// up to a full 30s poll cycle.
+const STEADY_INTERVAL_MS = 30000;
+const COLD_START_RETRY_MS = [2000, 4000, 8000, 16000];
+
 export default function TelemetryFooter() {
   const coords = useMapStore((s) => s.coords);
   const [apiUp, setApiUp] = useState<boolean | null>(null);
+  const [waking, setWaking] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const check = () =>
+    let everUp = false;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const scheduleNext = () => {
+      if (cancelled) return;
+      const delay = everUp
+        ? STEADY_INTERVAL_MS
+        : COLD_START_RETRY_MS[Math.min(attempt, COLD_START_RETRY_MS.length - 1)];
+      timer = setTimeout(check, delay);
+    };
+
+    const check = () => {
       fetch(`${API_BASE}/health`)
-        .then((r) => !cancelled && setApiUp(r.ok))
-        .catch(() => !cancelled && setApiUp(false));
+        .then((r) => {
+          if (cancelled) return;
+          setApiUp(r.ok);
+          setWaking(false);
+          if (r.ok) everUp = true;
+          else attempt++;
+          scheduleNext();
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setApiUp(false);
+          // Only the "still waking up" framing before we've ever seen it up —
+          // a backend that goes down AFTER working is a real outage, not a
+          // cold start, and should read as OFFLINE straight away.
+          setWaking(!everUp);
+          attempt++;
+          scheduleNext();
+        });
+    };
+
     check();
-    const t = setInterval(check, 30000);
     return () => {
       cancelled = true;
-      clearInterval(t);
+      clearTimeout(timer);
     };
   }, []);
 
@@ -32,14 +69,20 @@ export default function TelemetryFooter() {
       <span className="flex items-center gap-1.5 bg-surface/80 backdrop-blur rounded-full px-3 py-1.5 ring-1 ring-line pointer-events-auto">
         <span
           className={`h-1.5 w-1.5 rounded-full ${
-            apiUp === null
-              ? "bg-dim"
+            apiUp === null || waking
+              ? "bg-amber animate-pulse-soft"
               : apiUp
               ? "bg-teal animate-pulse-soft"
               : "bg-amber"
           }`}
         />
-        {apiUp === null ? "LINKING…" : apiUp ? "KAIROS LINK ACTIVE" : "API OFFLINE"}
+        {apiUp === null
+          ? "LINKING…"
+          : waking
+          ? "WAKING UP…"
+          : apiUp
+          ? "KAIROS LINK ACTIVE"
+          : "API OFFLINE"}
       </span>
       {coords && (
         <span className="bg-surface/80 backdrop-blur rounded-full px-3 py-1.5 ring-1 ring-line tracking-wider">

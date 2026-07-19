@@ -1,0 +1,35 @@
+# Keeps the Cloud Run backend from scaling to zero — free alternative to
+# paying for `min-instances`. Pings /health every 10 minutes; as long as the
+# gap between pings stays under Cloud Run's idle-scale-down window, the
+# container never fully cold-starts, so users don't hit the "waking up" delay.
+#
+# Reuses the same GCP_SA_KEY / GCP_PROJECT_ID secrets deploy.yml already has
+# — no new secrets to configure. Runtime cost is a handful of seconds per
+# run, ~700 minutes/month total, well inside GitHub Actions' free tier.
+
+name: Keep Kairos backend warm
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve the live Cloud Run URL and ping /health
+        run: |
+          URL=$(gcloud run services describe kairos-api \
+            --region us-central1 \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            --format='value(status.url)')
+          echo "Pinging $URL/health"
+          curl -sf --max-time 20 "$URL/health" && echo " -> OK" \
+            || echo " -> failed (backend may have been cold; next ping will catch it)"

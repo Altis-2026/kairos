@@ -11,6 +11,8 @@ Rules enforced here (see CLAUDE.md):
 import ee
 from datetime import datetime, timedelta
 
+import gee_ready
+
 S1_COLLECTION = "COPERNICUS/S1_GRD"
 JRC_WATER = "JRC/GSW1_4/GlobalSurfaceWater"
 
@@ -20,7 +22,15 @@ AMBER = "#E8A318"
 
 
 def bbox_geometry(bbox: list) -> ee.Geometry:
-    """Convert [min_lon, min_lat, max_lon, max_lat] into an ee.Geometry."""
+    """
+    Convert [min_lon, min_lat, max_lon, max_lat] into an ee.Geometry.
+
+    Every analysis function starts here, which makes this the natural
+    checkpoint for gee_ready.wait(): on a cold start, this blocks (briefly)
+    until Earth Engine finishes initializing in the background instead of
+    every analysis function needing its own check.
+    """
+    gee_ready.wait()
     return ee.Geometry.Rectangle(bbox)
 
 
