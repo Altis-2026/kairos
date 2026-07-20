@@ -1,1 +1,1 @@
-Retriggered again 2026-07-19 after granting Firebase Admin (broader role) to firebase-adminsdk-fbsvc service account.
+Retriggered again 2026-07-20 after regenerating and re-pasting a fresh FIREBASE_SA_KEY for firebase-adminsdk-fbsvc, confirmed Firebase project is linked, confirmed Firebase Admin role granted.
