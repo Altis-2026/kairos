@@ -78,6 +78,17 @@ jobs:
           npm ci
           npm run build
 
+      - name: Ensure a Firebase Hosting site exists
+        env:
+          FIREBASE_SA_KEY: ${{ secrets.FIREBASE_SA_KEY }}
+        run: |
+          echo "$FIREBASE_SA_KEY" > /tmp/firebase-sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/firebase-sa.json
+          npx firebase-tools@latest hosting:sites:create "${{ secrets.GCP_PROJECT_ID }}" \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            || echo "Site already exists or creation not needed — continuing."
+          rm -f /tmp/firebase-sa.json
+
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
