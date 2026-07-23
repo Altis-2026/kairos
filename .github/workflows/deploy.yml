@@ -16,6 +16,7 @@ name: Deploy Kairos
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   backend:
