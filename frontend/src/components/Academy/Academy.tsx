@@ -3,6 +3,8 @@ import {
   ArrowLeft,
   Award,
   BookOpen,
+  ExternalLink,
+  Newspaper,
   Check,
   ChevronRight,
   GraduationCap,
@@ -16,6 +18,8 @@ import {
   X,
 } from "lucide-react";
 import { goToApp } from "../../lib/embed";
+import { buildShareUrl } from "../../lib/share";
+import { CASE_STUDIES } from "../../lib/caseStudies";
 
 interface Lesson {
   icon: typeof Radar;
@@ -181,11 +185,12 @@ const QUIZ: Question[] = [
   },
 ];
 
-type Tab = "learn" | "quiz";
+type Tab = "learn" | "cases" | "quiz";
 
 export default function Academy() {
   const [tab, setTab] = useState<Tab>("learn");
   const [lesson, setLesson] = useState(0);
+  const [openCase, setOpenCase] = useState<string | null>(CASE_STUDIES[0].id);
   const [qIndex, setQIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [score, setScore] = useState(0);
@@ -226,22 +231,30 @@ export default function Academy() {
           >
             <ArrowLeft size={14} /> App
           </button>
-          <span className="font-mono text-[10px] tracking-[0.24em] text-dim">
+          <span className="hidden sm:inline font-mono text-[10px] tracking-[0.24em] text-dim">
             KAIROS <span className="text-teal">ACADEMY</span>
           </span>
         </div>
-        <div className="flex items-center gap-1 rounded-xl ring-1 ring-line p-0.5">
+        <div className="flex items-center gap-1 rounded-xl ring-1 ring-line p-0.5 shrink-0">
           <button
             onClick={() => setTab("learn")}
-            className={`h-8 px-3 rounded-[10px] text-xs flex items-center gap-1.5 transition ${
+            className={`h-8 px-2.5 sm:px-3 rounded-[10px] text-xs flex items-center gap-1.5 transition ${
               tab === "learn" ? "bg-raised text-ink" : "text-dim hover:text-ink"
             }`}
           >
             <BookOpen size={13} /> Learn
           </button>
           <button
+            onClick={() => setTab("cases")}
+            className={`h-8 px-2.5 sm:px-3 rounded-[10px] text-xs flex items-center gap-1.5 transition ${
+              tab === "cases" ? "bg-raised text-ink" : "text-dim hover:text-ink"
+            }`}
+          >
+            <Newspaper size={13} /> Cases
+          </button>
+          <button
             onClick={() => setTab("quiz")}
-            className={`h-8 px-3 rounded-[10px] text-xs flex items-center gap-1.5 transition ${
+            className={`h-8 px-2.5 sm:px-3 rounded-[10px] text-xs flex items-center gap-1.5 transition ${
               tab === "quiz" ? "bg-raised text-ink" : "text-dim hover:text-ink"
             }`}
           >
@@ -322,6 +335,74 @@ export default function Academy() {
                 )}
               </div>
             </div>
+          </div>
+        ) : tab === "cases" ? (
+          <div className="space-y-4">
+            <div>
+              <h1 className="font-display text-xl text-ink">
+                Three times radar was the only thing watching
+              </h1>
+              <p className="mt-2 text-sm text-dim leading-relaxed">
+                Real events, real dates. Read what happened, then run the same
+                analysis Kairos would have run at the time and see the data for
+                yourself.
+              </p>
+            </div>
+            {CASE_STUDIES.map((c) => {
+              const open = openCase === c.id;
+              return (
+                <div
+                  key={c.id}
+                  className="rounded-2xl bg-surface ring-1 ring-line overflow-hidden"
+                >
+                  <button
+                    onClick={() => setOpenCase(open ? null : c.id)}
+                    className="w-full px-5 py-4 text-left"
+                  >
+                    <div className="font-mono text-[9px] tracking-[0.2em] text-amber uppercase">
+                      {c.place} · {c.when}
+                    </div>
+                    <div className="mt-1 font-display text-lg text-ink leading-snug">
+                      {c.title}
+                    </div>
+                    <p className="mt-1.5 text-xs text-dim leading-relaxed">
+                      {c.hook}
+                    </p>
+                  </button>
+                  {open && (
+                    <div className="px-5 pb-5 space-y-3">
+                      {c.story.map((p, i) => (
+                        <p key={i} className="text-sm text-dim leading-relaxed">
+                          {p}
+                        </p>
+                      ))}
+                      <div className="rounded-xl bg-bg/60 ring-1 ring-line p-3">
+                        <div className="font-mono text-[9px] tracking-[0.2em] text-teal uppercase">
+                          What the radar saw
+                        </div>
+                        <p className="mt-1 text-[12px] text-dim leading-relaxed">
+                          {c.whatRadarSaw}
+                        </p>
+                      </div>
+                      <a
+                        href={buildShareUrl({
+                          analysis_type: c.analysis_type,
+                          bbox: c.bbox,
+                          start_date: c.start_date,
+                          end_date: c.end_date,
+                        })}
+                        className="flex h-10 items-center justify-center gap-2 rounded-xl bg-amber text-bg text-sm font-medium hover:brightness-110 transition"
+                      >
+                        {c.runLabel} <ExternalLink size={13} />
+                      </a>
+                      <p className="text-[11px] text-amber/90 leading-snug">
+                        {c.caution}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : finished ? (
           <div className="rounded-2xl bg-surface ring-1 ring-line p-8 text-center space-y-4">

@@ -4,16 +4,16 @@ import {
   CloudRain,
   Flame,
   Loader2,
+  MapPin,
   Play,
-  Search,
   Telescope,
   TrendingDown,
   Waves,
 } from "lucide-react";
 import Globe from "../Globe";
+import PlaceSearch from "../PlaceSearch";
 import { useMapStore, bboxCenterZoom } from "../../stores/mapStore";
 import { runForesight, type Hazard, type RiskOutlook } from "../../api/foresight";
-import { locatePlace } from "../../api/myplace";
 import { HAZARD_NAMES, PLAYBOOKS } from "../../lib/preparedness";
 import { goToApp } from "../../lib/embed";
 import type { BBox } from "../../types/map";
@@ -65,13 +65,15 @@ export default function Foresight() {
   const [target, setTarget] = useState<{ bbox: BBox; label: string } | null>(
     () => parseHashTarget()
   );
-  const [address, setAddress] = useState("");
-  const [locating, setLocating] = useState(false);
   const [hazard, setHazard] = useState<Hazard>("flood");
   const [running, setRunning] = useState(false);
-  const [outlook, setOutlook] = useState<RiskOutlook | null>(null);
+  const [outlooks, setOutlooks] = useState<Partial<Record<Hazard, RiskOutlook>>>(
+    {}
+  );
   const [error, setError] = useState<string | null>(null);
   const [playbookOpen, setPlaybookOpen] = useState(false);
+
+  const outlook = outlooks[hazard] ?? null;
 
   useEffect(() => {
     if (!target) return;
@@ -81,24 +83,37 @@ export default function Foresight() {
     map.requestFlyTo(center, Math.max(zoom, 8));
   }, [target]);
 
-  async function findAddress() {
-    const q = address.trim();
-    if (q.length < 3 || locating) return;
-    setLocating(true);
+  function retarget(bbox: BBox, label: string) {
+    setTarget({ bbox, label });
+    setOutlooks({});
     setError(null);
-    try {
-      const hit = await locatePlace(q);
-      if (!hit.found || !hit.bbox) {
-        setError("That place did not match anywhere. Try adding a city or ZIP.");
-      } else {
-        setTarget({ bbox: hit.bbox, label: hit.label ?? q });
-        setOutlook(null);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Lookup failed.");
-    } finally {
-      setLocating(false);
+    setPlaybookOpen(false);
+  }
+
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      setError("This browser does not expose location.");
+      return;
     }
+    setError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lon = pos.coords.longitude;
+        const lat = pos.coords.latitude;
+        retarget(
+          [
+            +(lon - 0.06).toFixed(5),
+            +(lat - 0.045).toFixed(5),
+            +(lon + 0.06).toFixed(5),
+            +(lat + 0.045).toFixed(5),
+          ],
+          "Where I am now"
+        );
+      },
+      () =>
+        setError("Location permission was denied. Type a place instead."),
+      { timeout: 10000 }
+    );
   }
 
   function useMapView() {
@@ -120,18 +135,18 @@ export default function Foresight() {
       ],
       label: "Current map view",
     });
-    setOutlook(null);
+    setOutlooks({});
+    setError(null);
   }
 
   async function run() {
     if (!target || running) return;
     setRunning(true);
     setError(null);
-    setOutlook(null);
     setPlaybookOpen(false);
     try {
       const result = await runForesight(hazard, target.bbox);
-      setOutlook(result);
+      setOutlooks((o) => ({ ...o, [hazard]: result }));
       useMapStore.getState().addRasterLayer({
         id: "foresight-risk",
         name: `${HAZARD_NAMES[hazard]} outlook`,
@@ -189,34 +204,24 @@ export default function Foresight() {
               the risk peak, and is it getting worse. No simulation, just the
               measured record, with the receipts shown.
             </p>
-            <div className="flex gap-2">
-              <input
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && findAddress()}
-                placeholder="Address, city or ZIP"
-                aria-label="Place to assess"
-                className="flex-1 h-10 rounded-xl bg-bg/70 ring-1 ring-line px-3 text-xs text-ink placeholder-dim outline-none focus:ring-amber/60"
-              />
+            <PlaceSearch
+              ariaLabel="Place to assess"
+              onPick={(p) => retarget(p.bbox, p.label)}
+            />
+            <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={findAddress}
-                disabled={locating}
-                title="Find this place"
-                className="h-10 w-10 grid place-items-center rounded-xl bg-amber text-bg hover:brightness-110 transition disabled:opacity-50"
+                onClick={useMyLocation}
+                className="h-10 rounded-xl ring-1 ring-line text-xs text-ink hover:ring-teal/50 transition flex items-center justify-center gap-1.5"
               >
-                {locating ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Search size={14} />
-                )}
+                <MapPin size={13} /> My location
+              </button>
+              <button
+                onClick={useMapView}
+                className="h-10 rounded-xl ring-1 ring-line text-xs text-ink hover:ring-teal/50 transition"
+              >
+                This map view
               </button>
             </div>
-            <button
-              onClick={useMapView}
-              className="w-full h-10 rounded-xl ring-1 ring-line text-xs text-ink hover:ring-teal/50 transition"
-            >
-              Use the current map view instead
-            </button>
           </>
         ) : (
           <>
@@ -227,7 +232,7 @@ export default function Foresight() {
               <button
                 onClick={() => {
                   setTarget(null);
-                  setOutlook(null);
+                  setOutlooks({});
                 }}
                 className="mt-1 text-[11px] text-dim hover:text-ink underline underline-offset-2"
               >
@@ -236,44 +241,66 @@ export default function Foresight() {
             </div>
 
             <div className="grid grid-cols-4 gap-1.5">
-              {HAZARDS.map((h) => (
-                <button
-                  key={h.id}
-                  onClick={() => {
-                    setHazard(h.id);
-                    setOutlook(null);
-                  }}
-                  className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2.5 ring-1 transition ${
-                    hazard === h.id
-                      ? "bg-raised ring-teal/50 text-teal"
-                      : "bg-bg/70 ring-line text-dim hover:text-ink"
-                  }`}
-                >
-                  <h.icon size={15} />
-                  <span className="text-[9px] leading-tight text-center">
-                    {HAZARD_NAMES[h.id]}
-                  </span>
-                </button>
-              ))}
+              {HAZARDS.map((h) => {
+                const done = outlooks[h.id];
+                return (
+                  <button
+                    key={h.id}
+                    onClick={() => {
+                      setHazard(h.id);
+                      setPlaybookOpen(false);
+                    }}
+                    className={`relative flex flex-col items-center gap-1 rounded-xl px-1 py-2.5 ring-1 transition ${
+                      hazard === h.id
+                        ? "bg-raised ring-teal/50 text-teal"
+                        : "bg-bg/70 ring-line text-dim hover:text-ink"
+                    }`}
+                  >
+                    <h.icon size={15} />
+                    <span className="text-[9px] leading-tight text-center">
+                      {HAZARD_NAMES[h.id]}
+                    </span>
+                    {done && (
+                      <span
+                        className={`absolute -top-1.5 -right-1 min-w-[18px] rounded-full bg-surface ring-1 ring-line px-1 font-mono text-[9px] ${
+                          LEVEL_COLORS[done.level] ?? "text-ink"
+                        }`}
+                      >
+                        {done.score}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
-            <button
-              onClick={run}
-              disabled={running}
-              className="w-full h-11 rounded-xl bg-amber text-bg text-sm font-medium hover:brightness-110 transition disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {running ? (
-                <>
-                  <Loader2 size={15} className="animate-spin" />
-                  Reading the satellite record...
-                </>
-              ) : (
-                <>
-                  <Play size={15} />
-                  Compute {HAZARD_NAMES[hazard].toLowerCase()} outlook
-                </>
-              )}
-            </button>
+            {!outlook && (
+              <button
+                onClick={run}
+                disabled={running}
+                className="w-full h-11 rounded-xl bg-amber text-bg text-sm font-medium hover:brightness-110 transition disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {running ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    Reading the satellite record...
+                  </>
+                ) : (
+                  <>
+                    <Play size={15} />
+                    Compute {HAZARD_NAMES[hazard].toLowerCase()} outlook
+                  </>
+                )}
+              </button>
+            )}
+
+            {!outlook && !running && (
+              <p className="text-[10px] text-dim/80 leading-snug">
+                This reads decades of satellite observations for the area, so it
+                takes up to a minute. Results stay on each tab, so you can
+                compare all four hazards.
+              </p>
+            )}
 
             {outlook && (
               <>

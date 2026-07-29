@@ -15,7 +15,11 @@ export default function InsarPanel({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     fetchInsarSites()
       .then((d) => setSites(d.sites))
-      .catch(() => setError("Could not reach the InSAR service."));
+      .catch((e) =>
+        setError(
+          e instanceof Error ? e.message : "Could not reach the InSAR service."
+        )
+      );
   }, []);
 
   const ifgOn = imageLayers.some((l) => l.id === IFG_ID);

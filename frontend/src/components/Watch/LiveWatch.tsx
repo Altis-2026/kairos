@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Loader2, Radio, RefreshCw, Sparkles, X } from "lucide-react";
+import { Bell, BellOff, Loader2, Radio, RefreshCw, Sparkles, X } from "lucide-react";
 import Globe from "../Globe";
 import WatchEventDetail from "./WatchEventDetail";
 import { useMapStore } from "../../stores/mapStore";
@@ -15,6 +15,13 @@ import {
 } from "../../api/feed";
 import { buildShareUrl } from "../../lib/share";
 import { goToApp } from "../../lib/embed";
+import {
+  disableNotifications,
+  enableNotifications,
+  notificationsEnabled,
+  notificationsSupported,
+  syncFindingNotifications,
+} from "../../lib/notify";
 import type { EventMarker } from "../../types/analysis";
 
 const WATCH_LAYER = "livewatch-events";
@@ -61,6 +68,7 @@ export default function LiveWatch() {
   const [feed, setFeed] = useState<FeedResponse | null>(null);
   const [feedStatus, setFeedStatus] = useState<Status>("loading");
   const [sweepRequested, setSweepRequested] = useState(false);
+  const [notifyOn, setNotifyOn] = useState(() => notificationsEnabled());
   const home = `${location.origin}${location.pathname}#app`;
 
   function loadFeed() {
@@ -68,6 +76,7 @@ export default function LiveWatch() {
       .then((d) => {
         setFeed(d);
         setFeedStatus(d.findings.length ? "ok" : "empty");
+        syncFindingNotifications(d.findings);
         if (d.findings.length) {
           useMapStore.getState().addPointLayer({
             id: FINDINGS_LAYER,
@@ -109,7 +118,10 @@ export default function LiveWatch() {
       .catch(() => {
         if (cancelled) return;
         setEventStatus("unavailable");
-        setNote("Live feed unavailable right now.");
+        setNote(
+          "The disaster feed is not reachable right now. The backend may be " +
+            "waking up from idle; give it a few seconds and refresh."
+        );
       });
     return () => {
       cancelled = true;
@@ -171,9 +183,34 @@ export default function LiveWatch() {
               ? `${feed?.findings.length ?? 0} AUTONOMOUS FINDINGS`
               : `${events.length} ACTIVE EVENTS`}
           </span>
-          <a href={home} onClick={goToApp} className="text-dim hover:text-ink" title="Exit Live Watch">
-            <X size={15} />
-          </a>
+          <div className="flex items-center gap-2">
+            {notificationsSupported() && (
+              <button
+                onClick={async () => {
+                  if (notifyOn) {
+                    disableNotifications();
+                    setNotifyOn(false);
+                  } else {
+                    setNotifyOn(await enableNotifications());
+                  }
+                }}
+                title={
+                  notifyOn
+                    ? "Stop notifying me about new findings"
+                    : "Notify me when Kairos finds something new"
+                }
+                aria-label={
+                  notifyOn ? "Turn off finding alerts" : "Turn on finding alerts"
+                }
+                className={notifyOn ? "text-teal" : "text-dim hover:text-ink"}
+              >
+                {notifyOn ? <Bell size={14} /> : <BellOff size={14} />}
+              </button>
+            )}
+            <a href={home} onClick={goToApp} className="text-dim hover:text-ink" title="Exit Live Watch">
+              <X size={15} />
+            </a>
+          </div>
         </div>
 
         <div className="flex gap-1.5 rounded-xl bg-bg/70 ring-1 ring-line p-1">

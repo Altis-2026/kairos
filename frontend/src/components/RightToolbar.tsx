@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Home,
+  Ship,
   Bell,
   Bot,
   Contrast,
@@ -26,6 +27,7 @@ import BatchPanel from "./Panels/BatchPanel";
 import AlertsPanel from "./Panels/AlertsPanel";
 import DistrictPanel from "./Panels/DistrictPanel";
 import MyPlacePanel from "./Panels/MyPlacePanel";
+import VesselPanel from "./Panels/VesselPanel";
 import AgentPanel from "./Panels/AgentPanel";
 import InsarPanel from "./Panels/InsarPanel";
 
@@ -62,6 +64,7 @@ export default function RightToolbar() {
     | "analytics"
     | "research"
     | "myplace"
+    | "vessels"
     | "agent"
     | "district"
     | "insar"
@@ -97,6 +100,7 @@ export default function RightToolbar() {
       "analytics",
       "research",
       "myplace",
+      "vessels",
       "agent",
       "district",
       "insar",
@@ -177,6 +181,13 @@ export default function RightToolbar() {
           <Bot size={17} />
         </ToolButton>
         <ToolButton
+          title="Dark vessels (radar vs transponders)"
+          active={openPanel === "vessels"}
+          onClick={() => setOpenPanel(openPanel === "vessels" ? null : "vessels")}
+        >
+          <Ship size={17} />
+        </ToolButton>
+        <ToolButton
           title="InSAR deep dive"
           active={openPanel === "insar"}
           onClick={() => setOpenPanel(openPanel === "insar" ? null : "insar")}
@@ -245,6 +256,9 @@ export default function RightToolbar() {
       )}
       {openPanel === "myplace" && (
         <MyPlacePanel onClose={() => setOpenPanel(null)} />
+      )}
+      {openPanel === "vessels" && (
+        <VesselPanel onClose={() => setOpenPanel(null)} />
       )}
       {openPanel === "agent" && (
         <AgentPanel onClose={() => setOpenPanel(null)} />

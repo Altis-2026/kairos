@@ -312,6 +312,17 @@ class QueryRequest(BaseModel):
     query: str
     viewport_bbox: Optional[List[float]] = None
     history: Optional[List[ConversationTurn]] = None
+    language: Optional[str] = None
+
+    @field_validator("language")
+    @classmethod
+    def validate_language(cls, v):
+        if v is None:
+            return v
+        v = v.strip()
+        if len(v) > 20:
+            raise ValueError("language must be a short BCP-47 tag")
+        return v or None
 
     @field_validator("query")
     @classmethod

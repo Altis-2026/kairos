@@ -6,17 +6,17 @@ import {
   Home,
   Loader2,
   MapPin,
-  Search,
   Telescope,
   TrendingDown,
   Waves,
   X,
 } from "lucide-react";
 import { useMapStore, bboxCenterZoom } from "../../stores/mapStore";
-import { locatePlace, type PlaceHit } from "../../api/myplace";
+import { type PlaceHit } from "../../api/myplace";
 import { runAnalyze } from "../../api/analyze";
 import { applyResultToGlobe } from "../../lib/applyResult";
 import { plainSentence } from "../../lib/plain";
+import PlaceSearch from "../PlaceSearch";
 import type { AnalysisResult } from "../../types/analysis";
 
 const STORAGE_KEY = "kairos_myplace";
@@ -47,7 +47,6 @@ function loadSaved(): PlaceHit | null {
 
 export default function MyPlacePanel({ onClose }: { onClose: () => void }) {
   const [place, setPlace] = useState<PlaceHit | null>(() => loadSaved());
-  const [address, setAddress] = useState("");
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, CheckState>>({});
@@ -71,20 +70,6 @@ export default function MyPlacePanel({ onClose }: { onClose: () => void }) {
     map.setAoi(hit.bbox);
     const { center } = bboxCenterZoom(hit.bbox);
     map.requestFlyTo(center, 11.5);
-  }
-
-  async function findAddress() {
-    const q = address.trim();
-    if (q.length < 3 || locating) return;
-    setLocating(true);
-    setError(null);
-    try {
-      adopt(await locatePlace(q));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Address lookup failed.");
-    } finally {
-      setLocating(false);
-    }
   }
 
   function useMyLocation() {
@@ -202,28 +187,20 @@ export default function MyPlacePanel({ onClose }: { onClose: () => void }) {
             own neighborhood: recent flooding, fire damage, new construction
             and slow ground movement, in plain English.
           </p>
-          <div className="flex gap-2">
-            <input
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && findAddress()}
-              placeholder="Street, city or ZIP"
-              aria-label="Your address"
-              className="flex-1 h-10 rounded-xl bg-bg/70 ring-1 ring-line px-3 text-xs text-ink placeholder-dim outline-none focus:ring-amber/60"
-            />
-            <button
-              onClick={findAddress}
-              disabled={locating}
-              title="Find this address"
-              className="h-10 w-10 grid place-items-center rounded-xl bg-amber text-bg hover:brightness-110 transition disabled:opacity-50"
-            >
-              {locating ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Search size={14} />
-              )}
-            </button>
-          </div>
+          <PlaceSearch
+            ariaLabel="Your address"
+            placeholder="Street, city or ZIP"
+            onPick={(p) =>
+              adopt({
+                found: true,
+                label: p.label,
+                lon: p.lon,
+                lat: p.lat,
+                bbox: p.bbox,
+                source: "map geocoder",
+              })
+            }
+          />
           <button
             onClick={useMyLocation}
             disabled={locating}

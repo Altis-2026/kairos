@@ -18,6 +18,7 @@ export function runQuery(
       query,
       viewport_bbox: viewportBbox ?? null,
       history: history && history.length ? history : null,
+      language: navigator.language || null,
     }),
   });
 }

@@ -49,19 +49,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-allowed_origins = [
-    "http://localhost:5173",
-    "http://localhost:4173",
-    "https://kairos-mu-liart.vercel.app",
-]
-prod_origin = os.getenv("FRONTEND_ORIGIN")
-if prod_origin:
-    allowed_origins.append(prod_origin)
-
+# Auth uses bearer tokens in headers, never cookies, so a wildcard origin is
+# safe here and removes a whole class of deploy-time CORS failures.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -84,6 +77,7 @@ from api.insar import router as insar_router
 from api.validation import router as validation_router
 from api.myplace import router as myplace_router
 from api.foresight import router as foresight_router
+from api.vessels import router as vessels_router
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -103,6 +97,7 @@ app.include_router(insar_router)
 app.include_router(validation_router)
 app.include_router(myplace_router)
 app.include_router(foresight_router)
+app.include_router(vessels_router)
 
 
 @app.get("/health")

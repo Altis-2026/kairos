@@ -18,6 +18,7 @@ import {
   Radio,
   Satellite,
   Shield,
+  Ship,
   Sparkles,
   Telescope,
   X,
@@ -195,7 +196,8 @@ const STEPS: Step[] = [
     body:
       "Five short lessons explain how radar sees the Earth: why it works at " +
       "night, why rough is bright and smooth is dark, and how Kairos turns " +
-      "echoes into answers. Then a ten question quiz to prove you got it.",
+      "echoes into answers. Then three narrated real cases you can replay as " +
+      "live analyses, and a ten question quiz.",
     action: {
       label: "Open the Academy",
       run: () => {
@@ -203,6 +205,19 @@ const STEPS: Step[] = [
         location.reload();
       },
     },
+  },
+  {
+    icon: <Ship size={20} />,
+    chip: "Dark vessels",
+    title: "Radar against transponders",
+    body:
+      "Large ships are required to broadcast their position over AIS radio. " +
+      "Radar sees them whether they broadcast or not. Kairos lines the two up " +
+      "for one documented historical date and shows which radar returns had " +
+      "no matching transponder, alongside every reason that can happen " +
+      "innocently.",
+    tip: "An unmatched return is a question worth asking, never an accusation.",
+    action: { label: "Open dark vessels", run: () => openPanel("vessels") },
   },
   {
     icon: <Landmark size={20} />,

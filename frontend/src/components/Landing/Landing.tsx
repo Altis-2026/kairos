@@ -521,8 +521,9 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
             <GraduationCap size={18} className="text-teal" />
             <h3 className="mt-3 font-medium">Academy</h3>
             <p className="mt-1 text-xs leading-relaxed text-dim">
-              Five short lessons on how radar sees the Earth, then a ten
-              question quiz. By the end you can read the images yourself.
+              Five short lessons on how radar sees the Earth, three narrated
+              real cases you can replay live, and a quiz. By the end you can
+              read the images yourself.
             </p>
           </motion.button>
         </div>

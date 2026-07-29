@@ -26,7 +26,9 @@ I live in Dallas. In July 2025 the Guadalupe River rose about 26 feet in under a
 - **Agent mode.** Give it a goal instead of a question ("find the newest deforestation across the Amazon this month") and it plans several analyses, runs them with live progress, and writes a report across all of them.
 - **It measures its own accuracy.** A benchmarks panel re-runs the production detectors over historical disasters with independent reference maps (Global Flood Database, MODIS burned area, Hansen forest loss) and computes IoU, precision, recall and F1 live. And every result has a "test other explanations" button that pulls the actual rainfall, wind and land-cover records to check whether something innocent explains the signal.
 - **My District.** Pick a US congressional district, get its real boundary as the analysis area, run standing checks inside it, and export a printable situation briefing.
-- **Academy.** Five short lessons on how radar sees the Earth, then a ten question quiz. The goal is that a first-time user leaves able to read the images themselves.
+- **Dark vessels.** Large ships must broadcast their position over AIS radio; radar sees them regardless. For one documented historical date in the Gulf of Mexico, Kairos runs its real ship detector, matches each return against public MarineCadastre AIS broadcasts using the actual radar acquisition timestamp and a drift-aware radius, and reports which returns had no transponder nearby, with the innocent explanations stated up front.
+- **Academy.** Five short lessons on how radar sees the Earth, three narrated real cases (the 2022 Pakistan floods, the Hunga Tonga eruption, Amazon clearing) that replay as live analyses, and a ten question quiz. The goal is that a first-time user leaves able to read the images themselves.
+- **Speaks your language.** The chat answers in whatever language you ask in, and can read answers aloud.
 - **A guided wizard** for full control: pick a task, draw an area (rectangle, free-hand polygon with live area and perimeter, or a pin), set dates, preview data availability, run, and read the result.
 - **Research tools** on every result: the raw grayscale radar backscatter behind the detection, a Sentinel-2 optical comparison so you can see exactly why radar matters under cloud, a before/after cross-fade, a time-series scrubber, a population density overlay, and an estimate of people and buildings inside the detection footprint.
 - **Live Watch**: a public dashboard of active disasters worldwide (from NASA EONET), one click from a real radar analysis of any of them.
@@ -104,10 +106,10 @@ AI tools were also used during development: I used Claude as a coding assistant 
 
 ## What's next
 
-- Dark vessel detection: cross-referencing radar ship detections against public AIS transponder records for one documented historical case
 - NISAR data once the archive opens up, for a second radar source and faster revisits
-- Email and push notifications when a watched area changes on a new pass
-- Narrated case studies (a flood, a volcano, a deforestation front) building on the Academy
+- Email delivery for alerts, alongside today's in-browser notifications
+- More dark-vessel cases, once each one's AIS day is verified against a real acquisition
+- A teacher view for the Academy, so a class can work through the cases together
 
 ## Data and credit
 

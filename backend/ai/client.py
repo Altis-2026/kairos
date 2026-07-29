@@ -45,7 +45,10 @@ def _history_messages(history: list = None) -> list:
 
 
 def parse_natural_language(
-    query: str, viewport_bbox: list = None, history: list = None
+    query: str,
+    viewport_bbox: list = None,
+    history: list = None,
+    language: str = None,
 ) -> ParsedQuery:
     client = _get_client()
     system = _get_system_prompt()
@@ -53,6 +56,8 @@ def parse_natural_language(
     context_lines = [f"Today's date: {date.today().isoformat()}"]
     if viewport_bbox:
         context_lines.append(f"viewport_bbox: {viewport_bbox}")
+    if language:
+        context_lines.append(f"language: {language}")
     user_message = "\n".join(context_lines) + f"\n\nUser query: {query}"
 
     prior = _history_messages(history)
@@ -90,7 +95,7 @@ def parse_natural_language(
         )
         return parse_query_response(retry.choices[0].message.content)
 
-def narrate_result(result: dict) -> str:
+def narrate_result(result: dict, language: str = None) -> str:
     import json as _json
     client = _get_client()
     system = _get_system_prompt()
@@ -102,12 +107,16 @@ def narrate_result(result: dict) -> str:
         if not isinstance(v, (dict, list)) or k == "headline_stat"
     }
 
+    prefix = "NARRATE: "
+    if language:
+        prefix = f"NARRATE (write in language {language}): "
+
     response = client.chat.completions.create(
         model=MODEL,
         max_tokens=400,
         messages=[
             {"role": "system", "content": system},
-            {"role": "user", "content": "NARRATE: " + _json.dumps(slim, default=str)},
+            {"role": "user", "content": prefix + _json.dumps(slim, default=str)},
         ],
         extra_body=_PROVIDER_PREFS,
     )

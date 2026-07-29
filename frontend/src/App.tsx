@@ -7,6 +7,7 @@ import RightToolbar from "./components/RightToolbar";
 import ChatBar from "./components/Chat/ChatBar";
 import Sidebar from "./components/Sidebar/Sidebar";
 import TelemetryFooter from "./components/TelemetryFooter";
+import SetupNotice from "./components/SetupNotice";
 import QuickAnalysisPanel from "./components/Panels/QuickAnalysisPanel";
 import CompareSlider from "./components/Map/CompareSlider";
 import TimelineScrubber from "./components/Map/TimelineScrubber";
@@ -37,10 +38,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    const onHashChange = () => {
-      const r = getRoute();
-      if (r === "landing" || r === "app") setRoute(r);
-    };
+    const onHashChange = () => setRoute(getRoute());
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
@@ -86,6 +84,7 @@ export default function App() {
       <ChatBar />
       <MapLegend />
       <TelemetryFooter />
+      <SetupNotice />
       <AnimatePresence>
         {quickAnalysisOpen && <QuickAnalysisPanel />}
         {compare && <CompareSlider />}

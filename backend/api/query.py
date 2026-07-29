@@ -15,7 +15,7 @@ def query(request: QueryRequest):
     )
     try:
         parsed = parse_natural_language(
-            request.query, request.viewport_bbox, history
+            request.query, request.viewport_bbox, history, request.language
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -81,7 +81,7 @@ def query(request: QueryRequest):
             continue
 
     try:
-        explanation = narrate_result(result)
+        explanation = narrate_result(result, request.language)
     except Exception:
         hs = result["headline_stat"]
         explanation = (

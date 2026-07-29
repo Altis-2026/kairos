@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, SatelliteDish } from "lucide-react";
 import { fetchScenes } from "../../../api/scenes";
 import { useMapStore } from "../../../stores/mapStore";
 import { useSidebarStore } from "../../../stores/sidebarStore";
+import { estimateNextPass } from "../../../lib/nextPass";
 
 export default function PreviewScenes() {
   const aoi = useMapStore((s) => s.aoi);
@@ -52,6 +53,33 @@ export default function PreviewScenes() {
               revisits most places every 12 days.
             </p>
           )}
+
+          {(() => {
+            const pass = estimateNextPass(data.scenes.map((s) => s.date));
+            if (!pass) return null;
+            return (
+              <div className="rounded-xl bg-bg/70 ring-1 ring-teal/25 p-3">
+                <div className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.18em] text-teal uppercase">
+                  <SatelliteDish size={11} /> Next expected pass
+                </div>
+                <div className="mt-1 text-xs text-ink">
+                  {pass.nextDate}
+                  <span className="text-dim">
+                    {" "}
+                    ({pass.daysAway === 0
+                      ? "today"
+                      : pass.daysAway === 1
+                      ? "tomorrow"
+                      : `in ${pass.daysAway} days`})
+                  </span>
+                </div>
+                <div className="mt-0.5 font-mono text-[9px] text-dim">
+                  from the {pass.cadenceDays}-day revisit measured here, last
+                  seen {pass.lastDate}
+                </div>
+              </div>
+            );
+          })()}
 
           <ul className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
             {data.scenes.map((s) => (
