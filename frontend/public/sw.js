@@ -1,4 +1,4 @@
-const CACHE_NAME = "kairos-shell-v1";
+const CACHE_NAME = "kairos-shell-v2";
 const SHELL = ["/", "/manifest.webmanifest", "/kairos-icon.png", "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {

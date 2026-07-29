@@ -7,10 +7,14 @@ import {
   Download,
   Droplets,
   Flame,
+  Gauge,
+  GraduationCap,
+  Home,
   Radio,
   Ship,
   Snowflake,
   Sprout,
+  Telescope,
   Trees,
   Waves,
 } from "lucide-react";
@@ -83,6 +87,8 @@ const CAPABILITIES = [
   { icon: Snowflake, name: "Sea ice", blurb: "The ice edge, even in polar darkness" },
   { icon: Building2, name: "Quake damage", blurb: "Collapsed structures within hours" },
   { icon: Sprout, name: "Crop health", blurb: "Vegetation vigour when optical is blind" },
+  { icon: Gauge, name: "Air quality", blurb: "The exhaust fingerprint of traffic and industry" },
+  { icon: Flame, name: "Methane watch", blurb: "Leak-scale enhancements from orbit" },
 ];
 
 const STEPS = [
@@ -106,6 +112,13 @@ const STEPS = [
 
 interface InstallPromptEvent extends Event {
   prompt: () => Promise<void>;
+}
+
+function isIOS(): boolean {
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+    !window.matchMedia("(display-mode: standalone)").matches
+  );
 }
 
 function starField(count: number, seed: number): string {
@@ -272,9 +285,15 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
                 </button>
               )}
             </div>
+            {!installEvent && isIOS() && (
+              <p className="mx-auto mt-3 max-w-lg text-[11px] text-dim lg:mx-0">
+                On iPhone or iPad: tap Share, then Add to Home Screen, and
+                Kairos runs as an app.
+              </p>
+            )}
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-mono text-[11px] tracking-wider text-dim lg:justify-start">
-              <span>13 ANALYSIS TYPES</span>
+              <span>19 ANALYSIS TYPES</span>
               <span className="text-teal">/</span>
               <span>WHOLE EARTH EVERY 12 DAYS</span>
               <span className="text-teal">/</span>
@@ -288,6 +307,32 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
         <div className="relative z-10 flex justify-center pb-6">
           <ArrowDown size={16} className="animate-pulse-soft text-dim" />
         </div>
+      </section>
+
+      <section className="mx-auto max-w-5xl px-6 py-16 sm:px-10">
+        <motion.div {...reveal} className="max-w-3xl">
+          <p className="font-mono text-[11px] tracking-[0.3em] text-amber">
+            WHY THIS EXISTS
+          </p>
+          <h2 className="mt-3 font-display text-2xl font-semibold sm:text-3xl">
+            The storm that blinds the cameras is the storm you need eyes for.
+          </h2>
+          <p className="mt-4 text-sm leading-relaxed text-dim sm:text-[15px]">
+            In July 2025 the Guadalupe River rose about 26 feet in under an
+            hour. More than a hundred people died in the Texas Hill Country
+            floods, a few hours from where I live in Dallas. For days
+            afterward, nobody could say exactly how far the water had spread,
+            because the same storm that caused the flooding blocked every
+            optical satellite overhead.
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-dim sm:text-[15px]">
+            Radar satellites saw through that storm the whole time. The data
+            was free and public. Reading it just took a remote sensing degree
+            and specialist software. Kairos removes that requirement: type a
+            question about your street, your county or anywhere on Earth, and
+            get the radar answer in plain English.
+          </p>
+        </motion.div>
       </section>
 
       {findings.length > 0 && (
@@ -344,8 +389,8 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
           What you can ask it
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-dim">
-          Thirteen analysis types run on the same radar archive. These are the
-          ones people reach for first.
+          Nineteen analysis types run on the same satellite archives. These
+          are the ones people reach for first.
         </p>
         <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {CAPABILITIES.map((c, i) => (
@@ -427,6 +472,64 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
 
       <section className="mx-auto max-w-5xl px-6 py-20 sm:px-10">
         <h2 className="font-display text-2xl font-semibold sm:text-3xl">
+          Made for your address, not just the atlas
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-dim">
+          You do not need a disaster or a research question. Start with the
+          place you care about most.
+        </p>
+        <div className="mt-8 grid gap-4 sm:grid-cols-3">
+          <motion.button
+            {...reveal}
+            onClick={onLaunch}
+            className="rounded-2xl bg-surface p-5 ring-1 ring-line text-left transition-colors hover:ring-teal/40"
+          >
+            <Home size={18} className="text-teal" />
+            <h3 className="mt-3 font-medium">My Place</h3>
+            <p className="mt-1 text-xs leading-relaxed text-dim">
+              Type your address. Kairos scans your own neighborhood for
+              flooding, fire damage, new construction and sinking ground, and
+              reports back in normal sentences.
+            </p>
+          </motion.button>
+          <motion.button
+            {...reveal}
+            transition={{ ...reveal.transition, delay: 0.08 }}
+            onClick={() => {
+              location.hash = "foresight";
+              location.reload();
+            }}
+            className="rounded-2xl bg-surface p-5 ring-1 ring-line text-left transition-colors hover:ring-amber/50"
+          >
+            <Telescope size={18} className="text-amber" />
+            <h3 className="mt-3 font-medium">Foresight</h3>
+            <p className="mt-1 text-xs leading-relaxed text-dim">
+              Decades of satellite records answer three questions about any
+              place: how exposed is it, when does the risk peak, and is it
+              getting worse. Plus what to do about it.
+            </p>
+          </motion.button>
+          <motion.button
+            {...reveal}
+            transition={{ ...reveal.transition, delay: 0.16 }}
+            onClick={() => {
+              location.hash = "learn";
+              location.reload();
+            }}
+            className="rounded-2xl bg-surface p-5 ring-1 ring-line text-left transition-colors hover:ring-teal/40"
+          >
+            <GraduationCap size={18} className="text-teal" />
+            <h3 className="mt-3 font-medium">Academy</h3>
+            <p className="mt-1 text-xs leading-relaxed text-dim">
+              Five short lessons on how radar sees the Earth, then a ten
+              question quiz. By the end you can read the images yourself.
+            </p>
+          </motion.button>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-5xl px-6 pb-20 sm:px-10">
+        <h2 className="font-display text-2xl font-semibold sm:text-3xl">
           How a question becomes a map
         </h2>
         <ol className="mt-8 space-y-4">
@@ -466,7 +569,9 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
 
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-5xl flex-col gap-2 px-6 py-8 text-xs text-dim sm:px-10">
-          <span>Built by students for the Congressional App Challenge.</span>
+          <span>
+            Built by Amogh Vinaykumar for the Congressional App Challenge.
+          </span>
           <span>
             Data: Sentinel-1, ESA Copernicus. Processing: Google Earth Engine.
             Basemap: Mapbox.

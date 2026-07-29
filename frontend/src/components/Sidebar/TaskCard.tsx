@@ -15,6 +15,8 @@ import {
   Wind,
   Thermometer,
   Move,
+  Gauge,
+  Cloud,
   type LucideIcon,
 } from "lucide-react";
 import type { AnalysisType } from "../../types/analysis";
@@ -36,6 +38,8 @@ const ICONS: Record<string, LucideIcon> = {
   wind: Wind,
   thermometer: Thermometer,
   move: Move,
+  gauge: Gauge,
+  cloud: Cloud,
 };
 
 export default function TaskCard({

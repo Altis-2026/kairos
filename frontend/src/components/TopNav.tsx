@@ -9,6 +9,8 @@ import {
   MapPin,
   Radio,
   Shield,
+  GraduationCap,
+  Telescope,
 } from "lucide-react";
 import { useMapStore } from "../stores/mapStore";
 import { useSidebarStore } from "../stores/sidebarStore";
@@ -219,6 +221,17 @@ export default function TopNav() {
         </button>
         <button
           onClick={() => {
+            location.hash = "foresight";
+            location.reload();
+          }}
+          title="Foresight: what could happen where you live"
+          className="hidden md:grid h-10 px-3.5 grid-flow-col items-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-amber transition-colors"
+        >
+          <Telescope size={15} className="text-amber" />
+          <span className="text-xs font-medium">Foresight</span>
+        </button>
+        <button
+          onClick={() => {
             location.hash = "guardian";
             location.reload();
           }}
@@ -227,6 +240,16 @@ export default function TopNav() {
         >
           <Shield size={15} className="text-teal" />
           <span className="text-xs font-medium">Guardian</span>
+        </button>
+        <button
+          onClick={() => {
+            location.hash = "learn";
+            location.reload();
+          }}
+          title="Academy: learn how radar sees the Earth"
+          className="hidden md:grid h-10 w-10 place-items-center rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-teal transition-colors"
+        >
+          <GraduationCap size={17} />
         </button>
         <button
           onClick={() => setTutorialOpen(true)}
@@ -264,6 +287,24 @@ export default function TopNav() {
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-dim hover:text-ink"
               >
                 <Shield size={15} className="text-teal" /> Guardian
+              </button>
+              <button
+                onClick={() => {
+                  location.hash = "foresight";
+                  location.reload();
+                }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-dim hover:text-ink"
+              >
+                <Telescope size={15} className="text-amber" /> Foresight
+              </button>
+              <button
+                onClick={() => {
+                  location.hash = "learn";
+                  location.reload();
+                }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-dim hover:text-ink"
+              >
+                <GraduationCap size={15} className="text-teal" /> Academy
               </button>
               <button
                 onClick={() => {

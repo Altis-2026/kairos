@@ -15,6 +15,7 @@ from gee.wind import estimate_ocean_wind
 from gee.soil_moisture import estimate_soil_moisture
 from gee.fire_fusion import fuse_fire
 from gee.ice_drift import track_ice_drift
+from gee.atmosphere import detect_methane, monitor_air_quality
 
 ANALYSIS_REGISTRY = {
     "flood_extent": {
@@ -328,6 +329,44 @@ ANALYSIS_REGISTRY = {
         "icon": "move",
         "sar_polarization": "HH",
         "instrument_mode": "EW",
+    },
+    "air_quality": {
+        "function": monitor_air_quality,
+        "display_name": "Air Quality (NO2)",
+        "description": (
+            "Maps mean tropospheric nitrogen dioxide from the Sentinel-5P "
+            "TROPOMI spectrometer, the combustion fingerprint of traffic, "
+            "power plants and industry. Hotspots well above the local mean "
+            "are flagged. Column averages at about 7 km resolution show "
+            "regional patterns, not individual streets."
+        ),
+        "category": "Atmosphere",
+        "data_sources": ["S5P"],
+        "estimated_seconds": 20,
+        "output_type": "raster",
+        "color_palette": ["#0B120E", "#3BA7FF", "#7BC043", "#E8A318", "#FF3B5C"],
+        "icon": "gauge",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "methane": {
+        "function": detect_methane,
+        "display_name": "Methane Watch",
+        "description": (
+            "Maps the mean methane column from Sentinel-5P TROPOMI and flags "
+            "enhancement zones sitting well above the local background, the "
+            "signature of oil and gas leaks, landfills and wetlands. Column "
+            "averages at about 7 km resolution show regional enhancements, "
+            "not single facilities."
+        ),
+        "category": "Atmosphere",
+        "data_sources": ["S5P"],
+        "estimated_seconds": 20,
+        "output_type": "raster",
+        "color_palette": ["#0B3D91", "#1E6FE8", "#00BFA8", "#E8A318", "#FF3B5C"],
+        "icon": "cloud",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
     },
 }
 

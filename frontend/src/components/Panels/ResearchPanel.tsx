@@ -31,6 +31,7 @@ import {
 import { fetchImpact } from "../../api/impact";
 import { buildEmbedSnippet } from "../../lib/embed";
 import ResultInsight from "../Insight/ResultInsight";
+import AccuracySection from "./AccuracySection";
 import type { ImpactResponse } from "../../types/analysis";
 import {
   downloadGeoTIFF,
@@ -572,6 +573,8 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
           </div>
         </>
       )}
+
+      <AccuracySection />
     </motion.aside>
   );
 }

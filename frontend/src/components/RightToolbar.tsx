@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Home,
   Bell,
   Bot,
   Contrast,
@@ -24,6 +25,7 @@ import HistoryPanel from "./Panels/HistoryPanel";
 import BatchPanel from "./Panels/BatchPanel";
 import AlertsPanel from "./Panels/AlertsPanel";
 import DistrictPanel from "./Panels/DistrictPanel";
+import MyPlacePanel from "./Panels/MyPlacePanel";
 import AgentPanel from "./Panels/AgentPanel";
 import InsarPanel from "./Panels/InsarPanel";
 
@@ -59,6 +61,7 @@ export default function RightToolbar() {
     | "layers"
     | "analytics"
     | "research"
+    | "myplace"
     | "agent"
     | "district"
     | "insar"
@@ -93,6 +96,7 @@ export default function RightToolbar() {
       "layers",
       "analytics",
       "research",
+      "myplace",
       "agent",
       "district",
       "insar",
@@ -157,6 +161,13 @@ export default function RightToolbar() {
           onClick={() => setOpenPanel(openPanel === "research" ? null : "research")}
         >
           <FlaskConical size={17} />
+        </ToolButton>
+        <ToolButton
+          title="My place (your address)"
+          active={openPanel === "myplace"}
+          onClick={() => setOpenPanel(openPanel === "myplace" ? null : "myplace")}
+        >
+          <Home size={17} />
         </ToolButton>
         <ToolButton
           title="Agent mode (give it a goal)"
@@ -231,6 +242,9 @@ export default function RightToolbar() {
       )}
       {openPanel === "district" && (
         <DistrictPanel onClose={() => setOpenPanel(null)} />
+      )}
+      {openPanel === "myplace" && (
+        <MyPlacePanel onClose={() => setOpenPanel(null)} />
       )}
       {openPanel === "agent" && (
         <AgentPanel onClose={() => setOpenPanel(null)} />

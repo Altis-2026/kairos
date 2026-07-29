@@ -1,0 +1,25 @@
+# Pings the backend every 10 minutes so the Railway container never idles
+# out. Set the BACKEND_URL repository variable to the public Railway URL
+# (Settings > Secrets and variables > Actions > Variables), for example
+# https://kairos-production.up.railway.app
+
+name: Keep Kairos backend warm
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          URL="${{ vars.BACKEND_URL }}"
+          if [ -z "$URL" ]; then
+            echo "BACKEND_URL repository variable is not set; skipping"
+            exit 0
+          fi
+          curl -sf --max-time 20 "${URL%/}/health" && echo " -> OK" \
+            || echo " -> failed; next ping will catch it"

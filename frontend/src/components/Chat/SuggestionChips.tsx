@@ -2,9 +2,9 @@ import { useChatStore } from "../../stores/chatStore";
 
 const SUGGESTIONS = [
   "Flooding in Bangladesh, August 2024",
+  "How is the air quality over Dallas this month?",
   "Ships in the Strait of Hormuz this week",
   "Deforestation in Rondônia, Brazil this year",
-  "Sea ice extent near Svalbard last month",
 ];
 
 export default function SuggestionChips({

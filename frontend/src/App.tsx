@@ -13,6 +13,8 @@ import TimelineScrubber from "./components/Map/TimelineScrubber";
 import MapLegend from "./components/Map/MapLegend";
 import LiveWatch from "./components/Watch/LiveWatch";
 import Guardian from "./components/Guardian/Guardian";
+import Foresight from "./components/Foresight/Foresight";
+import Academy from "./components/Academy/Academy";
 import EmbedView from "./components/Embed/EmbedView";
 import Landing from "./components/Landing/Landing";
 import Tutorial, { TUTORIAL_SEEN_KEY } from "./components/Tutorial/Tutorial";
@@ -60,6 +62,8 @@ export default function App() {
 
   if (route === "watch") return <LiveWatch />;
   if (route === "guardian") return <Guardian />;
+  if (route === "foresight") return <Foresight />;
+  if (route === "learn") return <Academy />;
   if (route === "embed") return <EmbedView />;
   if (route === "landing") {
     return (

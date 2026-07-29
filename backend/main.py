@@ -81,6 +81,9 @@ from api.feed import router as feed_router
 from api.districts import router as districts_router
 from api.agent import router as agent_router
 from api.insar import router as insar_router
+from api.validation import router as validation_router
+from api.myplace import router as myplace_router
+from api.foresight import router as foresight_router
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -97,6 +100,9 @@ app.include_router(feed_router)
 app.include_router(districts_router)
 app.include_router(agent_router)
 app.include_router(insar_router)
+app.include_router(validation_router)
+app.include_router(myplace_router)
+app.include_router(foresight_router)
 
 
 @app.get("/health")

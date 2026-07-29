@@ -419,3 +419,65 @@ class AgentReportRequest(BaseModel):
         if len(v) > 6:
             return v[:6]
         return v
+
+
+class ValidationRunRequest(BaseModel):
+
+    benchmark_id: str
+
+
+class ConfounderRequest(BaseModel):
+
+    analysis_type: str
+    bbox: List[float]
+    start_date: str
+    end_date: str
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+    @field_validator("start_date")
+    @classmethod
+    def validate_start(cls, v):
+        return _validate_date(v, "start_date")
+
+    @field_validator("end_date")
+    @classmethod
+    def validate_end(cls, v):
+        return _validate_date(v, "end_date")
+
+
+class MyPlaceRequest(BaseModel):
+
+    address: str
+
+    @field_validator("address")
+    @classmethod
+    def validate_address(cls, v):
+        v = v.strip()
+        if len(v) < 3:
+            raise ValueError("address is too short")
+        if len(v) > 300:
+            raise ValueError("address is too long")
+        return v
+
+
+class ForesightRequest(BaseModel):
+
+    hazard: str
+    bbox: List[float]
+
+    @field_validator("hazard")
+    @classmethod
+    def validate_hazard(cls, v):
+        allowed = ("flood", "wildfire", "drought", "subsidence")
+        if v not in allowed:
+            raise ValueError(f"hazard must be one of {allowed}")
+        return v
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)

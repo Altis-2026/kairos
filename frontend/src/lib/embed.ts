@@ -1,7 +1,14 @@
 import type { BBox } from "../types/map";
 import type { CaseRef } from "./share";
 
-export type Route = "watch" | "guardian" | "embed" | "app" | "landing";
+export type Route =
+  | "watch"
+  | "guardian"
+  | "foresight"
+  | "learn"
+  | "embed"
+  | "app"
+  | "landing";
 
 export function goToApp(e?: { preventDefault: () => void }) {
   e?.preventDefault();
@@ -13,6 +20,8 @@ export function getRoute(): Route {
   const hash = location.hash.replace(/^#/, "");
   if (hash === "watch") return "watch";
   if (hash === "guardian") return "guardian";
+  if (hash.startsWith("foresight")) return "foresight";
+  if (hash === "learn") return "learn";
   if (hash.startsWith("embed")) return "embed";
   if (!hash) return "landing";
   return "app";

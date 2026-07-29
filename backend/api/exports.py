@@ -21,6 +21,8 @@ _BASE_SCALE = {
     "soil_moisture": 60,
     "fire_fusion": 30,
     "ice_drift": 400,
+    "air_quality": 7000,
+    "methane": 7000,
 }
 
 _METHOD = {
@@ -113,6 +115,24 @@ _METHOD = {
         "baseline": "First-half composite is the reference image",
         "masking": "Restricted to ice (HH > -18 dB)",
         "resolution": "400 m analysis grid",
+    },
+    "air_quality": {
+        "collection": "COPERNICUS/S5P/OFFL/L3_NO2",
+        "band": "tropospheric_NO2_column_number_density",
+        "mode": "TROPOMI nadir spectrometry",
+        "threshold": "Hotspots: mean column > local mean + 1.5 sigma",
+        "baseline": "Mean of all valid retrievals over the analysis window",
+        "masking": "Quality filtering applied upstream in the L3 product",
+        "resolution": "About 7 km; column-integrated, not ground level",
+    },
+    "methane": {
+        "collection": "COPERNICUS/S5P/OFFL/L3_CH4",
+        "band": "CH4_column_volume_mixing_ratio_dry_air",
+        "mode": "TROPOMI nadir spectrometry",
+        "threshold": "Enhancement zones: mean column > local mean + 1.5 sigma",
+        "baseline": "Mean of all valid retrievals over the analysis window",
+        "masking": "Quality filtering applied upstream in the L3 product",
+        "resolution": "About 7 km; column-integrated, not ground level",
     },
     "surface_deformation": {
         "collection": "COPERNICUS/S1_GRD",

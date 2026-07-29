@@ -2,21 +2,59 @@ import { useEffect, useState } from "react";
 import { API_BASE } from "../api/client";
 import { useMapStore } from "../stores/mapStore";
 
+const STEADY_INTERVAL_MS = 30000;
+const RETRY_MS = [2000, 4000, 8000, 16000];
+const FAILS_BEFORE_OFFLINE = 3;
+
 export default function TelemetryFooter() {
   const coords = useMapStore((s) => s.coords);
-  const [apiUp, setApiUp] = useState<boolean | null>(null);
+  const [state, setState] = useState<"linking" | "up" | "waking" | "down">(
+    "linking"
+  );
 
   useEffect(() => {
     let cancelled = false;
-    const check = () =>
+    let everUp = false;
+    let fails = 0;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const scheduleNext = () => {
+      if (cancelled) return;
+      const delay =
+        fails === 0
+          ? STEADY_INTERVAL_MS
+          : RETRY_MS[Math.min(fails - 1, RETRY_MS.length - 1)];
+      timer = setTimeout(check, delay);
+    };
+
+    const onFail = () => {
+      fails++;
+      setState(fails >= FAILS_BEFORE_OFFLINE ? "down" : everUp ? "waking" : "linking");
+      scheduleNext();
+    };
+
+    const check = () => {
       fetch(`${API_BASE}/health`)
-        .then((r) => !cancelled && setApiUp(r.ok))
-        .catch(() => !cancelled && setApiUp(false));
+        .then((r) => {
+          if (cancelled) return;
+          if (r.ok) {
+            everUp = true;
+            fails = 0;
+            setState("up");
+            scheduleNext();
+          } else {
+            onFail();
+          }
+        })
+        .catch(() => {
+          if (!cancelled) onFail();
+        });
+    };
+
     check();
-    const t = setInterval(check, 30000);
     return () => {
       cancelled = true;
-      clearInterval(t);
+      clearTimeout(timer);
     };
   }, []);
 
@@ -28,14 +66,20 @@ export default function TelemetryFooter() {
       <span className="flex items-center gap-1.5 bg-surface/80 backdrop-blur rounded-full px-3 py-1.5 ring-1 ring-line pointer-events-auto">
         <span
           className={`h-1.5 w-1.5 rounded-full ${
-            apiUp === null
-              ? "bg-dim"
-              : apiUp
+            state === "up"
               ? "bg-teal animate-pulse-soft"
-              : "bg-amber"
+              : state === "down"
+              ? "bg-amber"
+              : "bg-amber animate-pulse-soft"
           }`}
         />
-        {apiUp === null ? "LINKING…" : apiUp ? "KAIROS LINK ACTIVE" : "API OFFLINE"}
+        {state === "up"
+          ? "KAIROS LINK ACTIVE"
+          : state === "down"
+          ? "RECONNECTING…"
+          : state === "waking"
+          ? "WAKING LINK…"
+          : "LINKING…"}
       </span>
       {coords && (
         <span className="bg-surface/80 backdrop-blur rounded-full px-3 py-1.5 ring-1 ring-line tracking-wider">

@@ -1,11 +1,19 @@
-import { useState } from "react";
-import { ArrowUp } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowUp, Mic, Volume2, VolumeX } from "lucide-react";
 import { runQuery } from "../../api/query";
 import { useChatStore } from "../../stores/chatStore";
 import { useMapStore } from "../../stores/mapStore";
+import { usePrefsStore } from "../../stores/prefsStore";
 import SuggestionChips from "./SuggestionChips";
 import ChatMessages from "./ChatMessage";
 import { applyResultToGlobe } from "../../lib/applyResult";
+import {
+  isSpeechSupported,
+  isTTSSupported,
+  speak,
+  startDictation,
+  stopSpeaking,
+} from "../../lib/voice";
 
 export { applyResultToGlobe };
 
@@ -14,7 +22,28 @@ const nextId = () => `m${++msgId}-${Date.now()}`;
 
 export default function ChatBar() {
   const [input, setInput] = useState("");
+  const [listening, setListening] = useState(false);
+  const dictation = useRef<{ stop: () => void } | null>(null);
   const { addMessage, updateMessage, loading, setLoading } = useChatStore();
+  const speakReplies = usePrefsStore((s) => s.speakReplies);
+  const toggleSpeakReplies = usePrefsStore((s) => s.toggleSpeakReplies);
+
+  function toggleMic() {
+    if (listening) {
+      dictation.current?.stop();
+      return;
+    }
+    const handle = startDictation({
+      onInterim: (text) => setInput(text),
+      onFinal: (text) => void send(text),
+      onError: () => setListening(false),
+      onEnd: () => setListening(false),
+    });
+    if (handle) {
+      dictation.current = handle;
+      setListening(true);
+    }
+  }
 
   async function send(text: string) {
     const query = text.trim();
@@ -54,13 +83,15 @@ export default function ChatBar() {
       const params = res.parameters as Record<string, unknown> | null;
       const reasoning =
         params && typeof params.reasoning === "string" ? params.reasoning : undefined;
+      const finalText =
+        res.explanation ??
+        "Analysis complete. The result layer has been added to the globe.";
       updateMessage(pendingId, {
-        text:
-          res.explanation ??
-          "Analysis complete. The result layer has been added to the globe.",
+        text: finalText,
         pending: false,
         reasoning,
       });
+      if (usePrefsStore.getState().speakReplies) speak(finalText);
     } catch (e) {
       updateMessage(pendingId, {
         text:
@@ -84,11 +115,41 @@ export default function ChatBar() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send(input)}
-            placeholder="Ask about this area…"
+            placeholder={listening ? "Listening…" : "Ask about this area…"}
             aria-label="Ask Kairos a question about anywhere on Earth"
             disabled={loading}
-            className="w-full h-14 pl-6 pr-16 rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line text-[15px] text-ink placeholder-dim outline-none focus:ring-amber/60 shadow-panel transition-shadow disabled:opacity-70"
+            className="w-full h-14 pl-6 pr-32 rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line text-[15px] text-ink placeholder-dim outline-none focus:ring-amber/60 shadow-panel transition-shadow disabled:opacity-70"
           />
+          {isTTSSupported() && (
+            <button
+              onClick={() => {
+                if (speakReplies) stopSpeaking();
+                toggleSpeakReplies();
+              }}
+              title={speakReplies ? "Stop reading replies aloud" : "Read replies aloud"}
+              aria-label={speakReplies ? "Stop reading replies aloud" : "Read replies aloud"}
+              className={`absolute right-[5.75rem] top-1/2 -translate-y-1/2 h-9 w-9 grid place-items-center rounded-xl transition ${
+                speakReplies ? "text-teal" : "text-dim hover:text-ink"
+              }`}
+            >
+              {speakReplies ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            </button>
+          )}
+          {isSpeechSupported() && (
+            <button
+              onClick={toggleMic}
+              disabled={loading}
+              title={listening ? "Stop listening" : "Ask by voice"}
+              aria-label={listening ? "Stop listening" : "Ask by voice"}
+              className={`absolute right-14 top-1/2 -translate-y-1/2 h-9 w-9 grid place-items-center rounded-xl transition disabled:opacity-40 ${
+                listening
+                  ? "text-amber animate-pulse-soft"
+                  : "text-dim hover:text-ink"
+              }`}
+            >
+              <Mic size={16} />
+            </button>
+          )}
           <button
             onClick={() => send(input)}
             disabled={loading || !input.trim()}

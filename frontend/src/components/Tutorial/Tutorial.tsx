@@ -6,6 +6,8 @@ import {
   ChevronRight,
   FileSpreadsheet,
   FlaskConical,
+  GraduationCap,
+  Home,
   Landmark,
   Bot,
   Layers,
@@ -17,6 +19,7 @@ import {
   Satellite,
   Shield,
   Sparkles,
+  Telescope,
   X,
 } from "lucide-react";
 import { useMapStore } from "../../stores/mapStore";
@@ -62,12 +65,24 @@ const STEPS: Step[] = [
   {
     icon: <MessageSquare size={20} />,
     chip: "Ask",
-    title: "Just type what you want",
+    title: "Just type (or say) what you want",
     body:
       "Use the bar at the bottom: “is there flooding near Dhaka right now?” " +
       "Kairos figures out the analysis type, the place and the dates, runs it, " +
-      "and explains the answer in chat.",
+      "and explains the answer in chat. The mic button lets you ask out loud, " +
+      "and the speaker button reads answers back.",
     tip: "Try the suggestion chips above the bar for one-tap examples.",
+  },
+  {
+    icon: <Home size={20} />,
+    chip: "My place",
+    title: "Start with your own address",
+    body:
+      "Open My Place, type where you live, and Kairos scans your " +
+      "neighborhood: recent flooding, fire damage, new construction and " +
+      "sinking ground, each explained in a normal sentence, not jargon.",
+    tip: "Addresses only go to a geocoder to find coordinates. Nothing is stored.",
+    action: { label: "Open My Place", run: () => openPanel("myplace") },
   },
   {
     icon: <PanelRightOpen size={20} />,
@@ -92,12 +107,13 @@ const STEPS: Step[] = [
   {
     icon: <Layers size={20} />,
     chip: "Analysis",
-    title: "Thirteen ways to read the planet",
+    title: "Nineteen ways to read the planet",
     body:
       "Floods and flood depth, ships, burn scars, oil spills, deforestation, " +
-      "sea ice, ground change, quake damage, subsidence, urban growth, crops, " +
-      "and land disturbance. Each uses a different radar signature. Kairos picks " +
-      "the right one, or you choose from the task list.",
+      "sea ice and its drift, ground change, quake damage, subsidence, urban " +
+      "growth, crops, soil moisture, ocean wind, land disturbance, fire " +
+      "fusion, plus air quality and methane from a second satellite. Kairos " +
+      "picks the right one, or you choose from the task list.",
     action: { label: "Browse analysis types", run: openSidebar },
   },
   {
@@ -106,10 +122,11 @@ const STEPS: Step[] = [
     title: "Understand what you're seeing",
     body:
       "Each result gives a headline number, a confidence score, and a coloured " +
-      "overlay on the globe. The legend (bottom-left) labels every colour. Hit " +
-      "“Explain this result” for a plain-language read: what it shows, the " +
-      "trend, likely causes, plus an optional regional news search.",
-    tip: "Radar can be fooled (e.g. wet farmland looks like flood). The explainer flags this.",
+      "overlay on the globe. Simple view reads it back in plain sentences; " +
+      "Expert view keeps the technical readout. “Test other explanations” " +
+      "pulls the real rainfall, wind and land-cover records to check whether " +
+      "something innocent could explain the signal.",
+    tip: "Radar can be fooled (e.g. wet farmland looks like flood). Kairos checks, not just warns.",
   },
   {
     icon: <FlaskConical size={20} />,
@@ -153,6 +170,39 @@ const STEPS: Step[] = [
       "analyses, runs each one, shows its progress live, and writes back what " +
       "it found across all of them.",
     action: { label: "Open Agent mode", run: () => openPanel("agent") },
+  },
+  {
+    icon: <Telescope size={20} />,
+    chip: "Foresight",
+    title: "What could happen here?",
+    body:
+      "Foresight reads decades of satellite records for any place and scores " +
+      "its exposure to floods, wildfire, drought and sinking ground. You get " +
+      "the risk map, the months it peaks, whether it is statistically getting " +
+      "worse, and a checklist of what to do about it.",
+    action: {
+      label: "Open Foresight",
+      run: () => {
+        location.hash = "foresight";
+        location.reload();
+      },
+    },
+  },
+  {
+    icon: <GraduationCap size={20} />,
+    chip: "Learn",
+    title: "The Academy",
+    body:
+      "Five short lessons explain how radar sees the Earth: why it works at " +
+      "night, why rough is bright and smooth is dark, and how Kairos turns " +
+      "echoes into answers. Then a ten question quiz to prove you got it.",
+    action: {
+      label: "Open the Academy",
+      run: () => {
+        location.hash = "learn";
+        location.reload();
+      },
+    },
   },
   {
     icon: <Landmark size={20} />,
