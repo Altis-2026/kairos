@@ -58,6 +58,9 @@ def main():
 
     print("Downloading wrapped interferogram:")
     ifg_ok = fetch(
+        f"{pair_base}/{args.pair}.geo.diff.png",
+        os.path.join(out_dir, "interferogram.png"),
+    ) or fetch(
         f"{pair_base}/{args.frame}_{args.pair}.geo.diff_pha.png",
         os.path.join(out_dir, "interferogram.png"),
     ) or fetch(
@@ -65,11 +68,18 @@ def main():
         os.path.join(out_dir, "interferogram.png"),
     )
 
-    print("Downloading coherence:")
+    print("Downloading coherence (optional, skipped on failure):")
     cc_ok = fetch(
+        f"{pair_base}/{args.pair}.geo.cc.png",
+        os.path.join(out_dir, "coherence.png"),
+    ) or fetch(
         f"{pair_base}/{args.frame}_{args.pair}.geo.cc.png",
         os.path.join(out_dir, "coherence.png"),
     )
+    if not cc_ok:
+        stale = os.path.join(out_dir, "coherence.png")
+        if os.path.exists(stale):
+            os.remove(stale)
 
     bbox = None
     if args.bbox:
@@ -90,9 +100,11 @@ def main():
             if lons and lats:
                 bbox = [min(lons), min(lats), max(lons), max(lats)]
 
-    if not (ifg_ok and cc_ok):
+    if not ifg_ok:
         print("\nDownload incomplete. Check the frame id and pair on the portal.")
         sys.exit(1)
+    if not cc_ok:
+        print("\nCoherence not found; installing the interferogram alone.")
     if not bbox:
         print("\nCould not determine the frame corners. Rerun with --bbox min_lon,min_lat,max_lon,max_lat")
         print("(the frame page on the portal shows its extent).")

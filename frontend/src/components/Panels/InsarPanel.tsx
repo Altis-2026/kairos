@@ -102,16 +102,25 @@ export default function InsarPanel({ onClose }: { onClose: () => void }) {
                 >
                   <Layers size={12} /> Interferogram
                 </button>
-                <button
-                  onClick={() => toggle(site, "coherence")}
-                  className={`h-9 rounded-lg text-[11px] flex items-center justify-center gap-1.5 ring-1 transition ${
-                    cohOn
-                      ? "bg-raised text-teal ring-teal/50"
-                      : "text-dim ring-line hover:text-ink"
-                  }`}
-                >
-                  <Layers size={12} /> Coherence
-                </button>
+                {site.layers.coherence ? (
+                  <button
+                    onClick={() => toggle(site, "coherence")}
+                    className={`h-9 rounded-lg text-[11px] flex items-center justify-center gap-1.5 ring-1 transition ${
+                      cohOn
+                        ? "bg-raised text-teal ring-teal/50"
+                        : "text-dim ring-line hover:text-ink"
+                    }`}
+                  >
+                    <Layers size={12} /> Coherence
+                  </button>
+                ) : (
+                  <div
+                    title="Coherence layer not installed for this site"
+                    className="h-9 rounded-lg text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim/40"
+                  >
+                    <Layers size={12} /> Coherence
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-[10px] text-amber leading-snug rounded-lg bg-bg ring-1 ring-line p-2">

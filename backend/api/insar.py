@@ -66,7 +66,9 @@ def _shape_site(site: dict) -> dict:
         "source_url": site["source_url"],
         "dates": meta.get("dates"),
         "frame": meta.get("frame"),
-        "available": all(layers.values()),
+        # The interferogram is the layer that actually demonstrates phase
+        # measurement; coherence is a supporting layer shown only when present.
+        "available": layers.get("interferogram") is not None,
         "layers": layers,
     }
 
