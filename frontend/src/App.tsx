@@ -44,7 +44,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (route === "app") void restoreFromHash();
+    if (route !== "app") return;
+    void restoreFromHash();
+    const params = new URLSearchParams(
+      location.hash.replace(/^#/, "").replace(/^app&?/, "")
+    );
+    const panel = params.get("panel");
+    if (panel) useMapStore.getState().requestPanel(panel);
   }, [route]);
 
   useEffect(() => {
@@ -66,8 +72,8 @@ export default function App() {
   if (route === "landing") {
     return (
       <Landing
-        onLaunch={() => {
-          location.hash = "app";
+        onLaunch={(panel) => {
+          location.hash = panel ? `app&panel=${panel}` : "app";
           setRoute("app");
         }}
       />

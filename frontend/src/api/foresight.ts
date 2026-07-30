@@ -43,3 +43,31 @@ export function runForesight(hazard: Hazard, bbox: BBox): Promise<RiskOutlook> {
     body: JSON.stringify({ hazard, bbox }),
   });
 }
+
+export interface AskAnswer {
+  answer: string;
+  source: "ai" | "data";
+}
+
+export function askForesight(
+  question: string,
+  outlook: RiskOutlook,
+  placeName: string
+): Promise<AskAnswer> {
+  return apiFetch<AskAnswer>("/foresight/ask", {
+    method: "POST",
+    body: JSON.stringify({
+      question,
+      hazard: outlook.hazard,
+      place_name: placeName,
+      score: outlook.score,
+      level: outlook.level,
+      drivers: outlook.drivers,
+      peak_months: outlook.seasonal.peak_months,
+      trend_summary: outlook.trend?.summary ?? null,
+      method: outlook.method,
+      data_years: outlook.data_years,
+      language: navigator.language || null,
+    }),
+  });
+}

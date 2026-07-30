@@ -180,7 +180,8 @@ const STEPS: Step[] = [
       "Foresight reads decades of satellite records for any place and scores " +
       "its exposure to floods, wildfire, drought and sinking ground. You get " +
       "the risk map, the months it peaks, whether it is statistically getting " +
-      "worse, and a checklist of what to do about it.",
+      "worse, and a checklist of what to do about it. Check all four at once, " +
+      "ask it questions in plain language, then print the report.",
     action: {
       label: "Open Foresight",
       run: () => {

@@ -492,3 +492,43 @@ class ForesightRequest(BaseModel):
     @classmethod
     def validate_bbox(cls, v):
         return _validate_bbox_values(v)
+
+
+class ForesightAskRequest(BaseModel):
+
+    question: str
+    hazard: str
+    place_name: Optional[str] = None
+    score: int
+    level: str
+    drivers: Optional[List[str]] = None
+    peak_months: Optional[List[str]] = None
+    trend_summary: Optional[str] = None
+    method: Optional[str] = None
+    data_years: Optional[str] = None
+    language: Optional[str] = None
+
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, v):
+        v = v.strip()
+        if not v:
+            raise ValueError("question must not be empty")
+        if len(v) > 400:
+            raise ValueError("question must be under 400 characters")
+        return v
+
+    @field_validator("hazard")
+    @classmethod
+    def validate_hazard(cls, v):
+        allowed = ("flood", "wildfire", "drought", "subsidence")
+        if v not in allowed:
+            raise ValueError(f"hazard must be one of {allowed}")
+        return v
+
+    @field_validator("score")
+    @classmethod
+    def validate_score(cls, v):
+        if not (0 <= v <= 100):
+            raise ValueError("score must be between 0 and 100")
+        return v

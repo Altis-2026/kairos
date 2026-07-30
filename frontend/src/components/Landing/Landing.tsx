@@ -168,7 +168,11 @@ function RadarSweep() {
   );
 }
 
-export default function Landing({ onLaunch }: { onLaunch: () => void }) {
+export default function Landing({
+  onLaunch,
+}: {
+  onLaunch: (panel?: string) => void;
+}) {
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
   const starsSmall = useMemo(() => starField(90, 1337), []);
@@ -259,21 +263,28 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
               <button
-                onClick={onLaunch}
+                onClick={() => onLaunch("myplace")}
                 className="group flex h-12 items-center gap-2 rounded-full bg-amber px-7 font-medium text-bg transition hover:brightness-110"
               >
-                Launch Kairos
+                <Home size={17} />
+                Check my address
                 <ArrowRight
                   size={17}
                   className="transition-transform group-hover:translate-x-0.5"
                 />
               </button>
               <button
+                onClick={() => onLaunch()}
+                className="flex h-12 items-center gap-2 rounded-full bg-surface/90 px-6 text-sm text-ink ring-1 ring-line transition-colors hover:ring-teal/60"
+              >
+                Explore the globe
+              </button>
+              <button
                 onClick={openLiveWatch}
                 className="flex h-12 items-center gap-2 rounded-full bg-surface/90 px-6 text-sm text-ink ring-1 ring-line transition-colors hover:ring-amber/60"
               >
                 <Radio size={15} className="text-amber" />
-                See live disasters
+                Live disasters
               </button>
               {installEvent && (
                 <button
@@ -481,7 +492,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
         <div className="mt-8 grid gap-4 sm:grid-cols-3">
           <motion.button
             {...reveal}
-            onClick={onLaunch}
+            onClick={() => onLaunch("myplace")}
             className="rounded-2xl bg-surface p-5 ring-1 ring-line text-left transition-colors hover:ring-teal/40"
           >
             <Home size={18} className="text-teal" />
@@ -559,7 +570,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
             The globe is waiting.
           </p>
           <button
-            onClick={onLaunch}
+            onClick={() => onLaunch()}
             className="flex h-12 items-center gap-2 rounded-full bg-amber px-7 font-medium text-bg transition hover:brightness-110"
           >
             Launch Kairos

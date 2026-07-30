@@ -354,3 +354,53 @@ def write_mission_report(goal: str, plan_summary: str, outcomes: list) -> str:
         extra_body=_PROVIDER_PREFS,
     )
     return response.choices[0].message.content.strip()
+
+
+_FORESIGHT_SYSTEM = (
+    "You are Kairos, explaining a hazard-exposure outlook to a homeowner or "
+    "renter who is not a scientist. You are given the numbers Kairos computed "
+    "from decades of satellite records for one specific place, plus their "
+    "question. Answer only from those numbers and general public-safety "
+    "knowledge. Never invent a statistic, a date, a news event, or a local "
+    "detail you were not given. Be clear that the score describes measured "
+    "history and present exposure, not a prediction of a specific future "
+    "event. If the question cannot be answered from the data, say so and point "
+    "to what the data does show. Two short paragraphs at most, calm and plain, "
+    "no markdown headers."
+)
+
+
+def _foresight_facts(ctx: dict) -> str:
+    lines = [
+        f"Hazard: {ctx.get('hazard')}",
+        f"Place: {ctx.get('place_name') or 'the selected area'}",
+        f"Exposure score: {ctx.get('score')} out of 100 ({ctx.get('level')})",
+        f"Record used: {ctx.get('data_years')}" if ctx.get("data_years") else "",
+        f"How it was measured: {ctx.get('method')}" if ctx.get("method") else "",
+    ]
+    drivers = ctx.get("drivers") or []
+    if drivers:
+        lines.append("What drives the score: " + " ".join(drivers))
+    peaks = ctx.get("peak_months") or []
+    if peaks:
+        lines.append("Peak months: " + ", ".join(peaks))
+    if ctx.get("trend_summary"):
+        lines.append("Long-term trend test: " + ctx["trend_summary"])
+    lines.append(f"Question: {ctx.get('question')}")
+    if ctx.get("language"):
+        lines.append(f"Answer in this language: {ctx['language']}")
+    return "\n".join(line for line in lines if line)
+
+
+def answer_foresight_question(ctx: dict) -> str:
+    client = _get_client()
+    response = client.chat.completions.create(
+        model=MODEL,
+        max_tokens=450,
+        messages=[
+            {"role": "system", "content": _FORESIGHT_SYSTEM},
+            {"role": "user", "content": _foresight_facts(ctx)},
+        ],
+        extra_body=_PROVIDER_PREFS,
+    )
+    return response.choices[0].message.content.strip()
