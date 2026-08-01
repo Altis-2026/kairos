@@ -59,6 +59,7 @@ jobs:
             --memory 1Gi \
             --timeout 300 \
             --min-instances 1 \
+            --service-account kairos-backend@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --set-env-vars GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
 
   frontend:
