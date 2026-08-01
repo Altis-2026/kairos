@@ -7,6 +7,7 @@
  *   #app                        -> the app itself (globe + tools)
  *   #watch                      -> the public Live Watch dashboard (no login)
  *   #guardian                   -> the citizen-science Guardian mode (no login)
+ *   #foresight&bbox=..&label=.. -> the Foresight hazard outlook for one place
  *   #embed&task=..&bbox=..&..   -> a minimal embeddable result widget
  *   #task=..&bbox=..&..         -> normal app + restore a shared analysis
  *
@@ -16,13 +17,27 @@
 import type { BBox } from "../types/map";
 import type { CaseRef } from "./share";
 
-export type Route = "watch" | "guardian" | "embed" | "app" | "landing";
+export type Route =
+  | "watch"
+  | "guardian"
+  | "foresight"
+  | "embed"
+  | "app"
+  | "landing";
+
+/** Leave a full-screen public view and return to the app. */
+export function goToApp(e?: { preventDefault: () => void }) {
+  e?.preventDefault();
+  location.hash = "app";
+  location.reload();
+}
 
 export function getRoute(): Route {
   const hash = location.hash.replace(/^#/, "");
   if (!hash) return "landing";
   if (hash === "watch") return "watch";
   if (hash === "guardian") return "guardian";
+  if (hash.startsWith("foresight")) return "foresight";
   if (hash.startsWith("embed")) return "embed";
   return "app";
 }

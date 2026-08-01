@@ -59,7 +59,10 @@ export default function TelemetryFooter() {
     `${Math.abs(v).toFixed(4)}°${v >= 0 ? pos : neg}`;
 
   return (
-    <div className="absolute left-5 bottom-5 z-20 flex items-center gap-3 font-mono text-[10px] text-dim pointer-events-none select-none">
+    // Below `lg` the chat bar spans nearly the full width at this same bottom
+    // edge and sits above this in the stacking order, so the badges would be
+    // covered rather than read. Hide them instead of overlapping.
+    <div className="absolute left-5 bottom-5 z-20 hidden lg:flex items-center gap-3 font-mono text-[10px] text-dim pointer-events-none select-none">
       <span className="flex items-center gap-1.5 bg-surface/80 backdrop-blur rounded-full px-3 py-1.5 ring-1 ring-line pointer-events-auto">
         <span
           className={`h-1.5 w-1.5 rounded-full ${

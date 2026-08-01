@@ -118,6 +118,7 @@ export default function Globe() {
 
   const layers = useMapStore((s) => s.layers);
   const pointLayers = useMapStore((s) => s.pointLayers);
+  const imageLayers = useMapStore((s) => s.imageLayers);
   const aoi = useMapStore((s) => s.aoi);
   const drawMode = useMapStore((s) => s.drawMode);
   const flyTo = useMapStore((s) => s.flyTo);
@@ -143,6 +144,7 @@ export default function Globe() {
       // Re-sync everything after any style swap
       syncRasterLayers(map);
       syncPointLayers(map);
+      syncImageLayers(map);
       syncAoi(map);
     });
 
@@ -242,6 +244,46 @@ export default function Globe() {
     }
   }
 
+  function syncImageLayers(map: mapboxgl.Map) {
+    const current = useMapStore.getState().imageLayers;
+    for (const layer of current) {
+      const srcId = `kairos-img-src-${layer.id}`;
+      const lyrId = `kairos-img-lyr-${layer.id}`;
+      const [minLon, minLat, maxLon, maxLat] = layer.bbox;
+      // Mapbox image sources want the four corners clockwise from top-left.
+      const coordinates: [
+        [number, number],
+        [number, number],
+        [number, number],
+        [number, number]
+      ] = [
+        [minLon, maxLat],
+        [maxLon, maxLat],
+        [maxLon, minLat],
+        [minLon, minLat],
+      ];
+      const existing = map.getSource(srcId) as mapboxgl.ImageSource | undefined;
+      if (!existing) {
+        map.addSource(srcId, { type: "image", url: layer.url, coordinates });
+      } else {
+        existing.updateImage({ url: layer.url, coordinates });
+      }
+      if (!map.getLayer(lyrId)) {
+        map.addLayer({ id: lyrId, type: "raster", source: srcId });
+      }
+      map.setPaintProperty(lyrId, "raster-opacity", layer.visible ? layer.opacity : 0);
+      map.setPaintProperty(lyrId, "raster-fade-duration", 0);
+    }
+    const wanted = new Set(current.map((l) => `kairos-img-lyr-${l.id}`));
+    for (const l of map.getStyle()?.layers ?? []) {
+      if (l.id.startsWith("kairos-img-lyr-") && !wanted.has(l.id)) {
+        map.removeLayer(l.id);
+        const srcId = l.id.replace("kairos-img-lyr-", "kairos-img-src-");
+        if (map.getSource(srcId)) map.removeSource(srcId);
+      }
+    }
+  }
+
   function syncPointLayers(map: mapboxgl.Map) {
     const current = useMapStore.getState().pointLayers;
     for (const layer of current) {
@@ -302,6 +344,13 @@ export default function Globe() {
     syncPointLayers(map);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointLayers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    syncImageLayers(map);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageLayers]);
 
   useEffect(() => {
     const map = mapRef.current;

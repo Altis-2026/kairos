@@ -14,11 +14,13 @@ import {
   MapPin,
   Radio,
   Shield,
+  Telescope,
 } from "lucide-react";
 import { useMapStore } from "../stores/mapStore";
 import { useSidebarStore } from "../stores/sidebarStore";
 import { useAuthStore } from "../stores/authStore";
 import { useIsCompact } from "../hooks/useIsCompact";
+import KairosMark from "./KairosMark";
 import { firebaseEnabled, signInWithGoogle, signOut } from "../lib/firebase";
 
 const MAPBOX_TOKEN = (import.meta.env.VITE_MAPBOX_TOKEN as string) || "";
@@ -219,17 +221,15 @@ export default function TopNav() {
     <header className="absolute top-0 inset-x-0 z-30 flex items-center gap-2 px-3 h-16 pointer-events-none lg:gap-4 lg:px-5">
       {/* Brand */}
       <div className="flex items-center gap-3 pointer-events-auto">
-        <img
-          src="/altis-logo.png"
-          alt="Altis"
-          className="h-9 w-9 rounded-xl ring-1 ring-line shrink-0"
-        />
+        <span className="h-9 w-9 shrink-0 grid place-items-center rounded-xl bg-surface/90 ring-1 ring-line text-[#C9E6F7]">
+          <KairosMark size={24} title="Kairos" />
+        </span>
         <div className="leading-tight hidden lg:block">
           <div className="font-display font-semibold text-lg text-ink tracking-tight">
-            Altis
+            Kairos
           </div>
           <div className="font-mono text-[9px] tracking-[0.22em] text-dim">
-            KAIROS · SAR PLATFORM
+            BY ALTIS · SAR PLATFORM
           </div>
         </div>
       </div>
@@ -283,6 +283,17 @@ export default function TopNav() {
         >
           <Shield size={15} className="text-teal" />
           <span className="text-xs font-medium hidden lg:inline">Guardian</span>
+        </button>
+        <button
+          onClick={() => {
+            location.hash = "foresight";
+            location.reload();
+          }}
+          title="Foresight — hazard exposure where you live"
+          className="h-10 w-10 lg:w-auto lg:px-3.5 grid grid-flow-col items-center justify-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-teal transition-colors"
+        >
+          <Telescope size={15} className="text-teal" />
+          <span className="text-xs font-medium hidden lg:inline">Foresight</span>
         </button>
         <button
           onClick={() => setTutorialOpen(true)}

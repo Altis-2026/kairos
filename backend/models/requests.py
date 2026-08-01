@@ -387,3 +387,73 @@ class CompareAnalysesRequest(BaseModel):
     analysis_type: str
     a: ComparisonSide
     b: ComparisonSide
+
+
+class MyPlaceRequest(BaseModel):
+    """POST /myplace/locate — free-tier address lookup."""
+
+    address: str
+
+    @field_validator("address")
+    @classmethod
+    def validate_address(cls, v):
+        v = v.strip()
+        if len(v) < 3:
+            raise ValueError("address is too short")
+        if len(v) > 300:
+            raise ValueError("address is too long")
+        return v
+
+
+class ForesightRequest(BaseModel):
+    """POST /foresight — hazard exposure outlook for one area."""
+
+    hazard: str
+    bbox: List[float]
+
+    @field_validator("hazard")
+    @classmethod
+    def validate_hazard(cls, v):
+        allowed = ("flood", "wildfire", "drought", "subsidence")
+        if v not in allowed:
+            raise ValueError(f"hazard must be one of {allowed}")
+        return v
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+
+class ForesightAskRequest(BaseModel):
+    """POST /foresight/ask — a follow-up question about a computed outlook."""
+
+    question: str
+    hazard: str
+    place_name: Optional[str] = None
+    score: int
+    level: str
+    drivers: Optional[List[str]] = None
+    peak_months: Optional[List[str]] = None
+    trend_summary: Optional[str] = None
+    method: Optional[str] = None
+    data_years: Optional[str] = None
+    language: Optional[str] = None
+
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, v):
+        v = v.strip()
+        if not v:
+            raise ValueError("question must not be empty")
+        if len(v) > 400:
+            raise ValueError("question must be under 400 characters")
+        return v
+
+    @field_validator("hazard")
+    @classmethod
+    def validate_hazard(cls, v):
+        allowed = ("flood", "wildfire", "drought", "subsidence")
+        if v not in allowed:
+            raise ValueError(f"hazard must be one of {allowed}")
+        return v

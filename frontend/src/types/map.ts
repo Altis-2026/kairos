@@ -54,6 +54,19 @@ export interface PointLayer {
   visible: boolean;
 }
 
+/**
+ * A georeferenced still image pinned to a bbox — used for research-grade
+ * products Kairos serves rather than computes, like the InSAR interferograms.
+ */
+export interface ImageLayer {
+  id: string;
+  name: string;
+  url: string;
+  bbox: BBox;
+  opacity: number;
+  visible: boolean;
+}
+
 export type DrawMode = "rectangle" | "pin" | "quickpin" | null;
 
 export type BaseStyle = "satellite" | "dark" | "terrain";
