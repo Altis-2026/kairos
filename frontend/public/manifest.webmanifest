@@ -42,6 +42,13 @@
       "description": "Help vet possible illegal activity spotted from orbit",
       "url": "/#guardian",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Foresight",
+      "short_name": "Foresight",
+      "description": "Hazard exposure where you live, from the satellite record",
+      "url": "/#foresight",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

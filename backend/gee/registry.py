@@ -15,6 +15,7 @@ from gee.fire import detect_burn_scar
 from gee.oil import detect_oil_spill
 from gee.deforestation import detect_deforestation
 from gee.ice import detect_sea_ice
+from gee.ice_drift import track_ice_drift
 from gee.deformation import detect_deformation
 from gee.flood_depth import estimate_flood_depth
 from gee.damage import assess_damage
@@ -130,6 +131,24 @@ ANALYSIS_REGISTRY = {
         "output_type": "raster",
         "color_palette": ["#BFEFFF"],
         "icon": "snowflake",
+        "sar_polarization": "HH",
+        "instrument_mode": "EW",
+    },
+    "ice_drift": {
+        "function": track_ice_drift,
+        "display_name": "Sea Ice Drift Tracking",
+        "description": (
+            "Measures how fast and in which direction the ice is moving, by "
+            "cross-correlating radar texture between two passes to track the "
+            "same floes through time. Sea ice extent says where the ice is; "
+            "drift says where it is going."
+        ),
+        "category": "Environmental",
+        "data_sources": ["S1"],
+        "estimated_seconds": 35,
+        "output_type": "raster",
+        "color_palette": ["#0B3B5C", "#1E6FE8", "#00BFA8", "#BFEFFF", "#FFFFFF"],
+        "icon": "wind",
         "sar_polarization": "HH",
         "instrument_mode": "EW",
     },

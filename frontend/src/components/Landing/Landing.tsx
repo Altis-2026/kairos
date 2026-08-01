@@ -26,6 +26,11 @@ import {
 } from "lucide-react";
 import { ANALYSIS_COLORS, fetchFeed, timeAgo, type Finding } from "../../api/feed";
 import { joinWaitlist } from "../../api/waitlist";
+import KairosMark from "../KairosMark";
+import { fetchRegistry } from "../../api/registry";
+
+// Shown until /registry answers; kept in step with backend/gee/registry.py.
+const ANALYSIS_COUNT_FALLBACK = 22;
 
 const EXAMPLE_QUESTIONS = [
   "is there flooding near Dhaka right now?",
@@ -247,6 +252,9 @@ function RadarSweep() {
 export default function Landing({ onLaunch }: { onLaunch: () => void }) {
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
+  // The registry is the single source of truth for how many analyses exist, so
+  // this headline number can never drift from reality the way a literal would.
+  const [analysisCount, setAnalysisCount] = useState(ANALYSIS_COUNT_FALLBACK);
   const starsSmall = useMemo(() => starField(90, 1337), []);
   const starsBright = useMemo(() => starField(30, 4242), []);
   const typed = useTypewriter(EXAMPLE_QUESTIONS);
@@ -254,6 +262,14 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
   useEffect(() => {
     fetchFeed(3)
       .then((d) => setFindings(d.findings.slice(0, 3)))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchRegistry()
+      .then((types) => {
+        if (types.length) setAnalysisCount(types.length);
+      })
       .catch(() => {});
   }, []);
 
@@ -293,13 +309,14 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
         </div>
 
         <header className="relative z-10 flex h-16 items-center gap-3">
-          <img
-            src="/altis-logo.png"
-            alt=""
-            className="h-9 w-9 rounded-xl ring-1 ring-line"
-          />
-          <span className="font-display font-semibold text-lg tracking-tight">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-surface/80 ring-1 ring-line text-[#C9E6F7]">
+            <KairosMark size={24} />
+          </span>
+          <span className="font-display text-lg font-semibold tracking-tight">
             Kairos
+          </span>
+          <span className="font-mono text-[9px] tracking-[0.22em] text-dim">
+            BY ALTIS
           </span>
         </header>
 
@@ -355,7 +372,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
             </div>
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-mono text-[11px] tracking-wider text-dim lg:justify-start">
-              <span>13 ANALYSIS TYPES</span>
+              <span>{analysisCount} ANALYSIS TYPES</span>
               <span className="text-teal">/</span>
               <span>WHOLE EARTH EVERY 12 DAYS</span>
               <span className="text-teal">/</span>

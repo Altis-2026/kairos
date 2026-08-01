@@ -14,6 +14,7 @@ import TimelineScrubber from "./components/Map/TimelineScrubber";
 import MapLegend from "./components/Map/MapLegend";
 import LiveWatch from "./components/Watch/LiveWatch";
 import Guardian from "./components/Guardian/Guardian";
+import Foresight from "./components/Foresight/Foresight";
 import EmbedView from "./components/Embed/EmbedView";
 import Landing from "./components/Landing/Landing";
 import Tutorial, { TUTORIAL_SEEN_KEY } from "./components/Tutorial/Tutorial";
@@ -36,11 +37,12 @@ export default function App() {
     return r;
   });
 
+  // Every route responds to the hash, so browser back/forward moves between
+  // the public views the same way the nav buttons do. (Those buttons also
+  // reload, which remounts the globe cleanly; this keeps the plain
+  // edit-the-URL and back-button paths working too.)
   useEffect(() => {
-    const onHashChange = () => {
-      const r = getRoute();
-      if (r === "landing" || r === "app") setRoute(r);
-    };
+    const onHashChange = () => setRoute(getRoute());
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
@@ -64,6 +66,7 @@ export default function App() {
 
   if (route === "watch") return <LiveWatch />;
   if (route === "guardian") return <Guardian />;
+  if (route === "foresight") return <Foresight />;
   if (route === "embed") return <EmbedView />;
   if (route === "landing") {
     return (

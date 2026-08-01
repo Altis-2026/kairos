@@ -9,6 +9,7 @@ import type {
   CompareControl,
   DrawMode,
   PointLayer,
+  ImageLayer,
   Projection,
   RasterLayer,
   ResultRef,
@@ -25,6 +26,7 @@ interface MapState {
   coords: { lng: number; lat: number } | null;
   layers: RasterLayer[];
   pointLayers: PointLayer[];
+  imageLayers: ImageLayer[];
   aoi: BBox | null;
   drawMode: DrawMode;
   flyTo: FlyToTarget | null;
@@ -48,6 +50,7 @@ interface MapState {
   setViewportBbox: (b: BBox) => void;
   addRasterLayer: (layer: RasterLayer) => void;
   addPointLayer: (layer: PointLayer) => void;
+  addImageLayer: (layer: ImageLayer) => void;
   removeLayer: (id: string) => void;
   clearGroup: (group: "compare" | "timeline") => void;
   setLayerOpacity: (id: string, opacity: number) => void;
@@ -74,6 +77,7 @@ export const useMapStore = create<MapState>((set) => ({
   coords: null,
   layers: [],
   pointLayers: [],
+  imageLayers: [],
   aoi: null,
   drawMode: null,
   flyTo: null,
@@ -98,10 +102,15 @@ export const useMapStore = create<MapState>((set) => ({
     set((s) => ({
       pointLayers: [...s.pointLayers.filter((l) => l.id !== layer.id), layer],
     })),
+  addImageLayer: (layer) =>
+    set((s) => ({
+      imageLayers: [...s.imageLayers.filter((l) => l.id !== layer.id), layer],
+    })),
   removeLayer: (id) =>
     set((s) => ({
       layers: s.layers.filter((l) => l.id !== id),
       pointLayers: s.pointLayers.filter((l) => l.id !== id),
+      imageLayers: s.imageLayers.filter((l) => l.id !== id),
     })),
   clearGroup: (group) =>
     set((s) => ({ layers: s.layers.filter((l) => l.group !== group) })),
@@ -117,6 +126,9 @@ export const useMapStore = create<MapState>((set) => ({
       pointLayers: s.pointLayers.map((l) =>
         l.id === id ? { ...l, visible: !l.visible } : l
       ),
+      imageLayers: s.imageLayers.map((l) =>
+        l.id === id ? { ...l, visible: !l.visible } : l
+      ),
     })),
   setLayerVisible: (id, visible) =>
     set((s) => ({
@@ -124,8 +136,11 @@ export const useMapStore = create<MapState>((set) => ({
       pointLayers: s.pointLayers.map((l) =>
         l.id === id ? { ...l, visible } : l
       ),
+      imageLayers: s.imageLayers.map((l) =>
+        l.id === id ? { ...l, visible } : l
+      ),
     })),
-  clearLayers: () => set({ layers: [], pointLayers: [] }),
+  clearLayers: () => set({ layers: [], pointLayers: [], imageLayers: [] }),
   setAoi: (aoi) => set({ aoi }),
   setDrawMode: (drawMode) => set({ drawMode }),
   requestFlyTo: (center, zoom) =>
