@@ -20,6 +20,8 @@ import {
   Map as MapIcon,
   Minus,
   Plus,
+  Radar,
+  Ship,
   Telescope,
   X,
   type LucideIcon,
@@ -35,6 +37,8 @@ import HistoryPanel from "./Panels/HistoryPanel";
 import BatchPanel from "./Panels/BatchPanel";
 import AlertsPanel from "./Panels/AlertsPanel";
 import JanusPanel from "./Janus/JanusPanel";
+import InsarPanel from "./Panels/InsarPanel";
+import VesselPanel from "./Panels/VesselPanel";
 
 type PanelKey =
   | "layers"
@@ -43,7 +47,9 @@ type PanelKey =
   | "history"
   | "batch"
   | "alerts"
-  | "janus";
+  | "janus"
+  | "insar"
+  | "vessels";
 
 interface ToolAction {
   key: string;
@@ -101,6 +107,8 @@ export default function RightToolbar() {
       "batch",
       "alerts",
       "janus",
+      "insar",
+      "vessels",
     ];
     if ((known as string[]).includes(panelRequest)) {
       setOpenPanel(panelRequest as PanelKey);
@@ -191,6 +199,20 @@ export default function RightToolbar() {
       icon: Bell,
       active: openPanel === "alerts",
       onClick: () => openPanelAndCloseSheet("alerts"),
+    },
+    {
+      key: "vessels",
+      label: "Dark vessels",
+      icon: Ship,
+      active: openPanel === "vessels",
+      onClick: () => openPanelAndCloseSheet("vessels"),
+    },
+    {
+      key: "insar",
+      label: "InSAR deep dive",
+      icon: Radar,
+      active: openPanel === "insar",
+      onClick: () => openPanelAndCloseSheet("insar"),
     },
     {
       key: "zoom-in",
@@ -312,6 +334,10 @@ export default function RightToolbar() {
         <AnalyticsPanel onClose={() => setOpenPanel(null)} />
       )}
       {openPanel === "janus" && <JanusPanel onClose={() => setOpenPanel(null)} />}
+      {openPanel === "vessels" && (
+        <VesselPanel onClose={() => setOpenPanel(null)} />
+      )}
+      {openPanel === "insar" && <InsarPanel onClose={() => setOpenPanel(null)} />}
     </>
   );
 }

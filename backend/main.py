@@ -125,6 +125,10 @@ from api.waitlist import router as waitlist_router  # noqa: E402
 from api.janus import router as janus_router  # noqa: E402
 from api.keys import router as keys_router  # noqa: E402
 from api.portfolio import router as portfolio_router  # noqa: E402
+from api.foresight import router as foresight_router  # noqa: E402
+from api.vessels import router as vessels_router  # noqa: E402
+from api.insar import router as insar_router  # noqa: E402
+from api.myplace import router as myplace_router  # noqa: E402
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -143,6 +147,10 @@ app.include_router(waitlist_router)
 app.include_router(janus_router)
 app.include_router(keys_router)
 app.include_router(portfolio_router)
+app.include_router(foresight_router)
+app.include_router(vessels_router)
+app.include_router(insar_router)
+app.include_router(myplace_router)
 
 
 @app.middleware("http")
