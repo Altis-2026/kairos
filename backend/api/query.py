@@ -42,6 +42,19 @@ def query(request: QueryRequest):
             "explanation": None,
         }
 
+    # Parser evaluation: stop here and report what the language layer produced.
+    # Measuring parse quality does not require paying for the analysis that
+    # would follow it.
+    if request.parse_only:
+        return {
+            "understood": True,
+            "clarification": None,
+            "parameters": parsed.model_dump(),
+            "result": None,
+            "explanation": None,
+            "parse_only": True,
+        }
+
     # Defensive: understood=true requires complete parameters
     if not (parsed.analysis_type and parsed.bbox and parsed.start_date and parsed.end_date):
         return {
