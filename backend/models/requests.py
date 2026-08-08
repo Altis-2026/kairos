@@ -317,6 +317,11 @@ class QueryRequest(BaseModel):
     # Prior turns of the conversation so follow-ups ("now show fires there",
     # "what about last year") resolve against earlier context. Most recent last.
     history: Optional[List[ConversationTurn]] = None
+    # Return the parsed parameters WITHOUT running the analysis. Used by the
+    # parser evaluation harness (scripts/paper_data/), where running a full
+    # GEE analysis per test query would cost an hour and real quota to measure
+    # something that happens entirely before the analysis starts.
+    parse_only: bool = False
 
     @field_validator("query")
     @classmethod
