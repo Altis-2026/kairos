@@ -517,7 +517,9 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     openingId,
     sending,
     watchBusy,
+    redeeming,
     error,
+    redeem,
     loadHome,
     open,
     openCompanion,
@@ -532,6 +534,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
 
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState<JanusMode>("mentor");
+  const [accessCode, setAccessCode] = useState("");
   const [newQuestion, setNewQuestion] = useState("");
   const [showBiblio, setShowBiblio] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -844,8 +847,47 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
         </p>
       )}
 
+      {/* ---------- Closed research preview: access code required ---------- */}
+      {available !== false && entitlements?.locked && (
+        <div className="min-h-0 flex-1 overflow-y-auto space-y-3 pr-0.5">
+          <p className="text-xs leading-relaxed text-dim">
+            Janus is an AI research mentor: it teaches the craft of
+            Earth-observation research, designs studies with you, runs real
+            analyses mid-conversation, and pushes back on weak reasoning.
+          </p>
+          <p className="text-xs leading-relaxed text-dim">
+            It is currently in a closed research preview. If you have an access
+            code, enter it below. The rest of Kairos works without one.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const code = accessCode.trim();
+              if (code && !redeeming) void redeem(code);
+            }}
+            className="space-y-2"
+          >
+            <input
+              value={accessCode}
+              onChange={(e) => setAccessCode(e.target.value)}
+              placeholder="Access code"
+              autoComplete="off"
+              spellCheck={false}
+              className="w-full rounded-lg bg-bg ring-1 ring-white/10 px-3 py-2 text-sm text-ink placeholder:text-dim/60 focus:outline-none focus:ring-amber/50"
+            />
+            <button
+              type="submit"
+              disabled={!accessCode.trim() || redeeming}
+              className="w-full rounded-lg bg-amber px-3 py-2 text-sm font-medium text-bg hover:bg-amber/90 transition disabled:opacity-50"
+            >
+              {redeeming ? "Checking..." : "Unlock Janus"}
+            </button>
+          </form>
+        </div>
+      )}
+
       {/* ---------- Home: projects + new project ---------- */}
-      {available !== false && !bundle && (
+      {available !== false && !entitlements?.locked && !bundle && (
         <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pr-0.5">
           <p className="text-xs leading-relaxed text-dim">
             A mentor that works with you like a PhD scientist: it teaches the
