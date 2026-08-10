@@ -59,6 +59,21 @@ BENCHMARKS = [
         "reference": "Hansen Global Forest Change loss year (Landsat, 30 m)",
         "reference_scale_m": 30,
     },
+    # Point-based, not raster. Ship detection returns vessel positions rather
+    # than an area, so this benchmark scores detections against transponder
+    # broadcasts instead of computing pixel-area overlap. See run_benchmark.
+    {
+        "id": "gulf-vessels-2023",
+        "analysis_type": "ship_detection",
+        "region": "Mississippi River delta, Gulf of Mexico — 15 January 2023",
+        "bbox": [-89.6, 28.6, -88.9, 29.2],
+        "start_date": "2023-01-15",
+        "end_date": "2023-01-16",
+        "reference": "MarineCadastre AIS vessel broadcasts (NOAA and BOEM)",
+        "reference_scale_m": None,
+        "kind": "points",
+        "dark_vessel_case": "gulf-delta-2023",
+    },
 ]
 
 
@@ -170,12 +185,88 @@ def get_benchmark(benchmark_id: str) -> dict:
     )
 
 
+def _run_point_benchmark(bm: dict) -> dict:
+    """
+    Score a point detector against transponder broadcasts.
+
+    Ship detection returns vessel positions, so pixel-area overlap is the wrong
+    instrument. Instead we reuse the production dark-vessel screening, which
+    already matches each radar return to the AIS broadcast nearest in time
+    within a drift-widened radius, and read agreement off that matching.
+
+    Both numbers are bounds, not accuracy, and the caveat matters more than the
+    figure: an unmatched radar return is not necessarily a false positive,
+    because small craft are not required to broadcast AIS and this area holds
+    hundreds of fixed platforms that each read as a bright return. Precision is
+    therefore a LOWER bound on correctness. Recall is the cleaner of the two.
+    """
+    from gee import dark_vessels
+
+    screen = dark_vessels.screen_case(bm["dark_vessel_case"])
+
+    detections = screen["detections_total"]
+    matched_dets = screen["matched_count"]
+    ais_vessels = screen["ais_vessels_in_window"]
+    matched_vessels = screen["matched_vessel_count"]
+
+    precision = round(matched_dets / detections, 3) if detections else None
+    recall = round(matched_vessels / ais_vessels, 3) if ais_vessels else None
+    f1 = (
+        round(2 * precision * recall / (precision + recall), 3)
+        if precision and recall and (precision + recall) > 0
+        else None
+    )
+
+    metrics = {
+        "radar_detections": detections,
+        "ais_vessels_in_window": ais_vessels,
+        "matched_detections": matched_dets,
+        "matched_vessels": matched_vessels,
+        "unmatched_detections": screen["unmatched_count"],
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        # Area overlap is undefined for a point detector; the scoreboard stores
+        # None rather than a number that would invite comparison with the
+        # raster benchmarks.
+        "iou": None,
+    }
+
+    import scoreboard
+
+    scoreboard.log_run(bm, metrics)
+
+    return {
+        "benchmark": {k: v for k, v in bm.items()},
+        "metrics": metrics,
+        "kairos_tile_url": screen["tile_url"],
+        "reference_tile_url": None,
+        "matched": screen["matched"],
+        "unmatched": screen["unmatched"],
+        "data_date": screen["data_date"],
+        "radar_time_utc": screen["radar_time_utc"],
+        "match_radius_m": screen["match_radius_m"],
+        "caveats": (
+            "Point-based scoring, not area overlap, and the two figures are "
+            "bounds rather than accuracy. Precision is a LOWER bound: an "
+            "unmatched radar return may be a small craft with no AIS "
+            "obligation, or one of the hundreds of fixed platforms in this "
+            "area, not a false detection. Recall counts only vessels that were "
+            "broadcasting. " + " ".join(screen["caveats"])
+        ),
+    }
+
+
 def run_benchmark(benchmark_id: str) -> dict:
     """
     Run one benchmark end-to-end: production detector vs reference dataset.
     Slow (one full GEE analysis + comparison, typically 30-90 s).
     """
     bm = get_benchmark(benchmark_id)
+
+    if bm.get("kind") == "points":
+        return _run_point_benchmark(bm)
+
     geometry = common.bbox_geometry(bm["bbox"])
 
     # The exact production detector — not a special validation path.

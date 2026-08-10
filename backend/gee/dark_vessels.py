@@ -209,6 +209,10 @@ def screen_case(case_id: str) -> dict:
         "matched_count": len(matched_points),
         "unmatched_count": unmatched,
         "ais_vessels_in_window": len(broadcasts),
+        # Distinct transponders accounted for by at least one radar return.
+        # Differs from matched_count when two returns fall inside one vessel's
+        # match radius, and it is the numerator recall needs.
+        "matched_vessel_count": len(matched_mmsi),
         "match_radius_m": {
             "base": BASE_RADIUS_M,
             "typical": round(sum(radii) / len(radii)) if radii else BASE_RADIUS_M,
