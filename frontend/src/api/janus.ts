@@ -49,6 +49,8 @@ export interface Entitlements {
   blurb: string;
   features: string[];
   project_cap: number | null;
+  /** True while Janus is locked behind the research-preview access code. */
+  locked: boolean;
   catalog: { id: string; name: string; price_usd_month: number; blurb: string }[];
   unread_insights: number;
   skills: Skill[];
@@ -184,6 +186,16 @@ export function fetchCurricula(): Promise<{ curricula: Curriculum[] }> {
 
 export function fetchEntitlements(): Promise<Entitlements> {
   return apiFetch(`/janus/entitlements?owner=${encodeURIComponent(janusOwner())}`);
+}
+
+/** Redeem a research-preview access code, unlocking Janus for this owner. */
+export function redeemAccessCode(
+  code: string
+): Promise<{ unlocked: boolean; entitlements: Entitlements }> {
+  return apiFetch(`/janus/redeem`, {
+    method: "POST",
+    body: JSON.stringify({ owner: janusOwner(), code }),
+  });
 }
 
 export function listProjects(): Promise<{ projects: JanusProject[] }> {

@@ -13,6 +13,7 @@ import {
   fetchJanusStatus,
   getProject,
   listProjects,
+  redeemAccessCode,
   sendChat,
   toggleWatch,
   type Curriculum,
@@ -34,8 +35,10 @@ interface JanusState {
   openingId: number | null;
   sending: boolean;
   watchBusy: boolean;
+  redeeming: boolean;
   error: string | null;
 
+  redeem: (code: string) => Promise<boolean>;
   loadHome: () => Promise<void>;
   open: (id: number) => Promise<void>;
   openCompanion: () => Promise<void>;
@@ -62,7 +65,25 @@ export const useJanusStore = create<JanusState>((set, get) => ({
   openingId: null,
   sending: false,
   watchBusy: false,
+  redeeming: false,
   error: null,
+
+  redeem: async (code) => {
+    set({ redeeming: true, error: null });
+    try {
+      const { entitlements } = await redeemAccessCode(code);
+      set({ entitlements, redeeming: false });
+      // Projects and curricula were empty while locked; refill them now.
+      await get().loadHome();
+      return true;
+    } catch (e) {
+      set({
+        redeeming: false,
+        error: e instanceof Error ? e.message : "That access code was not accepted.",
+      });
+      return false;
+    }
+  },
 
   loadHome: async () => {
     set({ loadingHome: true, error: null });

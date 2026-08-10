@@ -2,15 +2,21 @@
 Janus subscription tiers and feature gating (docs/JANUS.md §5).
 
 The tier -> features map is the single source of truth for what each plan
-unlocks. Gating is real in the code today; billing is not yet wired, so the
-default tier is deliberately generous ("early_access" unlocks everything)
-while Janus is free during early access. When Stripe is connected, a
-successful checkout calls store.set_tier(owner, tier) and nothing else here
-changes: the gates already exist.
+unlocks. Gating is real in the code today; billing is not yet wired.
 
-To make a feature paid later, move it out of the early_access set and into
-the tier that should own it. Nothing else in the codebase needs editing.
+Access model while Janus is in closed research preview: a new owner starts
+"locked" and unlocks the full early-access tier by redeeming an access code
+we hand to individual researchers. Every Janus mentor turn costs real model
+spend, so an open default would let anonymous traffic draw down a shared
+budget with no cap; the code keeps preview usage to people we invited.
+
+When Stripe is connected, a successful checkout calls
+store.set_tier(owner, tier) and nothing else here changes: the gates already
+exist. To make a feature paid later, move it out of the early_access set and
+into the tier that should own it. Nothing else in the codebase needs editing.
 """
+
+import os
 
 # Every gateable capability. `requires()` checks membership against a tier.
 FEATURES = {
@@ -33,8 +39,20 @@ FEATURES = {
 FREE_PROJECT_CAP = 3
 
 TIERS = {
-    # The current default: everyone, free, everything. This is what makes the
-    # early-access launch feel unlimited while the gates quietly exist.
+    # Where every new owner starts during the closed research preview. No
+    # features, so no mentor turn can be spent before a code is redeemed.
+    "locked": {
+        "name": "Locked",
+        "price_usd_month": 0,
+        "blurb": (
+            "Janus is in closed research preview. Enter your access code to "
+            "unlock it."
+        ),
+        "features": set(),
+        "project_cap": 0,
+    },
+    # What redeeming a valid access code grants: free, everything, while
+    # Janus is in early access.
     "early_access": {
         "name": "Early Access",
         "price_usd_month": 0,
@@ -91,8 +109,34 @@ TIERS = {
     },
 }
 
-# What a brand-new owner gets before any billing exists.
-DEFAULT_TIER = "early_access"
+# What a brand-new owner gets: locked until they redeem an access code.
+DEFAULT_TIER = "locked"
+
+# The tier a valid access code grants.
+UNLOCK_TIER = "early_access"
+
+
+def access_code() -> str:
+    """
+    The current research-preview access code. Set JANUS_ACCESS_CODE to rotate
+    it without a redeploy of this module's logic; the fallback keeps local dev
+    and the current preview cohort working.
+    """
+    return os.getenv("JANUS_ACCESS_CODE", "kairos2026")
+
+
+def redeem(owner: str, code: str) -> bool:
+    """
+    Redeem an access code for an owner. Returns True and promotes them to the
+    unlock tier on a match, False otherwise. Comparison ignores surrounding
+    whitespace and case, because the code is transcribed by hand from an email.
+    """
+    from janus import store
+
+    if (code or "").strip().casefold() != access_code().strip().casefold():
+        return False
+    store.set_tier(owner, UNLOCK_TIER)
+    return True
 
 
 def resolve_tier(owner: str) -> str:
@@ -112,8 +156,11 @@ def entitlements(owner: str) -> dict:
         "blurb": tier["blurb"],
         "features": sorted(tier["features"]),
         "project_cap": tier["project_cap"],
+        # Whether this owner still needs an access code. The frontend renders
+        # the unlock prompt from this rather than inferring it from the tier id.
+        "locked": tier_id == "locked",
         # The upgrade ladder, so the UI can render a pricing prompt when a
-        # gated feature is hit — without hardcoding prices in the frontend.
+        # gated feature is hit, without hardcoding prices in the frontend.
         "catalog": [
             {
                 "id": tid,
@@ -122,7 +169,7 @@ def entitlements(owner: str) -> dict:
                 "blurb": t["blurb"],
             }
             for tid, t in TIERS.items()
-            if tid not in ("early_access",)
+            if tid not in ("early_access", "locked")
         ],
     }
 
