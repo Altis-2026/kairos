@@ -1,16 +1,16 @@
-# Runs every query in queries.jsonl through the NL parser (parse_only, so no
+﻿# Runs every query in queries.jsonl through the NL parser (parse_only, so no
 # analysis is executed) and writes a CSV with blank columns for you to score.
 #
 #   .\collect_parses.ps1 -Api "https://kairos-api-...run.app"
 #
-# Output: parses_to_score.csv — open it in Excel and fill the four blank
+# Output: parses_to_score.csv - open it in Excel and fill the four blank
 #         columns by hand. That hand-scoring IS the measurement; there is no
 #         way to automate it honestly, because "did it pick the right place"
 #         needs a human who knows where Springfield was supposed to be.
 #
 # REQUIRES the parse_only flag on POST /query (backend/api/query.py). If every
 # row comes back with an error mentioning parse_only, the deployed backend
-# predates that change — redeploy first.
+# predates that change - redeploy first.
 
 param(
     [Parameter(Mandatory=$true)][string]$Api,
@@ -21,7 +21,7 @@ param(
 $ErrorActionPreference = "Continue"
 
 if (-not (Test-Path $QueryFile)) {
-    Write-Host "Cannot find $QueryFile — run this from scripts/paper_data/." -ForegroundColor Red
+    Write-Host "Cannot find $QueryFile - run this from scripts/paper_data/." -ForegroundColor Red
     exit 1
 }
 
@@ -102,7 +102,7 @@ Scoring rules, so the number means something:
   score_type    y if got_type is the right analysis (or correctly CLARIFY/refused
                 when expected_type says CLARIFY / REFUSE / AMBIGUOUS_MULTI)
   score_place   y if got_bbox actually contains the intended place. CHECK A FEW
-                ON A MAP — a confident bbox in the wrong hemisphere scores n.
+                ON A MAP - a confident bbox in the wrong hemisphere scores n.
   score_dates   y if the window is defensible for the query. For rows 15-21
                 (relative dates) this is the interesting column.
   score_overall y only if all three applicable columns are y.

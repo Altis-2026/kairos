@@ -1,9 +1,9 @@
-# Runs every ground-truth benchmark N times and writes one row per run.
+﻿# Runs every ground-truth benchmark N times and writes one row per run.
 #
 #   .\collect_benchmarks.ps1 -Api "https://kairos-api-77017849721.us-central1.run.app" -Runs 5
 #
 # Output: benchmarks_raw.csv (one row per run) + benchmarks_summary.csv
-#         (mean/min/max per benchmark — this is what goes in the paper table).
+#         (mean/min/max per benchmark - this is what goes in the paper table).
 #
 # Each run is a full production analysis plus a reference comparison, so budget
 # 30-90 s per run. 3 benchmarks x 5 runs is roughly 15-20 minutes; leave it going.
