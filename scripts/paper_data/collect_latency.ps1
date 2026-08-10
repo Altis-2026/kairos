@@ -1,4 +1,4 @@
-# Measures end-to-end /analyze latency per analysis type, and compares it to
+﻿# Measures end-to-end /analyze latency per analysis type, and compares it to
 # the `estimated_seconds` each type advertises in the registry.
 #
 #   .\collect_latency.ps1 -Api "https://kairos-api-...run.app" -Runs 3
@@ -19,7 +19,7 @@ param(
 $ErrorActionPreference = "Continue"
 
 # One city-scale AOI per type, each over a window where data is known to exist.
-# Keep these fixed across runs — latency is only comparable at constant AOI size.
+# Keep these fixed across runs - latency is only comparable at constant AOI size.
 $cases = @(
     @{ type="flood_extent";       bbox=@(89.3,25.0,89.9,25.5);        start="2017-08-10"; end="2017-08-31"; label="Brahmaputra, BD" },
     @{ type="wildfire_burn_scar"; bbox=@(-121.75,39.65,-121.35,39.95); start="2018-11-08"; end="2018-12-08"; label="Camp Fire, CA" },
@@ -100,4 +100,4 @@ $summary | Export-Csv -Path $sumPath -NoTypeInformation -Encoding UTF8
 $summary | Format-Table -AutoSize
 Write-Host "Wrote $sumPath" -ForegroundColor Cyan
 Write-Host "`nReport median_seconds per type. If vs_advertised is far from 1.0," -ForegroundColor Yellow
-Write-Host "that gap is itself a finding — say so rather than quietly fixing it." -ForegroundColor Yellow
+Write-Host "that gap is itself a finding - say so rather than quietly fixing it." -ForegroundColor Yellow
