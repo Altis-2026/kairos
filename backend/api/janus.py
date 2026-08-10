@@ -70,6 +70,24 @@ class WatchRequest(BaseModel):
     watch: bool
 
 
+def _require_access(owner: str):
+    """
+    Closed research preview gate. Guards the two paths that spend real model
+    budget (creating a project and taking a mentor turn) so an owner who has
+    not redeemed an access code cannot draw down the shared preview budget.
+    """
+    try:
+        entitlements.require(owner, "mentor_chat")
+    except entitlements.FeatureLocked:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Janus is in closed research preview. Enter your access code "
+                "to unlock it, or request one if you do not have a code."
+            ),
+        )
+
+
 def _owned_project(project_id: int, owner: str) -> dict:
     """Owner OR invited member may work on a project (shared projects)."""
     try:
@@ -112,6 +130,25 @@ def get_entitlements(owner: str = Query(..., min_length=1, max_length=128)):
     return ent
 
 
+class RedeemRequest(BaseModel):
+    owner: str = Field(min_length=1, max_length=128)
+    code: str = Field(min_length=1, max_length=64)
+
+
+@router.post("/janus/redeem")
+def redeem_access_code(request: RedeemRequest):
+    """
+    Redeem a research-preview access code. Returns the owner's refreshed
+    entitlements on success so the caller can unlock its UI from one response.
+    """
+    if not entitlements.redeem(request.owner, request.code):
+        raise HTTPException(
+            status_code=403,
+            detail="That access code is not valid. Check it and try again.",
+        )
+    return {"unlocked": True, "entitlements": entitlements.entitlements(request.owner)}
+
+
 @router.get("/janus/curricula")
 def get_curricula():
     return {"curricula": curricula_summary()}
@@ -119,6 +156,7 @@ def get_curricula():
 
 @router.post("/janus/projects")
 def create_project(request: CreateProjectRequest):
+    _require_access(request.owner)
     if request.curriculum_id is not None:
         valid = {c["id"] for c in curricula_summary()}
         if request.curriculum_id not in valid:
@@ -301,6 +339,7 @@ def shared_projects(owner: str = Query(..., min_length=1, max_length=128)):
 @router.post("/janus/projects/{project_id}/chat")
 def chat(project_id: int, request: ChatRequest):
     _owned_project(project_id, request.owner)
+    _require_access(request.owner)
     if not os.getenv("OPENROUTER_API_KEY"):
         raise HTTPException(
             status_code=503,
