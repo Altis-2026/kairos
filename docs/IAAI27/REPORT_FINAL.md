@@ -146,11 +146,14 @@ run is logged to a public scoreboard endpoint.
 | Camp Fire, 2018 | 0.000 | 0.000 | 0.000 | n/a |
 | Rondônia clearing, 2020 | 0.017 | 0.022 | 0.080 | 0.035 |
 
-These are weak numbers and we report them as they came back. The caveats travel
-with every result and belong here too: the references are coarser than
-Sentinel-1, 250 m to 500 m against 10 m, are built from different sensors
-carrying their own error, and agreement is computed at the reference's native
-scale. Section 4.2 is what happened when we investigated the zero.
+These are weak numbers and we report them as they came back. Each is
+deterministic across five repeated runs, identical to three decimal places, so
+they are not a favorable or unfavorable draw against run-to-run noise; the
+method produces exactly this result every time it is asked the same question.
+The caveats travel with every result and belong here too: the references are
+coarser than Sentinel-1, 250 m to 500 m against 10 m, are built from different
+sensors carrying their own error, and agreement is computed at the reference's
+native scale. Section 4.2 is what happened when we investigated the zero.
 
 A fourth benchmark, built but not yet run at submission time, scores ship
 detection against AIS transponder broadcasts. It is deliberately not an IoU: a
