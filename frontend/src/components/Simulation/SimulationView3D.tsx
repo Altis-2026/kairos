@@ -26,10 +26,12 @@ import {
   X,
 } from "lucide-react";
 import { useSimulationStore } from "../../stores/simulationStore";
+import type { DecodedSimulation } from "../../types/simulation";
 import { rampCss } from "../../lib/simulation";
 import {
   buildGridMesh,
   dryOffsetFor,
+  floodedExtent,
   hillshadeTexture,
   terrainHeights,
   skirtFlags,
@@ -156,20 +158,50 @@ function satelliteUrl(bbox: number[], widthM: number, depthM: number): string | 
 /**
  * Where the camera starts, and what "reset view" returns to.
  *
- * Distance has to account for relief as well as footprint: framing a canyon
- * purely on its footprint put the camera down among the peaks, because 2x
- * exaggerated relief is a large fraction of a small domain. The target is
- * lifted to roughly a third of the terrain height so orbiting pivots around
- * the landscape rather than around its base.
+ * Frames the flood rather than the domain. Distance still accounts for relief
+ * as well as footprint: framing purely on footprint put the camera down among
+ * the peaks on a canyon, where exaggerated relief is a large fraction of a
+ * small domain.
  */
 function defaultOrbit(
   mesh: GridMesh,
-  sim: { meta: { dem_min: number; dem_max: number } },
+  sim: DecodedSimulation,
   exaggeration: number
 ): OrbitState {
-  const span = Math.max(mesh.widthM, mesh.depthM);
+  const domainSpan = Math.max(mesh.widthM, mesh.depthM);
   const relief = (sim.meta.dem_max - sim.meta.dem_min) * exaggeration;
-  return createOrbit(span * 1.1 + relief, [0, relief * 0.3, 0]);
+  const dx = sim.meta.dx;
+
+  const extent = floodedExtent(sim);
+  if (!extent) {
+    // Nothing ever got wet — show the whole domain rather than nothing.
+    return createOrbit(domainSpan * 1.1 + relief, [0, relief * 0.3, 0]);
+  }
+
+  const halfX = ((sim.nx - 1) * dx) / 2;
+  const halfZ = ((sim.ny - 1) * dx) / 2;
+  const centreX = ((extent.minCol + extent.maxCol) / 2) * dx - halfX;
+  const centreZ = ((extent.minRow + extent.maxRow) / 2) * dx - halfZ;
+
+  const floodWidth = (extent.maxCol - extent.minCol + 1) * dx;
+  const floodHeight = (extent.maxRow - extent.minRow + 1) * dx;
+
+  // Geometric mean, not the longest side. A river flood is wide and thin —
+  // measured on the Guadalupe scene its bounding box is 11.6 x 2.6 km inside
+  // an 11.5 x 9.3 km domain, so the long axis alone is the whole domain and
+  // framing on it changes nothing. The mean pulls the camera in to suit the
+  // narrow axis and lets the long one overflow, which is the right trade: the
+  // flood fills the view and the rest is a drag away.
+  const floodSpan = Math.sqrt(floodWidth * floodHeight);
+
+  const radius = Math.min(
+    Math.max(floodSpan * 1.25 + relief * 0.35, domainSpan * 0.22),
+    domainSpan * 1.3 + relief
+  );
+
+  // Pivot at the water's own level, so orbiting turns around the flood.
+  const targetY = (extent.meanElevation - sim.meta.dem_min) * exaggeration;
+  return createOrbit(radius, [centreX, targetY, centreZ]);
 }
 
 interface GlScene {
