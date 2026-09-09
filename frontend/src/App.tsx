@@ -11,6 +11,7 @@ import TelemetryFooter from "./components/TelemetryFooter";
 import QuickAnalysisPanel from "./components/Panels/QuickAnalysisPanel";
 import CompareSlider from "./components/Map/CompareSlider";
 import TimelineScrubber from "./components/Map/TimelineScrubber";
+import SimulationScrubber from "./components/Simulation/SimulationScrubber";
 import MapLegend from "./components/Map/MapLegend";
 import LiveWatch from "./components/Watch/LiveWatch";
 import Guardian from "./components/Guardian/Guardian";
@@ -19,6 +20,7 @@ import EmbedView from "./components/Embed/EmbedView";
 import Landing from "./components/Landing/Landing";
 import Tutorial, { TUTORIAL_SEEN_KEY } from "./components/Tutorial/Tutorial";
 import { useMapStore } from "./stores/mapStore";
+import { useSimulationStore } from "./stores/simulationStore";
 import { restoreFromHash } from "./lib/share";
 import { getRoute } from "./lib/embed";
 
@@ -26,6 +28,7 @@ export default function App() {
   const quickAnalysisOpen = useMapStore((s) => s.quickAnalysisOpen);
   const compare = useMapStore((s) => s.compare);
   const timeline = useMapStore((s) => s.timeline);
+  const simulation = useSimulationStore((s) => s.sim);
   const setTutorialOpen = useMapStore((s) => s.setTutorialOpen);
 
   // A bare URL shows the landing page; installed-PWA launches skip it.
@@ -93,6 +96,7 @@ export default function App() {
         {quickAnalysisOpen && <QuickAnalysisPanel />}
         {compare && <CompareSlider />}
         {timeline && <TimelineScrubber />}
+        {simulation && <SimulationScrubber />}
       </AnimatePresence>
       <Tutorial />
     </div>
