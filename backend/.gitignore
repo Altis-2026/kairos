@@ -2,3 +2,6 @@
 # Local SQLite databases (feed, janus, waitlist)
 *.db
 kairos_*.db
+
+# Cached DEM tiles fetched for flood simulations (regenerated on demand)
+data/raster_cache/
