@@ -6,18 +6,23 @@ centimetres). Centimetres are plenty — the solver's own error bars are far
 wider than a centimetre — and halve the payload against float32 while keeping
 a 655 m ceiling no flood will reach.
 
-Transport resolution is decoupled from solve resolution
--------------------------------------------------------
-The solver runs at the DEM's native grid. Shipping that grid is a different
-question: 400x400 x 48 frames is 15 MB before base64. So frames are decimated
-to a viewer-appropriate grid on the way out, by area-averaging square blocks —
-unbiased in volume, unlike taking the block maximum, which would inflate every
-depth reading the user takes off the map.
+Transport resolution vs solve resolution
+---------------------------------------
+Frames ship at the solver's native grid by default. Decimation exists for
+grids too large to send, but it is deliberately OFF unless asked for, because
+area-averaging flattens exactly what a flood viewer is for: on a confined
+channel, halving the grid dropped a measured peak from 8.8 m to 4.8 m. That
+made the headline depth statistic and the animation a user actually looks at
+disagree by nearly a factor of two — a quiet credibility problem, not a
+rounding difference.
 
-The DEM is decimated by the same factor in the same way, so terrain and water
-stay on a shared grid and the 3D viewer can build one mesh for both. The
-returned `dx` is the transport cell size, not the solve cell size; both are
-reported so nobody has to guess which one a measurement refers to.
+When decimation IS requested, square blocks are area-averaged (unbiased in
+volume, unlike a block maximum, which would inflate every depth read off the
+map) and the DEM is decimated identically, so terrain and water stay on one
+shared grid the 3D viewer can build a single mesh from. In that case `dx` is
+the transport cell size, and both `depth_max` (what is rendered) and
+`depth_max_solve` (what the solver computed) are reported, so the two numbers
+can never silently drift apart again.
 """
 
 import base64
@@ -28,18 +33,29 @@ import numpy as np
 DEPTH_SCALE = 100.0
 _DEPTH_MAX_CM = 65535
 
-#: Default longest-edge of the transport grid. 256 x 256 x 48 frames is about
-#: 6 MB raw, which compresses to roughly a megabyte over the wire.
-DEFAULT_MAX_TRANSPORT_DIM = 256
+#: Default: no decimation. Frames ship at the solver's own resolution so the
+#: rendered animation matches the reported statistics exactly. gzip carries
+#: the cost — a real scene measured 2.2 MB raw and 0.17 MB over the wire,
+#: because most of a flood grid is dry and compresses away.
+DEFAULT_MAX_TRANSPORT_DIM = None
+
+#: Hard ceiling regardless of what a caller asks for: past this, a payload
+#: stops being something a browser should be asked to hold in memory.
+MAX_TRANSPORT_DIM = 1024
 
 
-def transport_factor(shape: tuple, max_dim: int = DEFAULT_MAX_TRANSPORT_DIM) -> int:
-    """Integer decimation factor that brings the longest edge under `max_dim`."""
-    if max_dim < 8:
+def transport_factor(shape: tuple, max_dim=DEFAULT_MAX_TRANSPORT_DIM) -> int:
+    """
+    Integer decimation factor that brings the longest edge under `max_dim`.
+
+    `None` means ship at native resolution, subject only to MAX_TRANSPORT_DIM.
+    """
+    ceiling = MAX_TRANSPORT_DIM if max_dim is None else min(int(max_dim), MAX_TRANSPORT_DIM)
+    if ceiling < 8:
         raise ValueError(f"max_dim must be at least 8; got {max_dim}.")
     longest = max(shape)
     factor = 1
-    while longest // factor > max_dim:
+    while longest // factor > ceiling:
         factor += 1
     return factor
 
@@ -80,7 +96,7 @@ def quantize_depth(depth: np.ndarray) -> np.ndarray:
 
 def encode_simulation(
     result,
-    max_transport_dim: int = DEFAULT_MAX_TRANSPORT_DIM,
+    max_transport_dim=DEFAULT_MAX_TRANSPORT_DIM,
     extra_meta: dict | None = None,
 ) -> dict:
     """
@@ -102,6 +118,10 @@ def encode_simulation(
 
     stacked = np.stack([quantize_depth(f) for f in frames])
     peak_cm = int(stacked.max()) if stacked.size else 0
+    # What the solver computed, before any decimation. Identical to depth_max
+    # at native resolution; reported always so the two can never drift apart
+    # unnoticed when decimation IS in play.
+    peak_solve = float(max((float(d.max()) for d in result.depths), default=0.0))
 
     meta = {
         "ny": ny,
@@ -112,6 +132,8 @@ def encode_simulation(
         "dem_min": float(dem_t.min()),
         "dem_max": float(dem_t.max()),
         "depth_max": peak_cm / DEPTH_SCALE,
+        "depth_max_solve": peak_solve,
+        "decimated": factor > 1,
         "depth_units": "centimetres, uint16",
         "dem_units": "metres, float32",
         "solve_dx": float(result.dx),

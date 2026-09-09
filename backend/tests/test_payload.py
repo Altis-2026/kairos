@@ -14,6 +14,7 @@ import pytest
 from solver import solve
 from solver.payload import (
     DEPTH_SCALE,
+    MAX_TRANSPORT_DIM,
     block_mean,
     decode_simulation,
     encode_simulation,
@@ -44,6 +45,16 @@ class TestDecimation:
     )
     def test_factor_brings_the_longest_edge_under_the_cap(self, shape, max_dim, expected):
         assert transport_factor(shape, max_dim) == expected
+
+    @pytest.mark.parametrize("shape", [(100, 100), (300, 300), (900, 700)])
+    def test_none_means_native_resolution(self, shape):
+        """The default. What the solver computed is what the viewer renders."""
+        assert transport_factor(shape, None) == 1
+
+    def test_an_absurd_grid_is_still_capped(self):
+        """Native by default, but not without limit — a browser has to hold it."""
+        assert transport_factor((4000, 4000), None) > 1
+        assert 4000 // transport_factor((4000, 4000), None) <= MAX_TRANSPORT_DIM
 
     def test_block_mean_preserves_the_average(self):
         """
@@ -98,6 +109,28 @@ class TestEncodedPayload:
         for i in (0, len(solved.depths) // 2, -1):
             expected = block_mean(solved.depths[i], factor)
             assert np.abs(depths[i] - expected).max() <= 0.5 / DEPTH_SCALE
+
+    def test_native_payload_peak_matches_the_solver_exactly(self, solved):
+        """
+        The bug this guards: the headline depth statistic is taken from the
+        solve grid while the animation is drawn from the shipped frames. At
+        native resolution those must be the same number, to the quantisation
+        step and no further.
+        """
+        payload = encode_simulation(solved)          # default: no decimation
+        meta = payload["meta"]
+        assert meta["transport_factor"] == 1
+        assert meta["decimated"] is False
+        assert meta["depth_max"] == pytest.approx(
+            meta["depth_max_solve"], abs=1.0 / DEPTH_SCALE
+        )
+
+    def test_decimation_is_flagged_and_reports_both_peaks(self, solved):
+        """When decimation IS on, both numbers travel so they cannot drift."""
+        payload = encode_simulation(solved, max_transport_dim=32)
+        meta = payload["meta"]
+        assert meta["decimated"] is True
+        assert meta["depth_max_solve"] >= meta["depth_max"]
 
     def test_meta_reports_both_grids_so_no_one_has_to_guess(self, solved):
         payload = encode_simulation(solved, max_transport_dim=64)

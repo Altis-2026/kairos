@@ -103,8 +103,16 @@ class TestParameterResolution:
             {"max_seconds": 99_999, "max_transport_dim": 8192, "inflow_cells": 10_000}
         )
         assert p["max_seconds"] == flood_sim.DEFAULT_MAX_SECONDS
-        assert p["max_transport_dim"] == 512
+        assert p["max_transport_dim"] == flood_sim.MAX_TRANSPORT_DIM
         assert p["inflow_cells"] == 400
+
+    def test_frames_ship_at_native_resolution_by_default(self):
+        """
+        Decimation is off unless asked for. Area-averaging flattens peaks in a
+        confined channel badly enough (8.8 m -> 4.8 m on a real scene) that the
+        headline depth and the rendered animation stopped agreeing.
+        """
+        assert flood_sim.resolve_params(None)["max_transport_dim"] is None
 
     def test_ceilings_can_still_be_lowered(self):
         p = flood_sim.resolve_params({"max_seconds": 30, "max_transport_dim": 64})
