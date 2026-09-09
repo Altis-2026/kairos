@@ -233,6 +233,90 @@ def _store_cached(path: str, dem: np.ndarray, void_fraction: float) -> None:
         pass  # A failed cache write is never worth failing a request over.
 
 
+#: How far the array's own corner elevation may disagree with an independent
+#: GEE sample at the same point before the array is rejected. GLO-30 is a
+#: mosaic and computePixels resamples, so a few metres of genuine disagreement
+#: between two different sampling paths is normal; tens or hundreds of metres,
+#: or a sign flip, means the grid is misaligned or transposed, not noisy.
+ORIENTATION_TOLERANCE_M = 20.0
+
+
+def check_orientation(dem: np.ndarray, corner_elevations: dict) -> None:
+    """
+    Verify the array's four corners match independently-sampled elevations.
+
+    This is the guard for the one failure mode in this module that does NOT
+    degrade to a clear error: a wrong affine transform (a flipped axis, a
+    transposed array, an off-by-one origin) still returns a full, plausible-
+    looking elevation grid — it just has north and south, or east and west,
+    swapped. Fed to the solver, that produces a confidently wrong, visually
+    convincing animation (water flowing uphill) rather than a crash.
+
+    `corner_elevations` is sampled by GEE's own point reducer, entirely
+    independently of the affine transform this module builds by hand — so
+    agreement here means two different code paths agree on where north is,
+    not that one internally-consistent-but-wrong path agrees with itself.
+
+    Args:
+        dem: the fetched (ny, nx) array.
+        corner_elevations: {"nw": float, "ne": float, "sw": float, "se": float},
+            each an elevation sampled directly at that corner's lon/lat by GEE.
+
+    Raises:
+        ValueError: any corner disagrees by more than ORIENTATION_TOLERANCE_M,
+            naming which corner(s) and by how much — enough to tell a genuine
+            axis flip from ordinary resampling noise at a glance.
+    """
+    ny, nx = dem.shape
+    array_corners = {
+        "nw": dem[0, 0], "ne": dem[0, nx - 1],
+        "sw": dem[ny - 1, 0], "se": dem[ny - 1, nx - 1],
+    }
+    mismatches = []
+    for corner, expected in corner_elevations.items():
+        actual = array_corners[corner]
+        if not np.isfinite(expected):
+            continue    # a void at the exact corner pixel; not a signal either way
+        diff = abs(actual - expected)
+        if diff > ORIENTATION_TOLERANCE_M:
+            mismatches.append(f"{corner}: array={actual:.1f}m independent={expected:.1f}m (diff {diff:.1f}m)")
+
+    if mismatches:
+        raise ValueError(
+            "DEM orientation check failed — the fetched array does not match "
+            "independently-sampled elevation at its own corners, which means "
+            "the grid is misaligned, flipped, or transposed rather than just "
+            "noisy (tolerance is " + f"{ORIENTATION_TOLERANCE_M:.0f}m). "
+            "Routing water on this grid would silently run it the wrong way. "
+            "Mismatches: " + "; ".join(mismatches)
+        )
+
+
+def _sample_corners(image, crs: str, corners: dict) -> dict:
+    """
+    Independently sample `image` at four (easting, northing) points in `crs`.
+
+    Uses ee.Geometry.Point + reduceRegion per point rather than reusing any
+    machinery from the fetch path above — the whole point is a second,
+    unrelated way of answering "what elevation is here?" to check the first.
+    `image` must be an ee.Image; ee is not imported at module level (see the
+    module docstring), so the caller — already inside the lazy `import ee`
+    block in `fetch_dem` — passes it in rather than this helper importing it
+    again.
+    """
+    import ee  # noqa: PLC0415 — mirrors fetch_dem's lazy import; see docstring.
+
+    result = {}
+    for name, (x, y) in corners.items():
+        point = ee.Geometry.Point([x, y], crs)
+        value = image.reduceRegion(
+            reducer=ee.Reducer.first(), geometry=point, scale=30,
+        ).get("DEM")
+        got = value.getInfo()
+        result[name] = float(got) if got is not None else float("nan")
+    return result
+
+
 def fetch_dem(
     bbox: list,
     scale_m: float = DEFAULT_SCALE_M,
@@ -330,6 +414,22 @@ def fetch_dem(
                 f"probably entirely over water."
             )
         dem = np.where(finite_mask, dem, float(dem[finite_mask].min()))
+
+    # Orientation guard (see module note on projection, and check_orientation's
+    # own docstring): sample the four corners of the exact grid just fetched,
+    # independently of the affine transform above, and confirm they agree.
+    # A wrong axis flip or transposition would otherwise return a full,
+    # plausible-looking grid with north and south — or east and west — swapped,
+    # which is the one failure mode here that does not fail loudly on its own.
+    half = plan.scale_m / 2.0   # sample pixel centres, not their corners
+    corner_points = {
+        "nw": (x0 + half, top - half),
+        "ne": (x0 + plan.nx * plan.scale_m - half, top - half),
+        "sw": (x0 + half, top - plan.ny * plan.scale_m + half),
+        "se": (x0 + plan.nx * plan.scale_m - half, top - plan.ny * plan.scale_m + half),
+    }
+    independent = _sample_corners(image, plan.crs, corner_points)
+    check_orientation(dem, independent)
 
     if use_cache:
         _store_cached(path, dem, void_fraction)
