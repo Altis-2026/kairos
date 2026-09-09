@@ -30,6 +30,8 @@ interface SimulationState {
 
   showFlood: boolean;
   showTerrain: boolean;
+  /** The 3D view is a mode, not an overlay — see SimulationView3D. */
+  view3d: boolean;
   opacity: number;
   /** Depth (m) mapped to the top of the colour ramp. */
   depthScaleM: number;
@@ -45,6 +47,7 @@ interface SimulationState {
   togglePlaying: () => void;
   cycleSpeed: () => void;
 
+  setView3d: (on: boolean) => void;
   setShowFlood: (on: boolean) => void;
   setShowTerrain: (on: boolean) => void;
   setOpacity: (opacity: number) => void;
@@ -63,6 +66,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
   showFlood: true,
   showTerrain: true,
+  view3d: false,
   opacity: 0.9,
   depthScaleM: 1,
 
@@ -91,6 +95,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       progressNote: null,
       frame: 0,
       playing: false,
+      view3d: false,
     }),
 
   setFrame: (frame) => {
@@ -110,6 +115,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   cycleSpeed: () =>
     set((s) => ({ speed: SPEEDS[(SPEEDS.indexOf(s.speed as 1) + 1) % SPEEDS.length] })),
 
+  setView3d: (view3d) => set({ view3d }),
   setShowFlood: (showFlood) => set({ showFlood }),
   setShowTerrain: (showTerrain) => set({ showTerrain }),
   setOpacity: (opacity) => set({ opacity }),
