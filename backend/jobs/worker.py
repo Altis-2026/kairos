@@ -25,6 +25,23 @@ def job_run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: 
     return run_analysis(analysis_type, bbox, start_date, end_date)
 
 
+def job_run_simulation(bbox: list, start_date: str, params: dict | None = None):
+    """
+    Job function for a forward flood simulation — importable by rq from this
+    module path. Kept separate from `job_run_analysis` because a simulation
+    needs its parameter dict and returns a much larger payload.
+    """
+    from api.analyze import run_analysis
+
+    return run_analysis(
+        analysis_type="flood_simulation",
+        bbox=bbox,
+        start_date=start_date,
+        end_date=start_date,
+        params=params or {},
+    )
+
+
 def main():
     project = os.getenv("GOOGLE_CLOUD_PROJECT")
     if not project:

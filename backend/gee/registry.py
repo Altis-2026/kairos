@@ -30,6 +30,8 @@ from gee.flooded_forest import detect_flooded_forest
 from gee.snow import detect_wet_snow
 from gee.consensus import flood_consensus
 from gee.archaeology import detect_anomalies
+from solver.flood_sim import simulate_flood
+from solver.presets import SCENE_IDS
 
 ANALYSIS_REGISTRY = {
     "flood_extent": {
@@ -419,6 +421,80 @@ ANALYSIS_REGISTRY = {
         "sar_polarization": "VV",
         "instrument_mode": "IW",
     },
+    "flood_simulation": {
+        "function": simulate_flood,
+        "display_name": "Flood Simulation (forward model)",
+        "description": (
+            "SIMULATED, not observed. Routes an assumed inflow hydrograph over "
+            "real Copernicus GLO-30 terrain with a local-inertial shallow-water "
+            "solver, producing an animated rise and recession instead of a "
+            "single snapshot. Answers 'where would water go?' — the question "
+            "radar cannot answer, because the flood has not happened. For a "
+            "flood that did happen, use Flood Extent Mapping."
+        ),
+        "category": "Simulation (forward model)",
+        "data_sources": ["GLO-30"],
+        "estimated_seconds": 120,
+        "output_type": "simulation",
+        "color_palette": ["#3BA7FF", "#7B61FF", "#E85CCF"],
+        "icon": "waves",
+        "mode": "simulated",
+        "accepts_params": True,
+        "params_schema": {
+            "scene": {
+                "type": "string",
+                "label": "Showcase scene",
+                "help": "Preset AOI and hydrograph. Overrides the AOI box.",
+                "enum": list(SCENE_IDS),
+                "default": None,
+            },
+            "peak_discharge_m3s": {
+                "type": "number", "label": "Peak inflow", "unit": "m3/s",
+                "default": 300.0, "min": 1.0, "max": 20000.0,
+            },
+            "rise_minutes": {
+                "type": "number", "label": "Rise to peak", "unit": "min",
+                "default": 30.0, "min": 0.0, "max": 1440.0,
+            },
+            "peak_minutes": {
+                "type": "number", "label": "Time at peak", "unit": "min",
+                "default": 30.0, "min": 0.0, "max": 1440.0,
+            },
+            "recession_minutes": {
+                "type": "number", "label": "Recession", "unit": "min",
+                "default": 120.0, "min": 0.0, "max": 2880.0,
+            },
+            "duration_hours": {
+                "type": "number", "label": "Simulated duration", "unit": "h",
+                "default": 6.0, "min": 0.25, "max": 72.0,
+            },
+            "n_manning": {
+                "type": "number", "label": "Manning roughness",
+                "help": "0.03 smooth channel, 0.05 typical, 0.10 dense vegetation.",
+                "default": 0.05, "min": 0.01, "max": 0.2,
+            },
+            "rain_mm_per_hour": {
+                "type": "number", "label": "Uniform rainfall", "unit": "mm/h",
+                "default": 0.0, "min": 0.0, "max": 300.0,
+            },
+            "scale_m": {
+                "type": "number", "label": "Grid resolution", "unit": "m",
+                "default": 30.0, "enum": [10, 30, 60, 90],
+            },
+            "n_frames": {
+                "type": "integer", "label": "Animation frames",
+                "default": 48, "min": 2, "max": 240,
+            },
+            "fill_dem_pits": {
+                "type": "boolean", "label": "Fill DEM depressions",
+                "help": (
+                    "Removes sensor artefacts that trap water and stop the flood "
+                    "receding. Changes the terrain; always reported in the result."
+                ),
+                "default": True,
+            },
+        },
+    },
     "archaeology": {
         "function": detect_anomalies,
         "display_name": "Archaeology Mode (L-band anomalies)",
@@ -454,6 +530,15 @@ def registry_as_json() -> list:
             "output_type": cfg["output_type"],
             "color_palette": cfg["color_palette"],
             "icon": cfg["icon"],
+            # Observation vs forward model. Every entry that does not say
+            # otherwise measures something a satellite actually recorded; the
+            # frontend and the AI layer both key off this to keep simulated
+            # output from ever being described as a detection.
+            "mode": cfg.get("mode", "observed"),
+            # Entries with a parameter schema take an extra `params` object;
+            # the sidebar renders a form from it.
+            "accepts_params": cfg.get("accepts_params", False),
+            "params_schema": cfg.get("params_schema"),
         }
         for analysis_id, cfg in ANALYSIS_REGISTRY.items()
     ]
