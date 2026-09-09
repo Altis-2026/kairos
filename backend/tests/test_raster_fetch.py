@@ -180,3 +180,124 @@ class TestTileMetadata:
         assert meta["dem_void_fraction"] == 0.02
         assert "surface* model" in meta["dem_note"]
         assert meta["dem_shape"] == [4, 4]
+
+
+class TestOrientationGuard:
+    """
+    The guard for the one failure mode in this module that does not fail
+    loudly on its own: a wrong affine (flipped axis, transposed array) still
+    returns a full, plausible-looking DEM — just with north and south, or
+    east and west, swapped. Fed to the solver, that produces a confidently
+    wrong animation (water flowing uphill), not a crash. This is what makes
+    that impossible to ship silently.
+    """
+
+    def test_a_correctly_oriented_array_passes(self):
+        dem = np.array([[100.0, 90.0], [80.0, 70.0]])
+        rf.check_orientation(dem, {"nw": 100.0, "ne": 90.0, "sw": 80.0, "se": 70.0})
+
+    def test_matches_within_tolerance_for_ordinary_resampling_noise(self):
+        dem = np.array([[100.0, 90.0], [80.0, 70.0]])
+        rf.check_orientation(
+            dem, {"nw": 105.0, "ne": 88.0, "sw": 81.0, "se": 73.0}
+        )   # all within 20 m
+
+    def test_a_north_south_flip_is_caught(self):
+        """The exact bug this exists to catch: rows reversed."""
+        dem = np.array([[400.0, 300.0], [200.0, 100.0]])   # nw/ne swapped with sw/se
+        with pytest.raises(ValueError, match="orientation check failed"):
+            rf.check_orientation(dem, {"nw": 200.0, "ne": 100.0, "sw": 400.0, "se": 300.0})
+
+    def test_an_east_west_flip_is_caught(self):
+        dem = np.array([[400.0, 300.0], [200.0, 100.0]])
+        with pytest.raises(ValueError, match="orientation check failed"):
+            rf.check_orientation(dem, {"nw": 300.0, "ne": 400.0, "sw": 100.0, "se": 200.0})
+
+    def test_a_transposition_is_caught(self):
+        dem = np.array([[400.0, 300.0], [200.0, 100.0]])
+        with pytest.raises(ValueError, match="orientation check failed"):
+            rf.check_orientation(dem, {"nw": 400.0, "ne": 200.0, "sw": 300.0, "se": 100.0})
+
+    def test_the_failing_corners_are_named_in_the_message(self):
+        """A partial mismatch (one corner off) must say which one, not just
+        that something disagreed — that's the difference between a five
+        second diagnosis and re-deriving the whole affine by hand."""
+        dem = np.array([[100.0, 90.0], [80.0, 70.0]])
+        with pytest.raises(ValueError, match="ne: array=90"):
+            rf.check_orientation(dem, {"nw": 100.0, "ne": 500.0, "sw": 80.0, "se": 70.0})
+
+    def test_a_void_at_the_sampled_corner_is_not_treated_as_a_mismatch(self):
+        """
+        GLO-30 has ocean voids; an independent sample can legitimately land on
+        one. NaN there is "no signal", not "signal of a bug" — it must not
+        block a real AOI whose corner happens to be over water.
+        """
+        dem = np.array([[100.0, 90.0], [80.0, 70.0]])
+        rf.check_orientation(
+            dem, {"nw": float("nan"), "ne": 90.0, "sw": 80.0, "se": 70.0}
+        )
+
+    def test_the_end_to_end_fetch_path_calls_the_guard(self, monkeypatch):
+        """
+        The guard existing as a function is not the point — it has to run on
+        every live fetch, unconditionally, or it protects nothing. This drives
+        `fetch_dem` with `ee` and `common` faked out and asserts the guard
+        actually fires and actually blocks a bad result.
+        """
+        import sys
+        import types
+
+        dem_array = np.array([[400.0, 300.0], [200.0, 100.0]], dtype=np.float32)
+        structured = np.zeros(dem_array.shape, dtype=[("DEM", "f4")])
+        structured["DEM"] = dem_array
+        import io as _io
+        buf = _io.BytesIO()
+        np.save(buf, structured)
+        npy_bytes = buf.getvalue()
+
+        fake_ee = types.SimpleNamespace()
+        fake_ee.data = types.SimpleNamespace(computePixels=lambda spec: npy_bytes)
+
+        class FakeGeom:
+            def transform(self, crs, err):
+                return self
+            def coordinates(self):
+                return self
+            def getInfo(self):
+                return [500000.0, 4000000.0]
+
+        fake_ee.Geometry = types.SimpleNamespace(
+            Rectangle=lambda bbox: None, Point=lambda *a, **k: FakeGeom()
+        )
+        fake_ee.ImageCollection = lambda name: types.SimpleNamespace(
+            select=lambda band: types.SimpleNamespace(mosaic=lambda: "fake_image")
+        )
+        fake_ee.Reducer = types.SimpleNamespace(first=lambda: "first")
+
+        monkeypatch.setitem(sys.modules, "ee", fake_ee)
+
+        # Patch the attribute on the real, already-imported gee.common module
+        # rather than swapping sys.modules["gee.common"] for a fake one:
+        # `from gee import common` inside fetch_dem binds to whatever object
+        # is already attached as `gee.common` once any other test in this
+        # process has imported it for real, so a sys.modules swap done here
+        # would be silently bypassed. Patching the attribute in place works
+        # regardless of import order.
+        from gee import common as real_common
+        monkeypatch.setattr(real_common, "bbox_geometry", lambda bbox: None)
+
+        # Correctly-oriented independent samples: fetch_dem must succeed.
+        monkeypatch.setattr(
+            rf, "_sample_corners",
+            lambda image, crs, corners: {"nw": 400.0, "ne": 300.0, "sw": 200.0, "se": 100.0},
+        )
+        tile = rf.fetch_dem([0.0, 0.0, 0.001, 0.001], scale_m=30.0, use_cache=False)
+        assert tile.dem.shape == (2, 2)
+
+        # Flipped independent samples: fetch_dem must refuse to return data.
+        monkeypatch.setattr(
+            rf, "_sample_corners",
+            lambda image, crs, corners: {"nw": 200.0, "ne": 100.0, "sw": 400.0, "se": 300.0},
+        )
+        with pytest.raises(ValueError, match="orientation check failed"):
+            rf.fetch_dem([0.0, 0.0, 0.001, 0.001], scale_m=30.0, use_cache=False)
