@@ -66,7 +66,8 @@ Li (2026), "Inunda: a GPU-native, differentiable solver for high-resolution
 flood inundation modeling", §2.1-2.3.
 """
 
-from dataclasses import dataclass, field
+import time
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -201,6 +202,7 @@ def solve(
     infiltration_mm_per_hour: float = 0.0,
     fill_dem_pits: bool = False,
     max_steps: int = DEFAULT_MAX_STEPS,
+    max_seconds: float | None = None,
     max_inflow_rise_m: float = 0.25,
 ) -> SolveResult:
     """
@@ -229,6 +231,9 @@ def solve(
             Off by default: it changes the terrain, so it is opt-in and
             reported back in the result.
         max_steps: guard against a run that will not finish.
+        max_seconds: wall-clock budget. A run that exceeds it returns the
+            frames it managed and says it was truncated, rather than holding a
+            worker until the queue times out.
         max_inflow_rise_m: clamp dt so injected water cannot raise an inflow
             cell by more than this in one step.
 
@@ -329,7 +334,17 @@ def solve(
     truncated = False
     reason: str | None = None
 
+    started = time.monotonic()
+
     while next_frame < len(frame_times):
+        if max_seconds is not None and (time.monotonic() - started) > max_seconds:
+            truncated = True
+            reason = (
+                f"Wall-clock budget of {max_seconds:.0f}s exhausted at "
+                f"t={t:.1f}s of {duration_s:.1f}s after {steps} steps. Coarsen "
+                f"the grid or shorten the event."
+            )
+            break
         if steps >= max_steps:
             truncated = True
             reason = (
