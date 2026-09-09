@@ -317,6 +317,70 @@ export function waterColors(
   return out;
 }
 
+export interface FloodedExtent {
+  minRow: number;
+  maxRow: number;
+  minCol: number;
+  maxCol: number;
+  /** Mean ground elevation under the flood, in metres. */
+  meanElevation: number;
+  cells: number;
+}
+
+/**
+ * Bounding box of every cell that is wet at any point in the run.
+ *
+ * Used to frame the camera. Framing on the whole domain is honest but
+ * undersells the result: a river flood is genuinely a thin thread, so on a
+ * real AOI it covers a few percent of the grid (4% on the Guadalupe scene,
+ * 1.5% in the canyon) and opening the view means hunting for the water.
+ * Fitting to the ever-wet extent instead puts the flood in the frame while
+ * still showing the terrain it is running through.
+ *
+ * The union across all frames rather than the peak frame, so the camera does
+ * not have to move as the flood grows and drains.
+ *
+ * Returns null when nothing ever gets wet — callers fall back to the domain.
+ */
+export function floodedExtent(sim: DecodedSimulation): FloodedExtent | null {
+  const { ny, nx, depths, dem } = sim;
+  const cells = ny * nx;
+  const thresholdCm = WET_THRESHOLD_M * DEPTH_SCALE;
+
+  let minRow = ny;
+  let maxRow = -1;
+  let minCol = nx;
+  let maxCol = -1;
+  let elevationSum = 0;
+  let wetCells = 0;
+
+  for (let i = 0; i < cells; i++) {
+    let wet = false;
+    for (let f = 0; f < sim.frames; f++) {
+      if (depths[f * cells + i] >= thresholdCm) {
+        wet = true;
+        break;
+      }
+    }
+    if (!wet) continue;
+    const r = (i / nx) | 0;
+    const c = i - r * nx;
+    if (r < minRow) minRow = r;
+    if (r > maxRow) maxRow = r;
+    if (c < minCol) minCol = c;
+    if (c > maxCol) maxCol = c;
+    elevationSum += dem[i];
+    wetCells++;
+  }
+
+  if (wetCells === 0) return null;
+  return {
+    minRow, maxRow, minCol, maxCol,
+    meanElevation: elevationSum / wetCells,
+    cells: wetCells,
+  };
+}
+
 /**
  * A shaded-relief image of the terrain, used as the basemap when satellite
  * imagery is unavailable or switched off.
