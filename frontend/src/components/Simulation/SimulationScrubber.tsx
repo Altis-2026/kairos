@@ -12,7 +12,7 @@
  */
 import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Gauge, Pause, Play, SkipBack, SkipForward, Waves, X } from "lucide-react";
+import { Box, Gauge, Pause, Play, SkipBack, SkipForward, Waves, X } from "lucide-react";
 import { useSimulationStore } from "../../stores/simulationStore";
 import {
   depthColor,
@@ -35,6 +35,8 @@ export default function SimulationScrubber() {
   const setPlaying = useSimulationStore((s) => s.setPlaying);
   const cycleSpeed = useSimulationStore((s) => s.cycleSpeed);
   const clearSimulation = useSimulationStore((s) => s.clearSimulation);
+  const view3d = useSimulationStore((s) => s.view3d);
+  const setView3d = useSimulationStore((s) => s.setView3d);
 
   // Per-frame peak depth, for the sparkline and the readout. Computed once
   // per simulation — it is a full pass over every cell of every frame.
@@ -91,7 +93,7 @@ export default function SimulationScrubber() {
       animate={{ opacity: 1, y: 0, x: "-50%" }}
       exit={{ opacity: 0, y: 16, x: "-50%" }}
       transition={{ type: "spring", stiffness: 320, damping: 32 }}
-      className="absolute bottom-24 left-1/2 z-30 w-[640px] max-w-[94vw] rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel px-4 py-3 pointer-events-auto"
+      className="absolute bottom-24 left-1/2 z-50 w-[640px] max-w-[94vw] rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel px-4 py-3 pointer-events-auto"
     >
       {/* Header — badge, scene, close */}
       <div className="flex items-center gap-2.5 mb-3">
@@ -106,8 +108,22 @@ export default function SimulationScrubber() {
           {sim.nx}×{sim.ny} @ {sim.meta.dx.toFixed(0)}m
         </span>
         <button
+          onClick={() => setView3d(!view3d)}
+          className={`ml-auto shrink-0 h-6 px-2 rounded-md ring-1 font-mono text-[9px] tracking-wider transition ${
+            view3d
+              ? "bg-teal text-bg ring-teal"
+              : "text-dim ring-line hover:text-ink hover:ring-teal/50"
+          }`}
+          title={view3d ? "Back to the globe" : "Open the 3D terrain view"}
+        >
+          <span className="inline-flex items-center gap-1">
+            <Box size={10} />
+            3D
+          </span>
+        </button>
+        <button
           onClick={clearSimulation}
-          className="ml-auto text-dim hover:text-ink transition-colors shrink-0"
+          className="text-dim hover:text-ink transition-colors shrink-0"
           title="Close simulation"
         >
           <X size={15} />

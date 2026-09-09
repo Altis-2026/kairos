@@ -87,6 +87,19 @@ function buildRampLut(): Uint8ClampedArray {
 
 const RAMP_LUT = buildRampLut();
 
+/**
+ * Ramp colour for a normalised depth, as RGBA bytes.
+ *
+ * Shared with the 3D view so the water mesh's vertex colours and the 2D
+ * overlay's pixels come from one ramp — two ramps that drift apart would mean
+ * the same depth reads as two different colours depending on the view.
+ */
+export function rampLookup(t: number): [number, number, number, number] {
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+  const i = Math.round(clamped * 255) * 4;
+  return [RAMP_LUT[i], RAMP_LUT[i + 1], RAMP_LUT[i + 2], RAMP_LUT[i + 3]];
+}
+
 /** CSS gradient for the legend — the same stops the pixels use. */
 export function rampCss(): string {
   const stops = RAMP_STOPS.map(
