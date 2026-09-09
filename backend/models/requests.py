@@ -37,6 +37,11 @@ class AnalyzeRequest(BaseModel):
     bbox: List[float]          # [min_lon, min_lat, max_lon, max_lat]
     start_date: str            # YYYY-MM-DD
     end_date: str              # YYYY-MM-DD
+    # Extra configuration for analysis types that declare `accepts_params` in
+    # the registry (currently the forward-model simulations). Passing this for
+    # an analysis that does not take parameters is an error rather than a
+    # silent no-op — see api/analyze.py.
+    params: Optional[dict] = None
 
     @field_validator("bbox")
     @classmethod
@@ -462,3 +467,38 @@ class ForesightAskRequest(BaseModel):
         if v not in allowed:
             raise ValueError(f"hazard must be one of {allowed}")
         return v
+
+
+class SimulateRequest(BaseModel):
+    """
+    POST /simulate — run a forward flood simulation over an AOI.
+
+    Either `bbox` or `scene` must be given: a showcase scene carries its own
+    AOI and hydrograph, an explicit bbox is simulated with whatever `params`
+    supplies over the defaults.
+    """
+
+    bbox: Optional[List[float]] = None
+    scene: Optional[str] = None
+    start_date: Optional[str] = None      # the date the event is labelled with
+    params: Optional[dict] = None
+    run_async: bool = True                # queue it; False forces inline
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v) if v is not None else v
+
+    @field_validator("start_date")
+    @classmethod
+    def validate_start(cls, v):
+        return _validate_date(v, "start_date") if v else v
+
+    @model_validator(mode="after")
+    def require_an_area(self):
+        if not self.bbox and not self.scene:
+            raise ValueError(
+                "Provide either a bbox to simulate or a showcase scene id "
+                "(GET /simulate/scenes lists them)."
+            )
+        return self

@@ -15,6 +15,7 @@ import ee
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 import gee_ready
 
@@ -100,6 +101,11 @@ prod_origin = os.getenv("FRONTEND_ORIGIN")
 if prod_origin:
     allowed_origins.append(_normalize_origin(prod_origin))
 
+# Simulation results ship depth frames as base64 arrays — a few megabytes raw
+# that compress to well under one, since most of a flood grid is dry. Cheap
+# for every other endpoint too; below the threshold nothing is touched.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -129,6 +135,7 @@ from api.foresight import router as foresight_router  # noqa: E402
 from api.vessels import router as vessels_router  # noqa: E402
 from api.insar import router as insar_router  # noqa: E402
 from api.myplace import router as myplace_router  # noqa: E402
+from api.simulate import router as simulate_router  # noqa: E402
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -151,6 +158,7 @@ app.include_router(foresight_router)
 app.include_router(vessels_router)
 app.include_router(insar_router)
 app.include_router(myplace_router)
+app.include_router(simulate_router)
 
 
 @app.middleware("http")
