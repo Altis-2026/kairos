@@ -29,7 +29,12 @@ import numpy as np
 
 from solver import forcing, presets
 from solver.hydraulic_route import solve
-from solver.payload import DEFAULT_MAX_TRANSPORT_DIM, encode_simulation, payload_bytes
+from solver.payload import (
+    DEFAULT_MAX_TRANSPORT_DIM,
+    MAX_TRANSPORT_DIM,
+    encode_simulation,
+    payload_bytes,
+)
 
 #: Depth below which a cell is not called flooded, for area statistics. Also
 #: the threshold the 3D viewer uses to push a vertex under the terrain.
@@ -63,7 +68,7 @@ DEFAULTS = {
     "open_edges": ["auto"],
     "fill_dem_pits": True,
     "inflow_cells": 12,
-    "max_transport_dim": DEFAULT_MAX_TRANSPORT_DIM,
+    "max_transport_dim": DEFAULT_MAX_TRANSPORT_DIM,   # None = native resolution
     "max_seconds": DEFAULT_MAX_SECONDS,
 }
 
@@ -80,7 +85,7 @@ _NON_NEGATIVE = (
 #: Both arrive over a public API, so neither can be a suggestion.
 _CEILINGS = {
     "max_seconds": DEFAULT_MAX_SECONDS,
-    "max_transport_dim": 512,
+    "max_transport_dim": MAX_TRANSPORT_DIM,
     "inflow_cells": 400,
 }
 
@@ -162,6 +167,8 @@ def resolve_params(params: dict | None) -> dict:
     # Resource ceilings clamp rather than reject: a caller asking for a bigger
     # payload or a longer solve gets the maximum, not an error.
     for key, ceiling in _CEILINGS.items():
+        if key == "max_transport_dim" and resolved[key] is None:
+            continue    # None is the default and means "ship native resolution"
         resolved[key] = min(_as_number(key, resolved[key]), ceiling)
         if resolved[key] <= 0:
             raise ValueError(f"{key} must be positive; got {resolved[key]}.")
@@ -326,7 +333,9 @@ def simulate_flood(
 
     payload = encode_simulation(
         result,
-        max_transport_dim=int(p["max_transport_dim"]),
+        max_transport_dim=(
+            None if p["max_transport_dim"] is None else int(p["max_transport_dim"])
+        ),
         extra_meta={
             "scene_id": scene.id if scene else None,
             "scene_name": scene.name if scene else None,

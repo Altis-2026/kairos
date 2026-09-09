@@ -7,6 +7,7 @@ Run locally:
     uvicorn main:app --reload --port 8000
 """
 
+import json
 import os
 import threading
 from contextlib import asynccontextmanager
@@ -32,11 +33,32 @@ def _init_gee_in_background(project_id: str, ee_creds: str | None) -> None:
     """
     try:
         if ee_creds:
-            creds_path = os.path.expanduser("~/.config/earthengine/credentials")
-            os.makedirs(os.path.dirname(creds_path), exist_ok=True)
-            with open(creds_path, "w") as f:
-                f.write(ee_creds)
-        ee.Initialize(project=project_id)
+            # EE_CREDENTIALS is normally a GCP service-account key. Those
+            # authenticate by signing a JWT with the private key in-process,
+            # which means they must be handed to ee.Initialize explicitly —
+            # dropping the JSON at ~/.config/earthengine/credentials (where the
+            # OAuth *user* flow keeps its refresh token) does not work, and
+            # fails with "please authorize access" as though nothing was
+            # configured at all.
+            info = json.loads(ee_creds)
+            if info.get("type") == "service_account":
+                ee.Initialize(
+                    credentials=ee.ServiceAccountCredentials(
+                        info["client_email"], key_data=ee_creds
+                    ),
+                    project=project_id,
+                )
+            else:
+                # A pasted OAuth credentials blob still works the old way.
+                creds_path = os.path.expanduser("~/.config/earthengine/credentials")
+                os.makedirs(os.path.dirname(creds_path), exist_ok=True)
+                with open(creds_path, "w") as f:
+                    f.write(ee_creds)
+                ee.Initialize(project=project_id)
+        else:
+            # No key supplied: fall back to Application Default Credentials,
+            # which is how this runs on Cloud Run via the metadata server.
+            ee.Initialize(project=project_id)
         print(f"[kairos] Google Earth Engine initialized — project: {project_id}")
     except Exception as e:
         gee_ready.error = str(e)

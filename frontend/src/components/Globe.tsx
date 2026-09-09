@@ -10,6 +10,8 @@ import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useMapStore } from "../stores/mapStore";
+import { useSimulationStore } from "../stores/simulationStore";
+import { renderFrame } from "../lib/simulation";
 import type { BBox } from "../types/map";
 
 const TOKEN = (import.meta.env.VITE_MAPBOX_TOKEN as string) || "";
@@ -22,6 +24,13 @@ const STYLES = {
 };
 
 const DEM_SOURCE = "kairos-dem";
+
+// The animated flood. A Mapbox `canvas` source is the right primitive here:
+// it pins a live <canvas> to four geographic corners and re-uploads it as the
+// canvas changes, so advancing a frame is just a redraw — no per-frame PNG
+// encoding, no source teardown, no index rebuilding.
+const SIM_SOURCE = "kairos-sim-src";
+const SIM_LAYER = "kairos-sim-lyr";
 
 const AOI_SOURCE = "kairos-aoi";
 const AOI_FILL = "kairos-aoi-fill";
@@ -66,7 +75,12 @@ function applyAtmosphere(map: mapboxgl.Map) {
  */
 function syncTerrain(map: mapboxgl.Map) {
   const style = useMapStore.getState().baseStyle;
-  if (style === "terrain") {
+  const { sim, showTerrain } = useSimulationStore.getState();
+  // Relief is what makes a simulated flood legible — water pooling in a
+  // valley only reads as water pooling if the valley is visible — so an
+  // active simulation turns terrain on regardless of the base style.
+  const wantTerrain = style === "terrain" || (sim !== null && showTerrain);
+  if (wantTerrain) {
     if (!map.getSource(DEM_SOURCE)) {
       map.addSource(DEM_SOURCE, {
         type: "raster-dem",
@@ -79,6 +93,22 @@ function syncTerrain(map: mapboxgl.Map) {
   } else {
     map.setTerrain(null);
   }
+}
+
+/** The four corners a canvas source wants, clockwise from top-left. */
+function bboxCorners(bbox: number[]): [
+  [number, number],
+  [number, number],
+  [number, number],
+  [number, number]
+] {
+  const [minLon, minLat, maxLon, maxLat] = bbox;
+  return [
+    [minLon, maxLat],
+    [maxLon, maxLat],
+    [maxLon, minLat],
+    [minLon, minLat],
+  ];
 }
 
 function ensureAoiLayers(map: mapboxgl.Map) {
@@ -115,6 +145,10 @@ export default function Globe() {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const spinningRef = useRef(true);
   const drawingRef = useRef<{ start: [number, number] } | null>(null);
+  // The canvas Mapbox reads the flood from, plus a reused ImageData buffer so
+  // playback does not allocate a few megabytes per frame.
+  const simCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const simImageRef = useRef<ImageData | null>(null);
 
   const layers = useMapStore((s) => s.layers);
   const pointLayers = useMapStore((s) => s.pointLayers);
@@ -124,6 +158,13 @@ export default function Globe() {
   const flyTo = useMapStore((s) => s.flyTo);
   const baseStyle = useMapStore((s) => s.baseStyle);
   const projection = useMapStore((s) => s.projection);
+
+  const sim = useSimulationStore((s) => s.sim);
+  const simFrame = useSimulationStore((s) => s.frame);
+  const simOpacity = useSimulationStore((s) => s.opacity);
+  const simDepthScale = useSimulationStore((s) => s.depthScaleM);
+  const simShowFlood = useSimulationStore((s) => s.showFlood);
+  const simShowTerrain = useSimulationStore((s) => s.showTerrain);
 
   // ---------- map init (once) ----------
   useEffect(() => {
@@ -145,6 +186,7 @@ export default function Globe() {
       syncRasterLayers(map);
       syncPointLayers(map);
       syncImageLayers(map);
+      syncSimulation(map);
       syncAoi(map);
     });
 
@@ -319,6 +361,89 @@ export default function Globe() {
     }
   }
 
+  /**
+   * Draw the current simulation frame and keep its canvas source in step.
+   *
+   * The canvas is sized to the solver's own grid — one pixel per cell — and
+   * Mapbox stretches it across the AOI, so the smoothing is the renderer's
+   * bilinear filter rather than anything invented here. Nothing is drawn for
+   * dry cells, so terrain shows through everywhere the model has no water.
+   */
+  function syncSimulation(map: mapboxgl.Map) {
+    const state = useSimulationStore.getState();
+    const current = state.sim;
+
+    // No simulation (or it was cleared): tear the layer down completely.
+    if (!current) {
+      if (map.getLayer(SIM_LAYER)) map.removeLayer(SIM_LAYER);
+      if (map.getSource(SIM_SOURCE)) map.removeSource(SIM_SOURCE);
+      simCanvasRef.current = null;
+      simImageRef.current = null;
+      return;
+    }
+
+    const { nx, ny } = current;
+    let canvas = simCanvasRef.current;
+    if (!canvas || canvas.width !== nx || canvas.height !== ny) {
+      canvas = document.createElement("canvas");
+      canvas.width = nx;
+      canvas.height = ny;
+      simCanvasRef.current = canvas;
+      simImageRef.current = null;
+      // A grid change means a different scene: drop the old source so the new
+      // canvas and corner coordinates are picked up cleanly.
+      if (map.getLayer(SIM_LAYER)) map.removeLayer(SIM_LAYER);
+      if (map.getSource(SIM_SOURCE)) map.removeSource(SIM_SOURCE);
+    }
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    if (!simImageRef.current) {
+      simImageRef.current = ctx.createImageData(nx, ny);
+    }
+
+    renderFrame(current, state.frame, simImageRef.current, {
+      depthScaleM: state.depthScaleM,
+    });
+    ctx.putImageData(simImageRef.current, 0, 0);
+
+    // Without a bbox there is nowhere on Earth to pin the frames; drawing
+    // anyway would place the flood at null island.
+    const bounds = current.meta.bbox;
+    if (!bounds || bounds.length !== 4) return;
+    const coordinates = bboxCorners(bounds);
+
+    if (!map.getSource(SIM_SOURCE)) {
+      map.addSource(SIM_SOURCE, {
+        type: "canvas",
+        canvas,
+        coordinates,
+        // Mapbox re-uploads the texture every frame while this is true, which
+        // is what makes scrubbing and playback update without touching the
+        // source again.
+        animate: true,
+      });
+    }
+    if (!map.getLayer(SIM_LAYER)) {
+      map.addLayer({
+        id: SIM_LAYER,
+        type: "raster",
+        source: SIM_SOURCE,
+        paint: {
+          "raster-opacity": state.showFlood ? state.opacity : 0,
+          "raster-fade-duration": 0,
+          "raster-resampling": "linear",
+        },
+      });
+    } else {
+      map.setPaintProperty(
+        SIM_LAYER,
+        "raster-opacity",
+        state.showFlood ? state.opacity : 0
+      );
+    }
+  }
+
   function syncAoi(map: mapboxgl.Map) {
     ensureAoiLayers(map);
     const current = useMapStore.getState().aoi;
@@ -358,6 +483,23 @@ export default function Globe() {
     syncAoi(map);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aoi]);
+
+  // Frame, ramp and opacity changes all just redraw the canvas in place.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    syncSimulation(map);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sim, simFrame, simOpacity, simDepthScale, simShowFlood]);
+
+  // A loaded simulation turns relief on; clearing it hands terrain back to
+  // whatever the base style wanted.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    syncTerrain(map);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sim, simShowTerrain]);
 
   useEffect(() => {
     const map = mapRef.current;

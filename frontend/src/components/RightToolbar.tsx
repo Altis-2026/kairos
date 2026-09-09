@@ -23,6 +23,7 @@ import {
   Radar,
   Ship,
   Telescope,
+  Waves,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -39,6 +40,7 @@ import AlertsPanel from "./Panels/AlertsPanel";
 import JanusPanel from "./Janus/JanusPanel";
 import InsarPanel from "./Panels/InsarPanel";
 import VesselPanel from "./Panels/VesselPanel";
+import SimulationPanel from "./Panels/SimulationPanel";
 
 type PanelKey =
   | "layers"
@@ -49,7 +51,8 @@ type PanelKey =
   | "alerts"
   | "janus"
   | "insar"
-  | "vessels";
+  | "vessels"
+  | "simulation";
 
 interface ToolAction {
   key: string;
@@ -208,6 +211,14 @@ export default function RightToolbar() {
       onClick: () => openPanelAndCloseSheet("vessels"),
     },
     {
+      key: "simulation",
+      label: "Flood simulation",
+      icon: Waves,
+      active: openPanel === "simulation",
+      amber: true,
+      onClick: () => openPanelAndCloseSheet("simulation"),
+    },
+    {
       key: "insar",
       label: "InSAR deep dive",
       icon: Radar,
@@ -317,6 +328,9 @@ export default function RightToolbar() {
         )}
       </AnimatePresence>
 
+      {openPanel === "simulation" && (
+        <SimulationPanel onClose={() => setOpenPanel(null)} />
+      )}
       {openPanel === "layers" && <LayerPanel onClose={() => setOpenPanel(null)} />}
       {openPanel === "research" && (
         <ResearchPanel onClose={() => setOpenPanel(null)} />
