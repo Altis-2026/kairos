@@ -177,6 +177,12 @@ export default function Globe() {
       zoom: 2.1,
     });
     mapRef.current = map;
+    // Dev-only handle for debugging and browser-driven checks (layer state,
+    // terrain, paint properties). `import.meta.env.DEV` is statically false in
+    // production builds, so this is removed entirely by the bundler.
+    if (import.meta.env.DEV) {
+      (window as unknown as Record<string, unknown>).__kairosMap = map;
+    }
 
     map.on("style.load", () => {
       applyAtmosphere(map);
