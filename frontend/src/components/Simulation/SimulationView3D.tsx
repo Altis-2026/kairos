@@ -20,7 +20,9 @@ import {
   Layers,
   Loader2,
   Mountain,
+  Orbit,
   RotateCcw,
+  Sparkles,
   Sun,
   Waves,
   X,
@@ -43,12 +45,43 @@ import {
 import {
   createOrbit,
   dollyBy,
+  eyePosition,
   orbitBy,
   viewProjection,
   type OrbitState,
 } from "../../lib/orbitCamera";
 
 type Basemap = "satellite" | "relief" | "none";
+
+/** Seconds the opening fly-in takes to settle into the framed view. */
+const FLY_IN_SECONDS = 2.1;
+/** How much further out the fly-in starts, as a multiple of the final radius. */
+const FLY_IN_START_SCALE = 2.3;
+/** Idle time before the camera starts drifting on its own. */
+const IDLE_BEFORE_ORBIT_S = 6;
+/** Idle orbit rate, radians per second — a full turn in about two minutes. */
+const IDLE_ORBIT_RATE = 0.05;
+
+/**
+ * Whether the viewer has asked for less animation.
+ *
+ * The stylesheet already honours this for the app's CSS animations; the 3D
+ * view has to check it itself, because its motion lives in a render loop
+ * rather than in CSS. When set, the fly-in, the idle drift and the water
+ * shimmer are all skipped and the view renders only in response to input.
+ */
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
+  );
+}
+
+/** Smoothstep-style ease so the fly-in settles instead of stopping dead. */
+function easeOutCubic(t: number): number {
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+  return 1 - Math.pow(1 - clamped, 3);
+}
 
 const TERRAIN_VS = `#version 300 es
 precision highp float;
@@ -96,19 +129,61 @@ in float aY;
 in vec4 aColor;
 uniform mat4 uViewProj;
 out vec4 vColor;
+out vec3 vWorldPos;
 void main() {
   vColor = aColor;
-  gl_Position = uViewProj * vec4(aXZ.x, aY, aXZ.y, 1.0);
+  vWorldPos = vec3(aXZ.x, aY, aXZ.y);
+  gl_Position = uViewProj * vec4(vWorldPos, 1.0);
 }`;
 
+/**
+ * Water shading.
+ *
+ * The depth-to-colour mapping is untouched here — it is decided on the CPU in
+ * `waterColors` and arrives as a vertex colour. Everything this shader adds is
+ * a surface treatment on top: a slow travelling ripple and a grazing-angle
+ * sheen, both of which make a flat coloured mesh read as a liquid surface
+ * rather than as paint on the terrain.
+ *
+ * Both effects are deliberately bounded. The ripple modulates brightness by a
+ * few percent and the sheen only lifts the grazing edge, so a viewer reading a
+ * depth off the legend still gets the right answer. Anything stronger would be
+ * decoration corrupting a measurement, and the toggle exists so the cosmetic
+ * layer can be removed entirely when someone wants the raw field.
+ */
 const WATER_FS = `#version 300 es
 precision highp float;
 in vec4 vColor;
+in vec3 vWorldPos;
 uniform float uOpacity;
+uniform float uTime;
+uniform float uShimmer;      // 0 = raw field, 1 = surface treatment on
+uniform vec3 uCameraPos;
+uniform float uCellSize;
 out vec4 outColor;
 void main() {
   if (vColor.a <= 0.0) discard;   // dry vertices contribute nothing
-  outColor = vec4(vColor.rgb, vColor.a * uOpacity);
+
+  vec3 rgb = vColor.rgb;
+  float alpha = vColor.a * uOpacity;
+
+  if (uShimmer > 0.5) {
+    // Two travelling waves at different angles and speeds, scaled to the grid
+    // so the pattern is the same physical size whatever the resolution.
+    float k = 6.2831853 / (uCellSize * 18.0);
+    float w1 = sin(vWorldPos.x * k + uTime * 0.9);
+    float w2 = sin((vWorldPos.z * 0.85 + vWorldPos.x * 0.28) * k * 1.37 - uTime * 0.62);
+    rgb *= 1.0 + 0.055 * (w1 * w2);
+
+    // Grazing-angle sheen: real water throws back more light the closer the
+    // view gets to the surface plane. Cheap stand-in for a reflection.
+    vec3 toEye = normalize(uCameraPos - vWorldPos);
+    float fresnel = pow(1.0 - clamp(toEye.y, 0.0, 1.0), 4.0);
+    rgb += vec3(0.16, 0.21, 0.26) * fresnel;
+    alpha = clamp(alpha + fresnel * 0.16, 0.0, 1.0);
+  }
+
+  outColor = vec4(rgb, alpha);
 }`;
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string) {
@@ -228,6 +303,16 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
   const frameRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
   const dirtyRef = useRef(true);
+  /** Wall-clock seconds since the view opened; drives the water shimmer. */
+  const clockRef = useRef<number>(0);
+  const lastTickRef = useRef<number>(0);
+  /** Progress of the opening fly-in, 0 to 1. Reaches 1 and stays there. */
+  const flyInRef = useRef<number>(0);
+  /** Timestamp of the last real interaction, for the idle auto-orbit. */
+  const lastInputRef = useRef<number>(0);
+  // Read once into a ref rather than every frame: matchMedia in a render loop
+  // is a needless layout query 60 times a second.
+  const reducedMotionRef = useRef<boolean>(prefersReducedMotion());
 
   const sim = useSimulationStore((s) => s.sim);
   const frame = useSimulationStore((s) => s.frame);
@@ -238,6 +323,8 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
   const [exaggeration, setExaggeration] = useState(2.2);
   const [occlude, setOcclude] = useState(true);
   const [basemap, setBasemap] = useState<Basemap>("satellite");
+  const [shimmer, setShimmer] = useState(true);
+  const [autoOrbit, setAutoOrbit] = useState(true);
   const [textureNote, setTextureNote] = useState<string | null>(null);
   // Why satellite was abandoned, kept separate: switching to relief re-runs
   // this effect, and the relief branch would otherwise overwrite the reason
@@ -253,7 +340,11 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
 
     const gl = canvas.getContext("webgl2", {
       antialias: true,
-      alpha: false,
+      // Transparent clear so the space-theme backdrop behind the canvas shows
+      // through. premultipliedAlpha off keeps the blended water reading the
+      // same as it did against an opaque clear.
+      alpha: true,
+      premultipliedAlpha: false,
       depth: true,
     });
     if (!gl) {
@@ -364,6 +455,10 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
 
     // Frame the whole domain.
     orbitRef.current = defaultOrbit(scene.mesh, sim, exaggeration);
+    flyInRef.current = 0;
+    clockRef.current = 0;
+    lastTickRef.current = 0;
+    lastInputRef.current = performance.now();
     dirtyRef.current = true;
 
     return () => {
@@ -475,12 +570,56 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       canvas.height = h;
       dirtyRef.current = true;
     }
+
+    // ---- time-driven motion --------------------------------------------
+    // Everything below runs off wall-clock delta rather than frame count, so
+    // the fly-in takes the same two seconds on a 60Hz and a 144Hz display.
+    const now = performance.now();
+    const dt = lastTickRef.current ? (now - lastTickRef.current) / 1000 : 0;
+    lastTickRef.current = now;
+    const reduced = reducedMotionRef.current;
+
+    if (!reduced) {
+      clockRef.current += dt;
+
+      // Opening fly-in: ease the camera in from further out.
+      if (flyInRef.current < 1) {
+        flyInRef.current = Math.min(flyInRef.current + dt / FLY_IN_SECONDS, 1);
+        dirtyRef.current = true;
+      }
+
+      // Idle drift, once the viewer has left it alone for a moment. Any
+      // interaction pushes lastInput forward and stops this immediately.
+      if (
+        autoOrbit &&
+        flyInRef.current >= 1 &&
+        now - lastInputRef.current > IDLE_BEFORE_ORBIT_S * 1000
+      ) {
+        orbitRef.current = orbitBy(orbit, IDLE_ORBIT_RATE * dt, 0);
+        dirtyRef.current = true;
+      }
+
+      // The shimmer is animated, so it needs a frame even when nothing else
+      // changed — but only while there is water on screen to shimmer.
+      if (shimmer && showFlood) dirtyRef.current = true;
+    }
+
     if (!dirtyRef.current) return;
     dirtyRef.current = false;
 
     const { gl, mesh } = scene;
+
+    // The fly-in only scales distance; the framed target is already correct,
+    // so easing the radius alone reads as a dolly rather than a swing.
+    const live = orbitRef.current ?? orbit;
+    const flyScale =
+      1 + (FLY_IN_START_SCALE - 1) * (1 - easeOutCubic(flyInRef.current));
+    const camera: OrbitState = { ...live, radius: live.radius * flyScale };
+
     gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0.043, 0.071, 0.055, 1);
+    // Transparent clear: the space-theme gradient behind the canvas shows
+    // through, matching the globe rather than sitting on a flat slab.
+    gl.clearColor(0, 0, 0, 0);
     gl.clearDepth(1);
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
@@ -488,7 +627,8 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
     gl.disable(gl.BLEND);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    const vp = viewProjection(orbit, canvas.width / Math.max(canvas.height, 1));
+    const vp = viewProjection(camera, canvas.width / Math.max(canvas.height, 1));
+    const eye = eyePosition(camera);
 
     // --- terrain ---
     gl.useProgram(scene.terrainProgram);
@@ -527,6 +667,20 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       gl.uniform1f(
         gl.getUniformLocation(scene.waterProgram, "uOpacity"), opacity
       );
+      gl.uniform1f(
+        gl.getUniformLocation(scene.waterProgram, "uTime"), clockRef.current
+      );
+      gl.uniform1f(
+        gl.getUniformLocation(scene.waterProgram, "uShimmer"),
+        shimmer && !reduced ? 1 : 0
+      );
+      gl.uniform3f(
+        gl.getUniformLocation(scene.waterProgram, "uCameraPos"),
+        eye[0], eye[1], eye[2]
+      );
+      gl.uniform1f(
+        gl.getUniformLocation(scene.waterProgram, "uCellSize"), sim.meta.dx
+      );
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       // Depth *test* on so ridges hide the water behind them; depth *write*
@@ -545,7 +699,10 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
     }
 
     gl.bindVertexArray(null);
-  }, [sim, basemap, showFlood, opacity, depthScaleM, exaggeration, occlude]);
+  }, [
+    sim, basemap, showFlood, opacity, depthScaleM, exaggeration, occlude,
+    shimmer, autoOrbit,
+  ]);
 
   useEffect(() => {
     rafRef.current = requestAnimationFrame(render);
@@ -560,7 +717,12 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
     let lastX = 0;
     let lastY = 0;
 
+    const markInput = () => {
+      lastInputRef.current = performance.now();
+    };
+
     const down = (e: PointerEvent) => {
+      markInput();
       dragging = true;
       lastX = e.clientX;
       lastY = e.clientY;
@@ -572,6 +734,7 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       const dy = e.clientY - lastY;
       lastX = e.clientX;
       lastY = e.clientY;
+      markInput();
       orbitRef.current = orbitBy(orbitRef.current, -dx * 0.006, dy * 0.006);
       dirtyRef.current = true;
     };
@@ -584,6 +747,7 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
     const wheel = (e: WheelEvent) => {
       if (!orbitRef.current) return;
       e.preventDefault();
+      markInput();
       const span = sceneRef.current
         ? Math.max(sceneRef.current.mesh.widthM, sceneRef.current.mesh.depthM)
         : 1000;
@@ -611,6 +775,8 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
     const scene = sceneRef.current;
     if (!scene || !sim) return;
     orbitRef.current = defaultOrbit(scene.mesh, sim, exaggeration);
+    flyInRef.current = 0;
+    lastInputRef.current = performance.now();
     dirtyRef.current = true;
   };
 
@@ -626,6 +792,17 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       // offers. The scrubber sits above it at z-50 so playback stays reachable.
       className="absolute inset-0 z-[45] bg-bg"
     >
+      {/* Space-theme backdrop, so entering the 3D view feels like the same
+          product as the globe rather than a flat slab behind a mesh. The
+          canvas clears transparent and composites over this. */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(120% 90% at 50% 8%, rgba(0,191,168,0.10) 0%, rgba(11,18,14,0) 55%), " +
+            "linear-gradient(180deg, #0a1310 0%, #070d0a 100%)",
+        }}
+      />
       <canvas
         ref={canvasRef}
         className="absolute inset-0 h-full w-full touch-none cursor-grab active:cursor-grabbing"
@@ -704,6 +881,18 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
           label="Occlude behind terrain"
           on={occlude}
           onClick={() => setOcclude(!occlude)}
+        />
+        <Toggle
+          icon={Sparkles}
+          label="Water shimmer"
+          on={shimmer}
+          onClick={() => setShimmer(!shimmer)}
+        />
+        <Toggle
+          icon={Orbit}
+          label="Idle auto-orbit"
+          on={autoOrbit}
+          onClick={() => setAutoOrbit(!autoOrbit)}
         />
 
         <Range
