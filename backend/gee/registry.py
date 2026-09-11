@@ -30,6 +30,9 @@ from gee.flooded_forest import detect_flooded_forest
 from gee.snow import detect_wet_snow
 from gee.consensus import flood_consensus
 from gee.archaeology import detect_anomalies
+from solver.fire_behavior import FUEL_MODELS
+from solver.fire_presets import SCENES as FIRE_SCENES
+from solver.fire_sim import simulate_fire
 from solver.flood_sim import simulate_flood
 from solver.presets import SCENE_IDS
 
@@ -492,6 +495,95 @@ ANALYSIS_REGISTRY = {
                     "receding. Changes the terrain; always reported in the result."
                 ),
                 "default": True,
+            },
+        },
+    },
+    "fire_simulation": {
+        "function": simulate_fire,
+        "display_name": "Wildfire Spread Simulation (forward model)",
+        "description": (
+            "SIMULATED, not observed. Spreads a surface fire across real "
+            "Copernicus GLO-30 terrain using Rothermel fire behaviour and "
+            "Finney minimum-travel-time propagation, producing an animated "
+            "burn with arrival times, flame lengths and a growth curve. "
+            "Answers 'where would a fire go from here, in this fuel, under "
+            "this wind?' — the question a satellite cannot answer, because "
+            "the fire has not happened. For a fire that did happen, use "
+            "Wildfire Burn Scar Mapping."
+        ),
+        "category": "Simulation (forward model)",
+        "data_sources": ["GLO-30"],
+        "estimated_seconds": 90,
+        "output_type": "simulation",
+        "color_palette": ["#FFD166", "#F4743B", "#B5192B"],
+        "icon": "flame",
+        "mode": "simulated",
+        "accepts_params": True,
+        "params_schema": {
+            "scene": {
+                "type": "string",
+                "label": "Showcase scene",
+                "help": "Preset AOI, fuel and wind. Overrides the AOI box.",
+                "enum": sorted(FIRE_SCENES),
+                "default": None,
+            },
+            "fuel_model": {
+                "type": "string", "label": "Fuel model",
+                "help": "Anderson (1982) standard fuel models.",
+                "enum": sorted(FUEL_MODELS),
+                "default": "sh5",
+            },
+            "wind_ms": {
+                "type": "number", "label": "Midflame wind", "unit": "m/s",
+                "help": (
+                    "Wind AT THE FLAME, not the 10 m weather wind — typically "
+                    "a third to a half of it."
+                ),
+                "default": 5.0, "min": 0.0, "max": 25.0,
+            },
+            "wind_from_bearing": {
+                "type": "number", "label": "Wind from", "unit": "deg",
+                "help": "Compass bearing the wind blows FROM. 270 is a westerly.",
+                "default": 270.0, "min": 0.0, "max": 360.0,
+            },
+            "duration_hours": {
+                "type": "number", "label": "Duration", "unit": "h",
+                "default": 8.0, "min": 0.25, "max": 72.0,
+            },
+            "moisture_1h": {
+                "type": "number", "label": "1-hour fuel moisture",
+                "help": "Fraction, not percent: 0.06 is 6%.",
+                "default": 0.06, "min": 0.01, "max": 0.5,
+            },
+            "moisture_10h": {
+                "type": "number", "label": "10-hour fuel moisture",
+                "default": 0.07, "min": 0.01, "max": 0.5,
+            },
+            "moisture_100h": {
+                "type": "number", "label": "100-hour fuel moisture",
+                "default": 0.08, "min": 0.01, "max": 0.5,
+            },
+            "moisture_live": {
+                "type": "number", "label": "Live fuel moisture",
+                "help": "1.0 is fully green; 0.3 is cured.",
+                "default": 1.0, "min": 0.3, "max": 3.0,
+            },
+            "scale_m": {
+                "type": "number", "label": "Grid resolution", "unit": "m",
+                "default": 30.0, "min": 10.0, "max": 200.0,
+            },
+            "neighbours": {
+                "type": "number", "label": "Spread directions",
+                "help": (
+                    "More directions, less lattice bias: 8 overestimates "
+                    "off-axis travel by 8%, 16 by 2.8%, 32 by 1.3%."
+                ),
+                "enum": [8, 16, 32], "default": 32,
+            },
+            "ignition_point": {
+                "type": "point", "label": "Ignition point",
+                "help": "Where the fire starts. Defaults to the AOI centre.",
+                "default": None,
             },
         },
     },

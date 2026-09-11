@@ -25,16 +25,24 @@ def job_run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: 
     return run_analysis(analysis_type, bbox, start_date, end_date)
 
 
-def job_run_simulation(bbox: list, start_date: str, params: dict | None = None):
+def job_run_simulation(
+    bbox: list,
+    start_date: str,
+    params: dict | None = None,
+    analysis_type: str = "flood_simulation",
+):
     """
-    Job function for a forward flood simulation — importable by rq from this
-    module path. Kept separate from `job_run_analysis` because a simulation
-    needs its parameter dict and returns a much larger payload.
+    Job function for a forward simulation — importable by rq from this module
+    path. Kept separate from `job_run_analysis` because a simulation needs its
+    parameter dict and returns a much larger payload.
+
+    `analysis_type` defaults to the flood model so that jobs enqueued by an
+    older release, which did not pass it, still run correctly after a deploy.
     """
     from api.analyze import run_analysis
 
     return run_analysis(
-        analysis_type="flood_simulation",
+        analysis_type=analysis_type,
         bbox=bbox,
         start_date=start_date,
         end_date=start_date,
