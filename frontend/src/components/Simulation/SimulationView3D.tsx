@@ -19,6 +19,7 @@ import {
   Compass,
   Layers,
   Loader2,
+  Flame,
   Mountain,
   Orbit,
   RotateCcw,
@@ -30,9 +31,13 @@ import {
 import { useSimulationStore } from "../../stores/simulationStore";
 import type { DecodedSimulation } from "../../types/simulation";
 import { rampCss } from "../../lib/simulation";
+import { burnRampCss } from "../../lib/fire";
 import {
   buildGridMesh,
   dryOffsetFor,
+  burnColors,
+  burnHeights,
+  burnedExtent,
   floodedExtent,
   hillshadeTexture,
   terrainHeights,
@@ -42,6 +47,7 @@ import {
   waterHeights,
   type GridMesh,
 } from "../../lib/terrainMesh";
+import { isFire, type AnySolve } from "../../types/simulation";
 import {
   createOrbit,
   dollyBy,
@@ -233,21 +239,25 @@ function satelliteUrl(bbox: number[], widthM: number, depthM: number): string | 
 /**
  * Where the camera starts, and what "reset view" returns to.
  *
- * Frames the flood rather than the domain. Distance still accounts for relief
- * as well as footprint: framing purely on footprint put the camera down among
- * the peaks on a canyon, where exaggerated relief is a large fraction of a
- * small domain.
+ * Frames the event — the flood, or the burn — rather than the domain.
+ * Distance still accounts for relief as well as footprint: framing purely on
+ * footprint put the camera down among the peaks on a canyon, where
+ * exaggerated relief is a large fraction of a small domain.
  */
 function defaultOrbit(
   mesh: GridMesh,
-  sim: DecodedSimulation,
+  sim: AnySolve,
   exaggeration: number
 ): OrbitState {
   const domainSpan = Math.max(mesh.widthM, mesh.depthM);
   const relief = (sim.meta.dem_max - sim.meta.dem_min) * exaggeration;
   const dx = sim.meta.dx;
 
-  const extent = floodedExtent(sim);
+  // Frame on whatever the model actually produced. Both are thin against
+  // the domain — a river flood covers a few percent of the grid, and a
+  // wind-driven fire is a narrow tongue — so framing the whole AOI would put
+  // the result in a corner of the view in either case.
+  const extent = isFire(sim) ? burnedExtent(sim) : floodedExtent(sim);
   if (!extent) {
     // Nothing ever got wet — show the whole domain rather than nothing.
     return createOrbit(domainSpan * 1.1 + relief, [0, relief * 0.3, 0]);
@@ -314,11 +324,16 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
   // is a needless layout query 60 times a second.
   const reducedMotionRef = useRef<boolean>(prefersReducedMotion());
 
-  const sim = useSimulationStore((s) => s.sim);
+  const flood = useSimulationStore((s) => s.sim);
+  const fire = useSimulationStore((s) => s.fire);
+  // One handle for everything that is the same in both: the mesh, the
+  // terrain, the camera, the basemap. Only the draped surface differs.
+  const sim: AnySolve | null = flood ?? fire;
   const frame = useSimulationStore((s) => s.frame);
   const opacity = useSimulationStore((s) => s.opacity);
   const depthScaleM = useSimulationStore((s) => s.depthScaleM);
   const showFlood = useSimulationStore((s) => s.showFlood);
+  const frontMinutes = useSimulationStore((s) => s.frontMinutes);
 
   const [exaggeration, setExaggeration] = useState(2.2);
   const [occlude, setOcclude] = useState(true);
@@ -601,7 +616,7 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
 
       // The shimmer is animated, so it needs a frame even when nothing else
       // changed — but only while there is water on screen to shimmer.
-      if (shimmer && showFlood) dirtyRef.current = true;
+      if (shimmer && showFlood && !fire) dirtyRef.current = true;
     }
 
     if (!dirtyRef.current) return;
@@ -650,11 +665,25 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
 
     // --- water ---
     if (showFlood) {
+      if (fire) {
+        // A fire has no frames: the scrubber position is a time, and the
+        // surface is a threshold of the one arrival-time grid.
+        const minutes = fire.times[
+          Math.min(frameRef.current, fire.times.length - 1)
+        ];
+        burnHeights(
+          fire, minutes, scene.terrainY, exaggeration,
+          scene.dryOffset, fire.meta.dem_max - fire.meta.dem_min,
+          scene.waterY
+        );
+        burnColors(fire, minutes, frontMinutes, scene.waterRgba);
+      } else if (flood) {
       waterHeights(
-        sim, frameRef.current, scene.terrainY, exaggeration,
+        flood, frameRef.current, scene.terrainY, exaggeration,
         scene.dryOffset, scene.waterY
       );
-      waterColors(sim, frameRef.current, depthScaleM, scene.waterRgba);
+      waterColors(flood, frameRef.current, depthScaleM, scene.waterRgba);
+      }
       gl.bindBuffer(gl.ARRAY_BUFFER, scene.waterYBuffer);
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, scene.waterY);
       gl.bindBuffer(gl.ARRAY_BUFFER, scene.waterColorBuffer);
@@ -672,7 +701,7 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       );
       gl.uniform1f(
         gl.getUniformLocation(scene.waterProgram, "uShimmer"),
-        shimmer && !reduced ? 1 : 0
+        shimmer && !reduced && !fire ? 1 : 0
       );
       gl.uniform3f(
         gl.getUniformLocation(scene.waterProgram, "uCameraPos"),
@@ -700,8 +729,8 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
 
     gl.bindVertexArray(null);
   }, [
-    sim, basemap, showFlood, opacity, depthScaleM, exaggeration, occlude,
-    shimmer, autoOrbit,
+    sim, flood, fire, basemap, showFlood, opacity, depthScaleM, exaggeration,
+    occlude, shimmer, autoOrbit, frontMinutes,
   ]);
 
   useEffect(() => {
@@ -823,14 +852,16 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
           SIMULATED
         </span>
         <h2 className="mt-2 text-sm text-ink leading-snug">
-          {sim.meta.scene_name ?? "Flood simulation"}
+          {sim.meta.scene_name ?? (fire ? "Wildfire simulation" : "Flood simulation")}
         </h2>
         <p className="font-mono text-[10px] text-dim mt-0.5">
           {sim.nx}×{sim.ny} @ {sim.meta.dx.toFixed(0)} m ·{" "}
           {(sim.meta.dem_min ?? 0).toFixed(0)}–{(sim.meta.dem_max ?? 0).toFixed(0)} m
         </p>
         <p className="text-[10px] text-dim leading-relaxed mt-1.5">
-          Modelled water over real terrain. Not an observation, not a forecast.
+          {fire
+            ? "Modelled fire over real terrain. Not an observation, not a forecast."
+            : "Modelled water over real terrain. Not an observation, not a forecast."}
         </p>
       </div>
 
@@ -871,8 +902,8 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
         )}
 
         <Toggle
-          icon={Waves}
-          label="Flood depth"
+          icon={fire ? Flame : Waves}
+          label={fire ? "Burned area" : "Flood depth"}
           on={showFlood}
           onClick={() => useSimulationStore.getState().setShowFlood(!showFlood)}
         />
@@ -882,12 +913,18 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
           on={occlude}
           onClick={() => setOcclude(!occlude)}
         />
-        <Toggle
-          icon={Sparkles}
-          label="Water shimmer"
-          on={shimmer}
-          onClick={() => setShimmer(!shimmer)}
-        />
+        {/* The shimmer is a water surface treatment — a travelling ripple and
+            a grazing-angle sheen. Both are specific to a liquid surface, so
+            the toggle is hidden rather than relabelled for a fire, where it
+            would make the burn read as wet. */}
+        {!fire && (
+          <Toggle
+            icon={Sparkles}
+            label="Water shimmer"
+            on={shimmer}
+            onClick={() => setShimmer(!shimmer)}
+          />
+        )}
         <Toggle
           icon={Orbit}
           label="Idle auto-orbit"
@@ -904,17 +941,29 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
           display={`${exaggeration.toFixed(1)}×`}
           onChange={setExaggeration}
         />
+        {flood ? (
+          <Range
+            label="Depth scale"
+            value={depthScaleM}
+            min={0.25}
+            max={Math.max(flood.peakCm / 100, 0.5)}
+            step={0.05}
+            display={`${depthScaleM.toFixed(2)} m`}
+            onChange={(v) => useSimulationStore.getState().setDepthScaleM(v)}
+          />
+        ) : (
+          <Range
+            label="Front width"
+            value={frontMinutes}
+            min={2}
+            max={60}
+            step={1}
+            display={`${frontMinutes} min`}
+            onChange={(v) => useSimulationStore.getState().setFrontMinutes(v)}
+          />
+        )}
         <Range
-          label="Depth scale"
-          value={depthScaleM}
-          min={0.25}
-          max={Math.max(sim.peakCm / 100, 0.5)}
-          step={0.05}
-          display={`${depthScaleM.toFixed(2)} m`}
-          onChange={(v) => useSimulationStore.getState().setDepthScaleM(v)}
-        />
-        <Range
-          label="Water opacity"
+          label={fire ? "Burn opacity" : "Water opacity"}
           value={opacity}
           min={0.1}
           max={1}
@@ -926,11 +975,20 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
         <div className="space-y-1">
           <div
             className="h-2.5 rounded-full ring-1 ring-line"
-            style={{ background: rampCss() }}
+            style={{ background: fire ? burnRampCss() : rampCss() }}
           />
           <div className="flex justify-between font-mono text-[9px] text-dim">
-            <span>0 m</span>
-            <span>{depthScaleM.toFixed(1)} m</span>
+            {fire ? (
+              <>
+                <span>burning now</span>
+                <span>older burn</span>
+              </>
+            ) : (
+              <>
+                <span>0 m</span>
+                <span>{depthScaleM.toFixed(1)} m</span>
+              </>
+            )}
           </div>
         </div>
 

@@ -12,6 +12,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { useMapStore } from "../stores/mapStore";
 import { useSimulationStore } from "../stores/simulationStore";
 import { renderFrame } from "../lib/simulation";
+import { renderFire } from "../lib/fire";
 import type { BBox } from "../types/map";
 
 const TOKEN = (import.meta.env.VITE_MAPBOX_TOKEN as string) || "";
@@ -75,7 +76,7 @@ function applyAtmosphere(map: mapboxgl.Map) {
  */
 function syncTerrain(map: mapboxgl.Map) {
   const style = useMapStore.getState().baseStyle;
-  const { sim, showTerrain } = useSimulationStore.getState();
+  const { sim, fire, showTerrain } = useSimulationStore.getState();
   // Relief is what makes a simulated flood legible — water pooling in a
   // valley only reads as water pooling if the valley is visible — so an
   // active simulation turns terrain on regardless of the base style.
@@ -160,7 +161,9 @@ export default function Globe() {
   const projection = useMapStore((s) => s.projection);
 
   const sim = useSimulationStore((s) => s.sim);
+  const fire = useSimulationStore((s) => s.fire);
   const simFrame = useSimulationStore((s) => s.frame);
+  const simFrontMinutes = useSimulationStore((s) => s.frontMinutes);
   const simOpacity = useSimulationStore((s) => s.opacity);
   const simDepthScale = useSimulationStore((s) => s.depthScaleM);
   const simShowFlood = useSimulationStore((s) => s.showFlood);
@@ -377,7 +380,10 @@ export default function Globe() {
    */
   function syncSimulation(map: mapboxgl.Map) {
     const state = useSimulationStore.getState();
-    const current = state.sim;
+    // Whichever forward model is loaded; only one is ever non-null. Both draw
+    // through the same canvas source, because from Mapbox's point of view a
+    // burn and a flood are the same thing: an RGBA grid pinned to the AOI.
+    const current = state.sim ?? state.fire;
 
     // No simulation (or it was cleared): tear the layer down completely.
     if (!current) {
@@ -408,10 +414,19 @@ export default function Globe() {
       simImageRef.current = ctx.createImageData(nx, ny);
     }
 
-    renderFrame(current, state.frame, simImageRef.current, {
-      depthScaleM: state.depthScaleM,
-    });
-    ctx.putImageData(simImageRef.current, 0, 0);
+    if (state.fire) {
+      // A fire has no frames to index: every instant is a threshold of the
+      // one arrival-time grid, so the scrubber position becomes a time.
+      const minutes = state.fire.times[
+        Math.min(state.frame, state.fire.times.length - 1)
+      ];
+      renderFire(state.fire, minutes, ctx, state.frontMinutes);
+    } else if (state.sim) {
+      renderFrame(state.sim, state.frame, simImageRef.current, {
+        depthScaleM: state.depthScaleM,
+      });
+      ctx.putImageData(simImageRef.current, 0, 0);
+    }
 
     // Without a bbox there is nowhere on Earth to pin the frames; drawing
     // anyway would place the flood at null island.
@@ -496,7 +511,7 @@ export default function Globe() {
     if (!map || !map.isStyleLoaded()) return;
     syncSimulation(map);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sim, simFrame, simOpacity, simDepthScale, simShowFlood]);
+  }, [sim, fire, simFrame, simOpacity, simDepthScale, simShowFlood, simFrontMinutes]);
 
   // A loaded simulation turns relief on; clearing it hands terrain back to
   // whatever the base style wanted.
