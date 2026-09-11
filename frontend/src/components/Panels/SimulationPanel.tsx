@@ -1,21 +1,23 @@
 /**
- * Flood simulation: pick a scene, run it, control how it draws.
+ * Forward simulation: pick a scene, run it, control how it draws.
  *
- * This panel is where a simulation is started, so it carries the primary
- * statement of what the feature is — a forward model over real terrain, not
- * an observation. Every scene also carries its own disclosure from the
- * backend, and both are shown rather than summarised away.
+ * Two models share this panel — a flood routed over terrain and a wildfire
+ * spread across it. They are presented together because they answer the same
+ * shape of question ("what would happen here?") and differ from every other
+ * analysis in Kairos in the same way: the terrain is measured and the event
+ * is not. So the panel carries that statement once, prominently, and every
+ * scene carries its own disclosure from the backend underneath it.
  *
- * Layers the viewer does not actually have yet (rainfall, watershed, impact
- * points) are rendered as explicitly disabled "soon" rows. A toggle that
- * silently does nothing is worse than no toggle at all — it implies the
- * feature exists and is simply not working.
+ * Layers the viewer does not actually have yet are rendered as explicitly
+ * disabled "soon" rows. A toggle that silently does nothing is worse than no
+ * toggle at all — it implies the feature exists and is simply broken.
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
   CloudRain,
+  Flame,
   Layers3,
   Loader2,
   MapPin,
@@ -23,14 +25,17 @@ import {
   Play,
   Share2,
   Waves,
+  Wind,
   X,
 } from "lucide-react";
 import { fetchScenes, runSimulation, type SimulationScene } from "../../api/simulate";
 import { useSimulationStore } from "../../stores/simulationStore";
 import { useMapStore, bboxCenterZoom } from "../../stores/mapStore";
 import { decodeSimulation, rampCss } from "../../lib/simulation";
+import { burnRampCss, decodeFire } from "../../lib/fire";
 import { panelShellFlex } from "../../lib/responsive";
 import type { BBox } from "../../types/map";
+import type { FirePayload, SimulationPayload } from "../../types/simulation";
 
 /** Layers that are real features but not built yet — shown, never faked. */
 const PLANNED_LAYERS = [
@@ -39,14 +44,32 @@ const PLANNED_LAYERS = [
   { icon: MapPin, label: "Impact points", note: "Population & buildings at risk" },
 ];
 
+/** Compass bearing to the eight-point name a person would actually say. */
+function compass(bearing: number): string {
+  const points = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  return points[Math.round(((bearing % 360) + 360) % 360 / 45) % 8];
+}
+
+/** The one-line summary under a scene name, per model. */
+function sceneSubtitle(scene: SimulationScene): string {
+  if (scene.kind === "fire") {
+    const wind = scene.wind_ms ?? 0;
+    const from = compass(scene.wind_from_bearing ?? 0);
+    return `${scene.region} · ${scene.fuel_model} · ${wind} m/s from ${from} · ${scene.duration_hours}h`;
+  }
+  const peak = scene.peak_discharge_m3s ?? 0;
+  return `${scene.region} · ${peak.toLocaleString()} m³/s peak · ${scene.duration_hours}h`;
+}
+
 export default function SimulationPanel({ onClose }: { onClose: () => void }) {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["simulation-scenes"],
-    queryFn: fetchScenes,
+    queryFn: () => fetchScenes(),
     staleTime: 10 * 60 * 1000,
   });
 
   const sim = useSimulationStore((s) => s.sim);
+  const fire = useSimulationStore((s) => s.fire);
   const status = useSimulationStore((s) => s.status);
   const simError = useSimulationStore((s) => s.error);
   const progressNote = useSimulationStore((s) => s.progressNote);
@@ -54,6 +77,7 @@ export default function SimulationPanel({ onClose }: { onClose: () => void }) {
   const showTerrain = useSimulationStore((s) => s.showTerrain);
   const opacity = useSimulationStore((s) => s.opacity);
   const depthScaleM = useSimulationStore((s) => s.depthScaleM);
+  const frontMinutes = useSimulationStore((s) => s.frontMinutes);
 
   const [activeScene, setActiveScene] = useState<string | null>(null);
 
@@ -64,12 +88,18 @@ export default function SimulationPanel({ onClose }: { onClose: () => void }) {
     store.setProgressNote("Fetching terrain…");
     try {
       const result = await runSimulation(
-        { scene: scene.id },
+        { kind: scene.kind, scene: scene.id },
         (note) => useSimulationStore.getState().setProgressNote(note)
       );
-      store.setProgressNote("Decoding frames…");
-      const decoded = await decodeSimulation(result.simulation);
-      store.loadSimulation(decoded);
+      if (scene.kind === "fire") {
+        store.setProgressNote("Decoding arrival times…");
+        store.loadFire(decodeFire(result.simulation as FirePayload));
+      } else {
+        store.setProgressNote("Decoding frames…");
+        store.loadSimulation(
+          await decodeSimulation(result.simulation as SimulationPayload)
+        );
+      }
 
       const bbox = result.bbox as BBox;
       const { center, zoom } = bboxCenterZoom(bbox);
@@ -85,6 +115,8 @@ export default function SimulationPanel({ onClose }: { onClose: () => void }) {
 
   const running = status === "running";
   const scenes = data?.scenes ?? [];
+  const floodScenes = scenes.filter((s) => s.kind !== "fire");
+  const fireScenes = scenes.filter((s) => s.kind === "fire");
 
   return (
     <motion.aside
@@ -104,7 +136,7 @@ export default function SimulationPanel({ onClose }: { onClose: () => void }) {
     >
       <div className="flex items-center justify-between mb-3 shrink-0">
         <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
-          FLOOD SIMULATION
+          FORWARD SIMULATION
         </span>
         <button onClick={onClose} className="text-dim hover:text-ink" title="Close">
           <X size={15} />
@@ -119,9 +151,11 @@ export default function SimulationPanel({ onClose }: { onClose: () => void }) {
             SIMULATED — NOT AN OBSERVATION
           </span>
           <p className="mt-1.5 text-[11px] text-dim leading-relaxed">
-            A shallow-water model routes an assumed inflow over real Copernicus
-            terrain. The ground is measured; the water is not. For a flood that
-            actually happened, run Flood Extent Mapping.
+            Forward models over real Copernicus terrain: water routed by a
+            shallow-water solver, fire spread by Rothermel behaviour. The
+            ground is measured; the event is not, and neither is a forecast.
+            For something that actually happened, run Flood Extent Mapping or
+            Wildfire Burn Scar Mapping.
           </p>
         </div>
 
@@ -136,13 +170,14 @@ export default function SimulationPanel({ onClose }: { onClose: () => void }) {
           </p>
         )}
 
-        {scenes.length > 0 && (
+        {floodScenes.length > 0 && (
           <div className="space-y-1.5">
-            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
+            <h3 className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
+              <Waves size={11} className="text-teal" />
               Showcase scenes
             </h3>
             <ul className="space-y-1.5">
-              {scenes.map((scene) => (
+              {floodScenes.map((scene) => (
                 <li key={scene.id}>
                   <button
                     onClick={() => void launch(scene)}
@@ -160,13 +195,51 @@ export default function SimulationPanel({ onClose }: { onClose: () => void }) {
                       </span>
                     </span>
                     <span className="block text-[10px] text-dim mt-0.5">
-                      {scene.region} · {scene.peak_discharge_m3s.toLocaleString()} m³/s
-                      peak · {scene.duration_hours}h
+                      {sceneSubtitle(scene)}
                     </span>
                   </button>
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {fireScenes.length > 0 && (
+          <div className="space-y-1.5">
+            <h3 className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
+              <Flame size={11} className="text-ember" />
+              Wildfire scenes
+            </h3>
+            <ul className="space-y-1.5">
+              {fireScenes.map((scene) => (
+                <li key={scene.id}>
+                  <button
+                    onClick={() => void launch(scene)}
+                    disabled={running}
+                    className="w-full text-left rounded-xl bg-bg/70 ring-1 ring-line px-3 py-2.5 transition hover:ring-ember/50 disabled:opacity-50 group"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-xs text-ink truncate">{scene.name}</span>
+                      <span className="ml-auto shrink-0 text-ember opacity-0 group-hover:opacity-100 transition-opacity">
+                        {activeScene === scene.id ? (
+                          <Loader2 size={13} className="animate-spin opacity-100" />
+                        ) : (
+                          <Play size={13} />
+                        )}
+                      </span>
+                    </span>
+                    <span className="block text-[10px] text-dim mt-0.5">
+                      {sceneSubtitle(scene)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[9px] text-dim leading-relaxed">
+              Scenarios, not reconstructions. Each place has burned, but the
+              fuel, wind and ignition are chosen — none of these reproduces an
+              actual fire.
+            </p>
           </div>
         )}
 
@@ -256,6 +329,87 @@ export default function SimulationPanel({ onClose }: { onClose: () => void }) {
             </div>
 
             <SimulationStats />
+          </>
+        )}
+
+        {fire && (
+          <>
+            <div className="space-y-1.5">
+              <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
+                Layers
+              </h3>
+              <LayerToggle
+                icon={Flame}
+                label="Burned area"
+                note="Modelled fire progression"
+                on={showFlood}
+                onClick={() => useSimulationStore.getState().setShowFlood(!showFlood)}
+              />
+              <LayerToggle
+                icon={Mountain}
+                label="Terrain relief"
+                note="3D elevation under the burn"
+                on={showTerrain}
+                onClick={() => useSimulationStore.getState().setShowTerrain(!showTerrain)}
+              />
+            </div>
+
+            <div className="rounded-xl bg-bg/70 ring-1 ring-line px-3 py-2.5 space-y-1">
+              <span className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.18em] text-dim uppercase">
+                <Wind size={10} /> Conditions
+              </span>
+              <p className="text-[11px] text-ink">
+                {fire.meta.fuel_name}{" "}
+                <span className="text-dim">({fire.meta.fuel_model})</span>
+              </p>
+              {fire.meta.wind_ms !== undefined && (
+                <p className="text-[10px] text-dim">
+                  {fire.meta.wind_ms} m/s midflame from{" "}
+                  {compass(fire.meta.wind_from_bearing ?? 0)} ·{" "}
+                  {(fire.durationMin / 60).toFixed(1)} h
+                </p>
+              )}
+            </div>
+
+            <Slider
+              label="Front width"
+              value={frontMinutes}
+              min={2}
+              max={60}
+              step={1}
+              suffix=" min"
+              onChange={(v) => useSimulationStore.getState().setFrontMinutes(v)}
+            />
+            <Slider
+              label="Opacity"
+              value={opacity}
+              min={0.1}
+              max={1}
+              step={0.05}
+              suffix=""
+              format={(v) => `${Math.round(v * 100)}%`}
+              onChange={(v) => useSimulationStore.getState().setOpacity(v)}
+            />
+
+            {/* Burn-age legend — the same ramp the pixels use */}
+            <div className="space-y-1">
+              <div
+                className="h-2.5 rounded-full ring-1 ring-line"
+                style={{ background: burnRampCss() }}
+              />
+              <div className="flex justify-between font-mono text-[9px] text-dim">
+                <span>burning now</span>
+                <span>older burn</span>
+              </div>
+              <p className="text-[9px] text-dim">
+                time since the front passed (simulated)
+              </p>
+            </div>
+
+            <p className="text-[9px] text-dim leading-relaxed">
+              Surface fire only — no crown fire, no spotting, no suppression.
+              Fuel is uniform across the domain and the wind is steady.
+            </p>
           </>
         )}
       </div>

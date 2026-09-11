@@ -1,5 +1,5 @@
 /**
- * Flood-simulation API client.
+ * Forward-simulation API client, for both the flood and wildfire models.
  *
  * POST /simulate either returns a finished result or, when a Redis worker is
  * available, a job id to poll — the backend picks based on what is running.
@@ -7,24 +7,41 @@
  * deployment they are talking to.
  */
 import { apiFetch, ApiError } from "./client";
-import type { SimulationPayload } from "../types/simulation";
+import type { FirePayload, SimulationPayload } from "../types/simulation";
 
+export type SimulationKind = "flood" | "fire";
+
+/**
+ * One showcase scene from either catalogue.
+ *
+ * The two models share the endpoint and the picker, so the fields specific to
+ * each are optional and `kind` says which set to read.
+ */
 export interface SimulationScene {
   id: string;
   name: string;
   region: string;
   bbox: number[];
   summary: string;
-  peak_discharge_m3s: number;
-  rise_minutes: number;
-  peak_minutes: number;
-  recession_minutes: number;
   duration_hours: number;
-  n_manning: number;
   scale_m: number;
   disclosure: string;
   tags: string[];
   mode: string;
+  kind: SimulationKind;
+
+  // Flood
+  peak_discharge_m3s?: number;
+  rise_minutes?: number;
+  peak_minutes?: number;
+  recession_minutes?: number;
+  n_manning?: number;
+
+  // Fire
+  fuel_model?: string;
+  wind_ms?: number;
+  wind_from_bearing?: number;
+  ignition_point?: number[];
 }
 
 export interface SimulationResult {
@@ -35,7 +52,7 @@ export interface SimulationResult {
   mode: string;
   confidence: number;
   headline_stat: { label: string; value: number; unit: string };
-  simulation: SimulationPayload;
+  simulation: SimulationPayload | FirePayload;
   stats: Record<string, unknown>;
 }
 
@@ -52,11 +69,11 @@ interface JobStatusResponse {
   error?: string;
 }
 
-export async function fetchScenes(): Promise<{
+export async function fetchScenes(kind?: SimulationKind): Promise<{
   scenes: SimulationScene[];
   note: string;
 }> {
-  return apiFetch("/simulate/scenes");
+  return apiFetch(`/simulate/scenes${kind ? `?kind=${kind}` : ""}`);
 }
 
 /** How long to keep polling a queued job before giving up. */
@@ -64,7 +81,13 @@ const POLL_TIMEOUT_MS = 10 * 60 * 1000;
 const POLL_INTERVAL_MS = 2000;
 
 export async function runSimulation(
-  body: { scene?: string; bbox?: number[]; start_date?: string; params?: Record<string, unknown> },
+  body: {
+    kind?: SimulationKind;
+    scene?: string;
+    bbox?: number[];
+    start_date?: string;
+    params?: Record<string, unknown>;
+  },
   onProgress?: (note: string) => void
 ): Promise<SimulationResult> {
   const response = await apiFetch<SimulationResult | QueuedResponse>("/simulate", {

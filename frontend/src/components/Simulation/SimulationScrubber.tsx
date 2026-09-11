@@ -5,15 +5,26 @@
  * scrubbable track, and the live readouts for the frame on screen.
  *
  * The SIMULATED badge is not decoration. This panel is the one piece of UI
- * that is always on screen while modelled water is being displayed, so it is
+ * that is always on screen while a modelled event is being displayed, so it is
  * where the observed/simulated distinction has to be impossible to miss —
  * hence the amber pill, the explicit wording, and the disclosure line rather
  * than a subtle colour cue someone could read past.
  */
 import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Box, Gauge, Pause, Play, SkipBack, SkipForward, Waves, X } from "lucide-react";
+import {
+  Box,
+  Flame,
+  Gauge,
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+  Waves,
+  X,
+} from "lucide-react";
 import { useSimulationStore } from "../../stores/simulationStore";
+import { burnColour, burnedHectares, frontFlameLength } from "../../lib/fire";
 import {
   depthColor,
   formatElapsed,
@@ -26,6 +37,8 @@ const FRAME_MS = 220;
 
 export default function SimulationScrubber() {
   const sim = useSimulationStore((s) => s.sim);
+  const fire = useSimulationStore((s) => s.fire);
+  const frontMinutes = useSimulationStore((s) => s.frontMinutes);
   const frame = useSimulationStore((s) => s.frame);
   const playing = useSimulationStore((s) => s.playing);
   const speed = useSimulationStore((s) => s.speed);
@@ -38,6 +51,11 @@ export default function SimulationScrubber() {
   const view3d = useSimulationStore((s) => s.view3d);
   const setView3d = useSimulationStore((s) => s.setView3d);
 
+  // The two forward models expose different quantities, so everything below
+  // the header reads from one shape that each fills in: a per-frame series
+  // for the sparkline, and two live readouts. Branching here rather than
+  // throughout the JSX keeps one scrubber rather than two near-copies.
+  //
   // Per-frame peak depth, for the sparkline and the readout. Computed once
   // per simulation — it is a full pass over every cell of every frame.
   const peaks = useMemo(() => {
@@ -51,33 +69,92 @@ export default function SimulationScrubber() {
   }, [sim]);
 
   // Playback loop.
+  // Fire series: burned hectares and the flame length at the live front.
+  const fireSeries = useMemo(() => {
+    if (!fire) return { area: [] as number[], flame: [] as number[] };
+    return {
+      area: fire.times.map((t) => burnedHectares(fire, t)),
+      flame: fire.times.map((t) => frontFlameLength(fire, t, frontMinutes)),
+    };
+  }, [fire, frontMinutes]);
+
   useEffect(() => {
-    if (!playing || !sim) return;
+    if (!playing || !sim && !fire) return;
     const id = setInterval(() => {
       const s = useSimulationStore.getState();
-      if (!s.sim) return;
+      const frames = s.sim?.frames ?? s.fire?.frames;
+      if (!frames) return;
       // Loop rather than stop: a flood that rises and drains reads best on
       // repeat, and stopping dead on the last frame hides the recession.
-      s.setFrame((s.frame + 1) % s.sim.frames);
+      s.setFrame((s.frame + 1) % frames);
     }, FRAME_MS / speed);
     return () => clearInterval(id);
-  }, [playing, speed, sim]);
+  }, [playing, speed, sim, fire]);
 
-  if (!sim) return null;
+  if (!sim && !fire) return null;
 
+  const isFire = !!fire;
+  const solve = (sim ?? fire)!;
+
+  // One shape, filled in by whichever model is loaded.
+  const track = isFire
+    ? {
+        title: fire!.meta.scene_name ?? "Wildfire simulation",
+        grid: `${fire!.nx}×${fire!.ny} @ ${fire!.meta.dx.toFixed(0)}m`,
+        series: fireSeries.area,
+        // Elapsed is already minutes for a fire; formatElapsed takes seconds.
+        elapsedSeconds: (fire!.times[frame] ?? 0) * 60,
+        totalSeconds: (fire!.durationMin ?? 0) * 60,
+        headline: {
+          value: (fireSeries.flame[frame] ?? 0).toFixed(1),
+          unit: "m flame length",
+          colour: (() => {
+            const c = burnColour(0, frontMinutes)!;
+            return `rgb(${c[0]},${c[1]},${c[2]})`;
+          })(),
+        },
+        secondary: {
+          value: (fireSeries.area[frame] ?? 0).toLocaleString(undefined, {
+            maximumFractionDigits: 0,
+          }),
+          unit: "ha burned",
+        },
+        sparkStroke: "#F4743B",
+      }
+    : {
+        title: sim!.meta.scene_name ?? "Flood simulation",
+        grid: `${sim!.nx}×${sim!.ny} @ ${sim!.meta.dx.toFixed(0)}m`,
+        series: peaks,
+        elapsedSeconds: sim!.times[frame] ?? 0,
+        totalSeconds: sim!.times[sim!.times.length - 1] ?? 0,
+        headline: {
+          value: (peaks[frame] ?? 0).toFixed(2),
+          unit: "m peak depth",
+          colour: depthColor(peaks[frame] ?? 0, Math.max(...peaks, 0.001)),
+        },
+        secondary: {
+          value: (areas[frame] ?? 0).toFixed(2),
+          unit: "km² flooded",
+        },
+        sparkStroke: "#3BA7FF",
+      };
+
+  const seriesMax = Math.max(...track.series, 0.001);
   const peakNow = peaks[frame] ?? 0;
   const areaNow = areas[frame] ?? 0;
   const scenePeak = Math.max(...peaks, 0.001);
-  const progress = sim.frames > 1 ? frame / (sim.frames - 1) : 0;
-  const elapsed = sim.times[frame] ?? 0;
+  const progress = solve.frames > 1 ? frame / (solve.frames - 1) : 0;
 
   // Sparkline geometry over the peak-depth series.
   const W = 100;
   const H = 22;
-  const points = peaks
+  const points = track.series
     .map((p, i) => {
-      const x = peaks.length === 1 ? 0 : (i / (peaks.length - 1)) * W;
-      const y = H - (p / scenePeak) * H;
+      const x = track.series.length === 1 ? 0 : (i / (track.series.length - 1)) * W;
+      // Normalised against this track's own maximum, not the flood peak.
+      // A fire's series is hectares in the thousands; dividing it by a depth
+      // in metres sent the whole polyline off the top of the viewBox.
+      const y = H - (p / seriesMax) * H;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
@@ -98,14 +175,12 @@ export default function SimulationScrubber() {
       {/* Header — badge, scene, close */}
       <div className="flex items-center gap-2.5 mb-3">
         <span className="inline-flex items-center gap-1.5 rounded-md bg-amber/15 ring-1 ring-amber/40 px-2 py-[3px] font-mono text-[9px] tracking-[0.18em] text-amber shrink-0">
-          <Waves size={10} />
+          {isFire ? <Flame size={10} /> : <Waves size={10} />}
           SIMULATED
         </span>
-        <span className="text-xs text-ink truncate min-w-0">
-          {sim.meta.scene_name ?? "Flood simulation"}
-        </span>
+        <span className="text-xs text-ink truncate min-w-0">{track.title}</span>
         <span className="font-mono text-[10px] text-dim shrink-0 hidden sm:inline">
-          {sim.nx}×{sim.ny} @ {sim.meta.dx.toFixed(0)}m
+          {track.grid}
         </span>
         <button
           onClick={() => setView3d(!view3d)}
@@ -189,7 +264,7 @@ export default function SimulationScrubber() {
             <input
               type="range"
               min={0}
-              max={sim.frames - 1}
+              max={solve.frames - 1}
               step={1}
               value={frame}
               onChange={(e) => {
@@ -201,11 +276,11 @@ export default function SimulationScrubber() {
             />
           </div>
           <div className="flex items-center justify-between font-mono text-[10px] text-dim">
-            <span>{formatElapsed(elapsed)}</span>
+            <span>{formatElapsed(track.elapsedSeconds)}</span>
             <span>
-              frame {frame + 1}/{sim.frames}
+              frame {frame + 1}/{solve.frames}
             </span>
-            <span>{formatElapsed(sim.times[sim.times.length - 1] ?? 0)}</span>
+            <span>{formatElapsed(track.totalSeconds)}</span>
           </div>
         </div>
 
@@ -230,13 +305,17 @@ export default function SimulationScrubber() {
           <polyline
             points={points}
             fill="none"
-            stroke="#3BA7FF"
+            stroke={track.sparkStroke}
             strokeWidth={1.5}
             vectorEffect="non-scaling-stroke"
           />
           <circle
-            cx={peaks.length === 1 ? 0 : (frame / (peaks.length - 1)) * W}
-            cy={H - (peakNow / scenePeak) * H}
+            cx={
+              track.series.length === 1
+                ? 0
+                : (frame / (track.series.length - 1)) * W
+            }
+            cy={H - ((track.series[frame] ?? 0) / seriesMax) * H}
             r={2.5}
             fill="#E8A318"
           />
@@ -248,17 +327,17 @@ export default function SimulationScrubber() {
         <span className="flex items-baseline gap-1.5">
           <span
             className="font-display text-2xl leading-none"
-            style={{ color: depthColor(peakNow, scenePeak) }}
+            style={{ color: track.headline.colour }}
           >
-            {peakNow.toFixed(2)}
+            {track.headline.value}
           </span>
-          <span className="text-[11px] text-dim">m peak depth</span>
+          <span className="text-[11px] text-dim">{track.headline.unit}</span>
         </span>
         <span className="flex items-baseline gap-1.5">
           <span className="font-display text-lg leading-none text-ink">
-            {areaNow.toFixed(2)}
+            {track.secondary.value}
           </span>
-          <span className="text-[11px] text-dim">km² flooded</span>
+          <span className="text-[11px] text-dim">{track.secondary.unit}</span>
         </span>
         <span className="ml-auto flex items-center gap-1.5 font-mono text-[9px] text-dim">
           <Gauge size={11} />

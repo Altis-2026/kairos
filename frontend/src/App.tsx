@@ -29,7 +29,11 @@ export default function App() {
   const quickAnalysisOpen = useMapStore((s) => s.quickAnalysisOpen);
   const compare = useMapStore((s) => s.compare);
   const timeline = useMapStore((s) => s.timeline);
-  const simulation = useSimulationStore((s) => s.sim);
+  // Either forward model. Both mount the same scrubber and the same 3D view,
+  // which branch internally on which one is loaded.
+  const flood = useSimulationStore((s) => s.sim);
+  const fire = useSimulationStore((s) => s.fire);
+  const simulation = flood ?? fire;
   const view3d = useSimulationStore((s) => s.view3d);
   const setView3d = useSimulationStore((s) => s.setView3d);
   const setTutorialOpen = useMapStore((s) => s.setTutorialOpen);

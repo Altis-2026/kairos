@@ -23,7 +23,8 @@
  * occlusion from any camera position, and no shader tricks.
  */
 import { rampLookup, DEPTH_SCALE, WET_THRESHOLD_M } from "./simulation";
-import type { DecodedSimulation } from "../types/simulation";
+import { burnColour } from "./fire";
+import type { DecodedFire, DecodedSimulation } from "../types/simulation";
 
 export interface GridMesh {
   /** 2 floats per vertex: world X and Z, centred on the origin. */
@@ -433,4 +434,124 @@ export function hillshadeTexture(
     }
   }
   return img;
+}
+
+// ---------------------------------------------------------------------------
+// Wildfire
+// ---------------------------------------------------------------------------
+
+/**
+ * How far above the ground the burn surface floats, as a fraction of relief.
+ *
+ * A fire has no depth, so unlike water there is no physical height to use.
+ * It still cannot sit exactly on the terrain: coincident surfaces z-fight,
+ * producing a shimmering speckle that reads as a rendering fault. This lifts
+ * it by a hair — enough to win the depth test everywhere, small enough that
+ * the burn still looks painted onto the ground rather than hovering over it.
+ */
+const BURN_LIFT_FRACTION = 0.004;
+
+/**
+ * Burn surface heights at minute `minutes`, with unburned vertices buried.
+ *
+ * Deliberately the same shape as `waterHeights`, and for the same reason: the
+ * 3D viewer's occlusion trick is that unburned geometry is pushed below the
+ * terrain so ordinary depth testing hides it. Fire reuses that whole pipeline
+ * rather than duplicating it — from the renderer's point of view a burn and a
+ * flood are both a coloured surface draped over the same mesh.
+ */
+export function burnHeights(
+  fire: DecodedFire,
+  minutes: number,
+  terrainY: Float32Array,
+  exaggeration: number,
+  dryOffset: number,
+  relief: number,
+  out: Float32Array
+): Float32Array {
+  const cells = fire.ny * fire.nx;
+  const buried = dryOffset * exaggeration;
+  const lift = Math.max(relief * BURN_LIFT_FRACTION, 0.5) * exaggeration;
+
+  for (let i = 0; i < cells; i++) {
+    const t = fire.arrival[i];
+    out[i] =
+      t >= fire.unburned || t > minutes
+        ? terrainY[i] - buried
+        : terrainY[i] + lift;
+  }
+  return out;
+}
+
+/**
+ * Per-vertex burn colour at minute `minutes`, RGBA bytes.
+ *
+ * Unburned vertices get zero alpha as well as being buried, so a vertex that
+ * does poke through on extreme terrain contributes nothing visible.
+ */
+export function burnColors(
+  fire: DecodedFire,
+  minutes: number,
+  frontMinutes: number,
+  out: Uint8Array
+): Uint8Array {
+  const cells = fire.ny * fire.nx;
+
+  for (let i = 0; i < cells; i++) {
+    const t = fire.arrival[i];
+    const p = i * 4;
+    if (t >= fire.unburned || t > minutes) {
+      out[p] = out[p + 1] = out[p + 2] = out[p + 3] = 0;
+      continue;
+    }
+    const age = minutes - t;
+    const colour = burnColour(age, frontMinutes)!;
+    out[p] = colour[0];
+    out[p + 1] = colour[1];
+    out[p + 2] = colour[2];
+    // The live front is opaque; older burn is translucent so the terrain it
+    // ran over still reads through it.
+    out[p + 3] = age <= frontMinutes ? 255 : 215;
+  }
+  return out;
+}
+
+/**
+ * Bounding box of everything that burns at any point in the run.
+ *
+ * The fire counterpart of `floodedExtent`, used for the same reason: framing
+ * the whole domain puts the burn in a corner of the view.
+ */
+export function burnedExtent(fire: DecodedFire): FloodedExtent | null {
+  const { ny, nx, arrival, dem, unburned } = fire;
+
+  let minRow = ny;
+  let maxRow = -1;
+  let minCol = nx;
+  let maxCol = -1;
+  let sum = 0;
+  let count = 0;
+
+  for (let row = 0; row < ny; row++) {
+    for (let col = 0; col < nx; col++) {
+      const i = row * nx + col;
+      if (arrival[i] >= unburned) continue;
+      if (row < minRow) minRow = row;
+      if (row > maxRow) maxRow = row;
+      if (col < minCol) minCol = col;
+      if (col > maxCol) maxCol = col;
+      sum += dem[i];
+      count += 1;
+    }
+  }
+
+  if (count === 0) return null;
+  return {
+    minRow,
+    maxRow,
+    minCol,
+    maxCol,
+    meanElevation: sum / count,
+    cells: count,
+  };
 }
