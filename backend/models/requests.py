@@ -471,13 +471,19 @@ class ForesightAskRequest(BaseModel):
 
 class SimulateRequest(BaseModel):
     """
-    POST /simulate — run a forward flood simulation over an AOI.
+    POST /simulate — run a forward simulation over an AOI.
 
     Either `bbox` or `scene` must be given: a showcase scene carries its own
-    AOI and hydrograph, an explicit bbox is simulated with whatever `params`
+    AOI and forcing, an explicit bbox is simulated with whatever `params`
     supplies over the defaults.
+
+    `kind` selects the physics. The two forward models answer different
+    questions over the same terrain, and share this endpoint because
+    everything around the physics — queueing, provenance, the simulated-vs-
+    observed labelling, the payload envelope — is identical for both.
     """
 
+    kind: str = "flood"                   # "flood" or "fire"
     bbox: Optional[List[float]] = None
     scene: Optional[str] = None
     start_date: Optional[str] = None      # the date the event is labelled with
@@ -493,6 +499,13 @@ class SimulateRequest(BaseModel):
     @classmethod
     def validate_start(cls, v):
         return _validate_date(v, "start_date") if v else v
+
+    @field_validator("kind")
+    @classmethod
+    def validate_kind(cls, v):
+        if v not in ("flood", "fire"):
+            raise ValueError(f"kind must be 'flood' or 'fire'; got {v!r}.")
+        return v
 
     @model_validator(mode="after")
     def require_an_area(self):
