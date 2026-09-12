@@ -7,6 +7,7 @@ Run locally:
     uvicorn main:app --reload --port 8000
 """
 
+import json
 import os
 import threading
 from contextlib import asynccontextmanager
@@ -15,6 +16,7 @@ import ee
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 import gee_ready
 
@@ -31,11 +33,32 @@ def _init_gee_in_background(project_id: str, ee_creds: str | None) -> None:
     """
     try:
         if ee_creds:
-            creds_path = os.path.expanduser("~/.config/earthengine/credentials")
-            os.makedirs(os.path.dirname(creds_path), exist_ok=True)
-            with open(creds_path, "w") as f:
-                f.write(ee_creds)
-        ee.Initialize(project=project_id)
+            # EE_CREDENTIALS is normally a GCP service-account key. Those
+            # authenticate by signing a JWT with the private key in-process,
+            # which means they must be handed to ee.Initialize explicitly —
+            # dropping the JSON at ~/.config/earthengine/credentials (where the
+            # OAuth *user* flow keeps its refresh token) does not work, and
+            # fails with "please authorize access" as though nothing was
+            # configured at all.
+            info = json.loads(ee_creds)
+            if info.get("type") == "service_account":
+                ee.Initialize(
+                    credentials=ee.ServiceAccountCredentials(
+                        info["client_email"], key_data=ee_creds
+                    ),
+                    project=project_id,
+                )
+            else:
+                # A pasted OAuth credentials blob still works the old way.
+                creds_path = os.path.expanduser("~/.config/earthengine/credentials")
+                os.makedirs(os.path.dirname(creds_path), exist_ok=True)
+                with open(creds_path, "w") as f:
+                    f.write(ee_creds)
+                ee.Initialize(project=project_id)
+        else:
+            # No key supplied: fall back to Application Default Credentials,
+            # which is how this runs on Cloud Run via the metadata server.
+            ee.Initialize(project=project_id)
         print(f"[kairos] Google Earth Engine initialized — project: {project_id}")
     except Exception as e:
         gee_ready.error = str(e)
@@ -100,6 +123,11 @@ prod_origin = os.getenv("FRONTEND_ORIGIN")
 if prod_origin:
     allowed_origins.append(_normalize_origin(prod_origin))
 
+# Simulation results ship depth frames as base64 arrays — a few megabytes raw
+# that compress to well under one, since most of a flood grid is dry. Cheap
+# for every other endpoint too; below the threshold nothing is touched.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -129,6 +157,7 @@ from api.foresight import router as foresight_router  # noqa: E402
 from api.vessels import router as vessels_router  # noqa: E402
 from api.insar import router as insar_router  # noqa: E402
 from api.myplace import router as myplace_router  # noqa: E402
+from api.simulate import router as simulate_router  # noqa: E402
 
 app.include_router(analyze_router)
 app.include_router(query_router)
@@ -151,6 +180,7 @@ app.include_router(foresight_router)
 app.include_router(vessels_router)
 app.include_router(insar_router)
 app.include_router(myplace_router)
+app.include_router(simulate_router)
 
 
 @app.middleware("http")

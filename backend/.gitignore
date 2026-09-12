@@ -2,3 +2,10 @@
 # Local SQLite databases (feed, janus, waitlist)
 *.db
 kairos_*.db
+
+# Cached DEM tiles fetched for flood simulations (regenerated on demand)
+data/raster_cache/
+
+# Local secrets — real GCP service-account key + project id live here.
+# NEVER commit this file.
+.env

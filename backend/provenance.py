@@ -31,6 +31,10 @@ def _secret() -> bytes:
 # context layers restyle) are deliberately excluded.
 _HASHED_KEYS = (
     "analysis_type",
+    # Whether this was measured or modelled is part of the scientific claim,
+    # so it is signed alongside the numbers rather than sitting beside them
+    # as restylable presentation.
+    "mode",
     "bbox",
     "start_date",
     "end_date",
