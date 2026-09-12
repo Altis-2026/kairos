@@ -11,6 +11,8 @@ import TelemetryFooter from "./components/TelemetryFooter";
 import QuickAnalysisPanel from "./components/Panels/QuickAnalysisPanel";
 import CompareSlider from "./components/Map/CompareSlider";
 import TimelineScrubber from "./components/Map/TimelineScrubber";
+import SimulationScrubber from "./components/Simulation/SimulationScrubber";
+import SimulationView3D from "./components/Simulation/SimulationView3D";
 import MapLegend from "./components/Map/MapLegend";
 import LiveWatch from "./components/Watch/LiveWatch";
 import Guardian from "./components/Guardian/Guardian";
@@ -19,6 +21,7 @@ import EmbedView from "./components/Embed/EmbedView";
 import Landing from "./components/Landing/Landing";
 import Tutorial, { TUTORIAL_SEEN_KEY } from "./components/Tutorial/Tutorial";
 import { useMapStore } from "./stores/mapStore";
+import { useSimulationStore } from "./stores/simulationStore";
 import { restoreFromHash } from "./lib/share";
 import { getRoute } from "./lib/embed";
 
@@ -26,6 +29,13 @@ export default function App() {
   const quickAnalysisOpen = useMapStore((s) => s.quickAnalysisOpen);
   const compare = useMapStore((s) => s.compare);
   const timeline = useMapStore((s) => s.timeline);
+  // Either forward model. Both mount the same scrubber and the same 3D view,
+  // which branch internally on which one is loaded.
+  const flood = useSimulationStore((s) => s.sim);
+  const fire = useSimulationStore((s) => s.fire);
+  const simulation = flood ?? fire;
+  const view3d = useSimulationStore((s) => s.view3d);
+  const setView3d = useSimulationStore((s) => s.setView3d);
   const setTutorialOpen = useMapStore((s) => s.setTutorialOpen);
 
   // A bare URL shows the landing page; installed-PWA launches skip it.
@@ -89,10 +99,16 @@ export default function App() {
       <ChatBar />
       <MapLegend />
       <TelemetryFooter />
+      {/* AnimatePresence tracks children by key; without explicit ones it
+          falls back to positional keys and collides as these toggle. */}
       <AnimatePresence>
-        {quickAnalysisOpen && <QuickAnalysisPanel />}
-        {compare && <CompareSlider />}
-        {timeline && <TimelineScrubber />}
+        {quickAnalysisOpen && <QuickAnalysisPanel key="quick-analysis" />}
+        {compare && <CompareSlider key="compare" />}
+        {timeline && <TimelineScrubber key="timeline" />}
+        {simulation && view3d && (
+          <SimulationView3D key="sim-3d" onClose={() => setView3d(false)} />
+        )}
+        {simulation && <SimulationScrubber key="sim-scrubber" />}
       </AnimatePresence>
       <Tutorial />
     </div>

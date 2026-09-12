@@ -1,0 +1,7 @@
+# Development and test dependencies.
+#   pip install -r requirements.txt -r requirements-dev.txt
+#   pytest
+#
+# The solver suite (solver/tests) is pure NumPy and needs no credentials,
+# no network, and no Earth Engine — it runs anywhere in a couple of seconds.
+pytest>=8.0.0

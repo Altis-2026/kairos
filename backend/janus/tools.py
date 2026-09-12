@@ -40,7 +40,13 @@ TOOL_SCHEMAS = [
                 "the result appears on the student's globe, so confirm the "
                 "parameters with the student before calling. Dates are "
                 "YYYY-MM-DD; bbox is [min_lon, min_lat, max_lon, max_lat] "
-                "and should usually span less than ~2 degrees."
+                "and should usually span less than ~2 degrees. "
+                "IMPORTANT: analysis types whose mode is 'simulated' (e.g. "
+                "flood_simulation) are FORWARD MODEL output, not observations "
+                "— never describe their results as something a satellite "
+                "detected or measured, and never use one to answer a question "
+                "about what actually happened. Types with accepts_params take "
+                "an optional `params` object described by their params_schema."
             ),
             "parameters": {
                 "type": "object",
@@ -54,6 +60,13 @@ TOOL_SCHEMAS = [
                     },
                     "start_date": {"type": "string"},
                     "end_date": {"type": "string"},
+                    "params": {
+                        "type": "object",
+                        "description": (
+                            "Extra parameters for analysis types that declare "
+                            "accepts_params. Omit for everything else."
+                        ),
+                    },
                 },
                 "required": ["analysis_type", "bbox", "start_date", "end_date"],
             },
@@ -553,13 +566,26 @@ TOOL_SCHEMAS = [
 
 def _slim_result(result: dict) -> dict:
     """Analysis result cut down for the prompt: scalars only, no tile URLs."""
+    mode = result.get("mode", "observed")
     slim = {
         "analysis_type": result.get("analysis_type"),
         "display_name": result.get("display_name"),
         "data_date": result.get("data_date"),
         "confidence": result.get("confidence"),
         "headline_stat": result.get("headline_stat"),
+        # Carried explicitly. Without it the mentor sees numbers with no way to
+        # tell a measurement from a model run, and would describe simulated
+        # water as something a satellite observed.
+        "mode": mode,
     }
+    if mode == "simulated":
+        slim["WARNING"] = (
+            "These figures are FORWARD MODEL OUTPUT over real terrain, driven "
+            "by an assumed inflow. They are not observations, not a forecast, "
+            "and not calibrated against any gauge. Never write that Kairos "
+            "'detected' or 'observed' them, and never cite them as evidence of "
+            "what actually happened."
+        )
     stats = result.get("stats") or {}
     slim["stats"] = {
         k: v for k, v in stats.items() if isinstance(v, (int, float, str, bool))
@@ -583,6 +609,12 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                     "name": t["display_name"],
                     "description": t["description"],
                     "data_sources": t["data_sources"],
+                    # "observed" = measured from imagery; "simulated" = forward
+                    # model output. Never describe a simulated result as a
+                    # detection or as something a satellite saw.
+                    "mode": t["mode"],
+                    "accepts_params": t["accepts_params"],
+                    "params_schema": t["params_schema"],
                 }
                 for t in registry_as_json()
             ]
@@ -600,6 +632,7 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                 bbox=args["bbox"],
                 start_date=args["start_date"],
                 end_date=args["end_date"],
+                params=args.get("params"),
             )
             # Remember this run so proactive monitoring knows what to watch
             # over this AOI and from which imagery date onward.

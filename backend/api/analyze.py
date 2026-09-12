@@ -10,7 +10,18 @@ router = APIRouter()
 
 # Keys that are promoted to top-level response fields; everything else
 # the GEE function returns goes into the `stats` dict.
-TOP_LEVEL_KEYS = {"tile_url", "data_date", "confidence", "headline_stat"}
+TOP_LEVEL_KEYS = {
+    "tile_url",
+    "data_date",
+    "confidence",
+    "headline_stat",
+    # Observation vs forward model. Promoted (and provenance-hashed) so a
+    # simulated result can never be mistaken for a detection downstream.
+    "mode",
+    # The frame payload for simulation results: megabytes of base64 that
+    # belong beside `stats`, not inside it.
+    "simulation",
+}
 
 # Keys that must never be serialized into the JSON response (e.g. the raw
 # ee.Image kept for GeoTIFF export).
@@ -49,7 +60,13 @@ def _context_layers(analysis_type: str, bbox: list) -> list:
     return layers
 
 
-def run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: str) -> dict:
+def run_analysis(
+    analysis_type: str,
+    bbox: list,
+    start_date: str,
+    end_date: str,
+    params: dict | None = None,
+) -> dict:
     """
     Shared analysis runner used by both /analyze and /query.
     Raises ValueError for user-facing problems (caller maps to HTTP 400).
@@ -61,7 +78,21 @@ def run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: str)
         )
 
     config = ANALYSIS_REGISTRY[analysis_type]
-    raw = config["function"](bbox=bbox, start_date=start_date, end_date=end_date)
+
+    # Most analyses take exactly (bbox, start_date, end_date). Entries that
+    # declare `accepts_params` — currently the forward-model simulations —
+    # take an extra `params` dict described by their `params_schema`.
+    call_kwargs = {"bbox": bbox, "start_date": start_date, "end_date": end_date}
+    if config.get("accepts_params"):
+        call_kwargs["params"] = params or {}
+    elif params:
+        raise ValueError(
+            f"'{analysis_type}' does not take extra parameters. "
+            f"Analyses that do: "
+            f"{[k for k, c in ANALYSIS_REGISTRY.items() if c.get('accepts_params')]}"
+        )
+
+    raw = config["function"](**call_kwargs)
 
     stats = {
         k: v
@@ -69,23 +100,25 @@ def run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: str)
         if k not in TOP_LEVEL_KEYS and k not in NON_SERIALIZED_KEYS
     }
 
-    return provenance.stamp(
-        {
-            "analysis_type": analysis_type,
-            "display_name": config["display_name"],
-            "bbox": bbox,
-            "start_date": start_date,
-            "end_date": end_date,
-            "tile_url": raw["tile_url"],
-            "data_date": raw["data_date"],
-            "confidence": raw.get("confidence", 0.8),
-            "headline_stat": raw.get(
-                "headline_stat", {"label": "Result", "value": 0, "unit": ""}
-            ),
-            "context_layers": _context_layers(analysis_type, bbox),
-            "stats": stats,
-        }
-    )
+    response = {
+        "analysis_type": analysis_type,
+        "display_name": config["display_name"],
+        "bbox": bbox,
+        "start_date": start_date,
+        "end_date": end_date,
+        "tile_url": raw["tile_url"],
+        "data_date": raw["data_date"],
+        "confidence": raw.get("confidence", 0.8),
+        "headline_stat": raw.get(
+            "headline_stat", {"label": "Result", "value": 0, "unit": ""}
+        ),
+        "context_layers": _context_layers(analysis_type, bbox),
+        "mode": raw.get("mode", config.get("mode", "observed")),
+        "stats": stats,
+    }
+    if "simulation" in raw:
+        response["simulation"] = raw["simulation"]
+    return provenance.stamp(response)
 
 
 @router.post("/analyze")
@@ -101,6 +134,7 @@ def analyze(request: AnalyzeRequest):
             bbox=request.bbox,
             start_date=request.start_date,
             end_date=request.end_date,
+            params=request.params,
         )
     except ValueError as e:
         # User-facing: no data available, unknown type, bad parameters
