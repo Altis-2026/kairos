@@ -1,5 +1,16 @@
-# Kairos CI/CD — deploys the backend to Cloud Run and the frontend to
-# Firebase Hosting on every push to main.
+# Kairos CI/CD — deploys the backend to Cloud Run on every push to main, and
+# verifies that the frontend still builds.
+#
+# The frontend itself is deployed by Vercel's own GitHub integration (the live
+# site is openkairos.vercel.app), not from here. This workflow used to also
+# push it to Firebase Hosting, but that step failed on every run for months:
+# the Firebase service account lacks serviceusage.serviceUsageConsumer on the
+# project and no Hosting site was ever created, so `firebase deploy` exited 1
+# every time. A job that is always red stops carrying information — it hides
+# a real backend failure just as effectively as it reports a fake frontend
+# one — so the dead deploy steps are gone and the build check that was worth
+# keeping stays. To move hosting back here, grant that role, create the site,
+# and restore the deploy step.
 #
 # Required repository secrets (Settings → Secrets → Actions):
 #   GCP_PROJECT_ID        your Google Cloud project ID
@@ -7,8 +18,7 @@
 #                         Cloud Run Admin + Artifact Registry Writer +
 #                         Service Account User roles
 #   OPENROUTER_API_KEY    for the deployed backend (AI chat + result explainer)
-#   FIREBASE_SA_KEY       JSON key for Firebase Hosting deploys
-#   VITE_MAPBOX_TOKEN     baked into the frontend build
+#   VITE_MAPBOX_TOKEN     baked into the frontend build check
 #   VITE_API_BASE_URL     the Cloud Run URL after first deploy
 
 name: Deploy Kairos
@@ -62,6 +72,7 @@ jobs:
             --service-account kairos-backend@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --set-env-vars GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
 
+  # Build-only: Vercel performs the actual frontend deploy.
   frontend:
     runs-on: ubuntu-latest
     needs: backend
@@ -80,23 +91,3 @@ jobs:
         run: |
           npm ci
           npm run build
-
-      - name: Ensure a Firebase Hosting site exists
-        env:
-          FIREBASE_SA_KEY: ${{ secrets.FIREBASE_SA_KEY }}
-        run: |
-          echo "$FIREBASE_SA_KEY" > /tmp/firebase-sa.json
-          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/firebase-sa.json
-          npx firebase-tools@latest hosting:sites:create "${{ secrets.GCP_PROJECT_ID }}" \
-            --project "${{ secrets.GCP_PROJECT_ID }}" \
-            || echo "Site already exists or creation not needed — continuing."
-          rm -f /tmp/firebase-sa.json
-
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SA_KEY }}
-          projectId: ${{ secrets.GCP_PROJECT_ID }}
-          channelId: live
-          entryPoint: frontend
