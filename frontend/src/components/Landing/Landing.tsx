@@ -316,7 +316,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
             Kairos
           </span>
           <span className="font-mono text-[9px] tracking-[0.22em] text-dim">
-            BY ALTIS
+            SAR PLATFORM
           </span>
         </header>
 
