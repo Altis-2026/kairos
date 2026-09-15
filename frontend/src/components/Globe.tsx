@@ -335,6 +335,37 @@ export default function Globe() {
     }
   }
 
+  /**
+   * Apply a map mutation now, or as soon as the style will accept one.
+   *
+   * `isStyleLoaded()` reports false not only before the first style arrives
+   * but also while Mapbox is swapping styles or settling after a camera move,
+   * and a source or layer added inside that window is rejected. Returning
+   * early there — which is what these effects used to do — silently dropped
+   * the update for good: the store had already changed, so nothing re-ran the
+   * effect, and only a later style swap would have recovered it.
+   *
+   * That is how the dark-vessel screening lost both of its point layers. The
+   * raster layer landed while the style was ready, the two AIS layers arrived
+   * a beat later while the map was flying to the AOI, and the map legend went
+   * on advertising three layers the map had never drawn.
+   *
+   * Deferring to the next `idle` keeps the update instead. The sync functions
+   * all check for an existing source or layer before adding, so running one
+   * twice is harmless.
+   */
+  function whenStyleReady(
+    map: mapboxgl.Map | null,
+    run: (m: mapboxgl.Map) => void
+  ) {
+    if (!map) return;
+    if (map.isStyleLoaded()) {
+      run(map);
+      return;
+    }
+    map.once("idle", () => run(map));
+  }
+
   function syncPointLayers(map: mapboxgl.Map) {
     const current = useMapStore.getState().pointLayers;
     for (const layer of current) {
@@ -478,47 +509,35 @@ export default function Globe() {
 
   // ---------- react to store changes ----------
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    syncRasterLayers(map);
+    whenStyleReady(mapRef.current, syncRasterLayers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layers]);
 
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    syncPointLayers(map);
+    whenStyleReady(mapRef.current, syncPointLayers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointLayers]);
 
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    syncImageLayers(map);
+    whenStyleReady(mapRef.current, syncImageLayers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageLayers]);
 
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    syncAoi(map);
+    whenStyleReady(mapRef.current, syncAoi);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aoi]);
 
   // Frame, ramp and opacity changes all just redraw the canvas in place.
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    syncSimulation(map);
+    whenStyleReady(mapRef.current, syncSimulation);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sim, fire, simFrame, simOpacity, simDepthScale, simShowFlood, simFrontMinutes]);
 
   // A loaded simulation turns relief on; clearing it hands terrain back to
   // whatever the base style wanted.
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    syncTerrain(map);
+    whenStyleReady(mapRef.current, syncTerrain);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sim, simShowTerrain]);
 
