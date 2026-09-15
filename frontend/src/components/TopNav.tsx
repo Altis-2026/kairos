@@ -229,7 +229,7 @@ export default function TopNav() {
             Kairos
           </div>
           <div className="font-mono text-[9px] tracking-[0.22em] text-dim">
-            BY ALTIS · SAR PLATFORM
+            SAR PLATFORM
           </div>
         </div>
       </div>
