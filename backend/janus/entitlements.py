@@ -18,6 +18,8 @@ into the tier that should own it. Nothing else in the codebase needs editing.
 
 import os
 
+from janus import store
+
 # Every gateable capability. `requires()` checks membership against a tier.
 FEATURES = {
     "mentor_chat",          # the core conversational mentor
@@ -147,7 +149,24 @@ def resolve_tier(owner: str) -> str:
 
 
 def entitlements(owner: str) -> dict:
-    """Full entitlement snapshot for the frontend to gate its UI."""
+    """
+    Full entitlement snapshot for the frontend to gate its UI.
+
+    `skills` and `unread_insights` are owner-scoped learning/activity state
+    from `janus.store`, not tier configuration — they live here rather than
+    in a separate endpoint because the frontend's `Entitlements` type has
+    always declared both as required fields, and this is the one call every
+    render of the panel already makes. Leaving either out is not merely an
+    incomplete response: `JanusPanel` reads `entitlements.skills.length`
+    unconditionally once a tier is unlocked, with no optional-chaining and no
+    error boundary anywhere in the app, so an owner whose entitlements ever
+    came back without this key would crash the entire React tree on render —
+    every button on the page stops responding, because React unmounts on an
+    uncaught error with nothing there to catch it. That is exactly what
+    happened until this endpoint was wired to the storage layer that already
+    computed both fields, unused, since store.py's `record_skill`,
+    `get_skills` and `unread_insight_count` predate this function.
+    """
     tier_id = resolve_tier(owner)
     tier = TIERS[tier_id]
     return {
@@ -171,6 +190,13 @@ def entitlements(owner: str) -> dict:
             for tid, t in TIERS.items()
             if tid not in ("early_access", "locked")
         ],
+        # A locked owner has no history to show and no insight has ever been
+        # generated for them, so both are empty/zero rather than a second
+        # round trip — the panel reads them straight off this one response.
+        "skills": [] if tier_id == "locked" else store.get_skills(owner),
+        "unread_insights": (
+            0 if tier_id == "locked" else store.unread_insight_count(owner)
+        ),
     }
 
 

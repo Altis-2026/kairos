@@ -10,6 +10,7 @@
  * color) rather than teal, so mentor moments read differently from data.
  */
 import { useEffect, useRef, useState } from "react";
+import { useClickOutside } from "../../hooks/useClickOutside";
 import { motion } from "framer-motion";
 import {
   ArrowUp,
@@ -532,6 +533,9 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     clearError,
   } = useJanusStore();
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  useClickOutside(panelRef, onClose, { ignoreSelector: '[data-tour="tool-janus"]' });
+
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState<JanusMode>("mentor");
   const [accessCode, setAccessCode] = useState("");
@@ -832,6 +836,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <motion.aside
+      ref={panelRef}
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
       className={`${panelShellFlex(
@@ -919,14 +924,21 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
             </p>
           </button>
 
-          {entitlements && entitlements.skills.length > 0 && (
+          {/* Optional-chained even though the type says this is always
+              present: the backend once shipped an entitlements payload
+              missing this key, and reading it unconditionally crashed the
+              whole app with no error boundary anywhere to catch it — every
+              control on the page stopped responding, not just Janus. The
+              backend is fixed, but a render this central to opening the
+              panel should never depend on that staying true forever. */}
+          {entitlements && (entitlements.skills?.length ?? 0) > 0 && (
             <div className="rounded-xl bg-bg/70 ring-1 ring-line px-3 py-2.5">
               <div className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.18em] text-amber uppercase">
                 <GraduationCap size={11} />
                 What Janus knows you can do
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {entitlements.skills.slice(0, 10).map((s) => (
+                {(entitlements.skills ?? []).slice(0, 10).map((s) => (
                   <span
                     key={s.skill}
                     title={s.note || undefined}
