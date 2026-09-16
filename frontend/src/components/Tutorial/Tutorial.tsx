@@ -221,7 +221,7 @@ const STEPS: Step[] = [
       "mentors a project like an advisor, tracks datasets and citations, and " +
       "exports to LaTeX, Google Docs, a Jupyter notebook or a policy brief. " +
       "It is still in research preview rather than general release.",
-    tip: "Access code: janus2026",
+    tip: "In closed research preview: it opens for anyone, but running it needs an access code from the team.",
     target: "tool-janus",
     action: { label: "Open Janus", run: () => openPanel("janus") },
   },
