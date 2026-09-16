@@ -65,12 +65,15 @@ interface ToolAction {
 
 function ToolButton({
   title,
+  tour,
   active,
   amber,
   onClick,
   children,
 }: {
   title: string;
+  /** Stable hook for the guided tour; see components/Tutorial. */
+  tour?: string;
   active?: boolean;
   amber?: boolean;
   onClick: () => void;
@@ -79,6 +82,7 @@ function ToolButton({
   return (
     <button
       title={title}
+      data-tour={tour}
       onClick={onClick}
       className={`h-10 w-10 grid place-items-center transition-colors ${
         active ? (amber ? "text-amber" : "text-teal") : "text-dim hover:text-ink"
@@ -112,6 +116,10 @@ export default function RightToolbar() {
       "janus",
       "insar",
       "vessels",
+      // Was missing: a requestPanel("simulation") fell through this list and
+      // silently did nothing, so the guide's "Try it" for the forward models
+      // opened no panel at all.
+      "simulation",
     ];
     if ((known as string[]).includes(panelRequest)) {
       setOpenPanel(panelRequest as PanelKey);
@@ -212,7 +220,7 @@ export default function RightToolbar() {
     },
     {
       key: "simulation",
-      label: "Flood simulation",
+      label: "Forward simulation",
       icon: Waves,
       active: openPanel === "simulation",
       amber: true,
@@ -266,6 +274,7 @@ export default function RightToolbar() {
             <ToolButton
               key={a.key}
               title={a.label}
+              tour={`tool-${a.key}`}
               active={a.active}
               amber={a.amber}
               onClick={a.onClick}

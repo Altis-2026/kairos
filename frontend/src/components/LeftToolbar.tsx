@@ -10,17 +10,21 @@ export default function LeftToolbar() {
 
   const Item = ({
     title,
+    tour,
     active,
     onClick,
     children,
   }: {
     title: string;
+    /** Stable hook for the guided tour; see components/Tutorial. */
+    tour?: string;
     active?: boolean;
     onClick: () => void;
     children: React.ReactNode;
   }) => (
     <button
       title={title}
+      data-tour={tour}
       onClick={onClick}
       className={`h-10 w-10 grid place-items-center transition-colors ${
         active ? "text-amber" : "text-dim hover:text-ink"
@@ -41,6 +45,7 @@ export default function LeftToolbar() {
       </Item>
       <Item
         title="Draw rectangle AOI (click and drag)"
+        tour="draw"
         active={drawMode === "rectangle"}
         onClick={() => setDrawMode(drawMode === "rectangle" ? null : "rectangle")}
       >
