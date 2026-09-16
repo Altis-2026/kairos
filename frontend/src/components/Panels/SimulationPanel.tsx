@@ -128,10 +128,21 @@ export default function SimulationPanel({ onClose }: { onClose: () => void }) {
       // an outer scroll region it just kept growing — on a 1600x800 window it
       // measured 1119px tall against an 800px viewport, hanging 160px off
       // BOTH the top and bottom, the bottom collision landing right on
-      // Mapbox's attribution strip. lg:top-24/bottom-3 bounds it to the
-      // viewport the same way every other tall panel in the app already does.
+      // Mapbox's attribution strip.
+      //
+      // The bottom bound is width-dependent because the things it can collide
+      // with are horizontally centred while this panel is right-aligned. The
+      // panel occupies the last 416px of the window (right-20 + w-21rem); the
+      // chat cluster is 672px wide about the centre and the playback scrubber
+      // 640px, so the two stop overlapping once the window passes ~1500px.
+      // Above that the panel runs full height; below it, it stops short of
+      // the bottom cluster and scrolls internally instead of sitting on top
+      // of the scrubber the simulation itself needs. bottom-64 is measured,
+      // not guessed: the scrubber is 135px tall anchored at bottom-24, so its
+      // top edge is 231px up, and 224px (bottom-56) still clipped it by 6.
       className={panelShellFlex(
-        "lg:right-20 lg:left-auto lg:top-24 lg:bottom-3 lg:w-[21rem]"
+        "lg:right-20 lg:left-auto lg:top-24 lg:w-[21rem] " +
+        "lg:bottom-64 min-[1520px]:bottom-3"
       )}
     >
       <div className="flex items-center justify-between mb-3 shrink-0">
