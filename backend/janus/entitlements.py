@@ -122,7 +122,7 @@ def access_code() -> str:
     it without a redeploy of this module's logic; the fallback keeps local dev
     and the current preview cohort working.
     """
-    return os.getenv("JANUS_ACCESS_CODE", "kairos2026")
+    return os.getenv("JANUS_ACCESS_CODE", "janus2026")
 
 
 def redeem(owner: str, code: str) -> bool:

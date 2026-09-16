@@ -239,6 +239,7 @@ export default function TopNav() {
         <button
           onClick={toggleSidebar}
           title="Menu"
+          data-tour="menu"
           className="shrink-0 flex items-center gap-2 h-10 w-10 lg:w-auto justify-center lg:px-4 rounded-full bg-surface/90 backdrop-blur ring-1 ring-line text-sm text-ink hover:ring-amber/60 transition-colors"
         >
           <Menu size={16} className="text-dim" />
@@ -268,6 +269,7 @@ export default function TopNav() {
             location.reload();
           }}
           title="Live Watch — active disasters worldwide"
+          data-tour="livewatch"
           className="h-10 w-10 lg:w-auto lg:px-3.5 grid grid-flow-col items-center justify-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-amber transition-colors"
         >
           <Radio size={15} className="text-amber" />
