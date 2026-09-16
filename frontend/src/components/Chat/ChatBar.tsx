@@ -78,7 +78,7 @@ export default function ChatBar() {
     <div className="absolute bottom-5 inset-x-0 z-30 flex flex-col items-center gap-3 px-4 pointer-events-none">
       <ChatMessages />
       <SuggestionChips onPick={send} />
-      <div className="w-full max-w-2xl pointer-events-auto">
+      <div className="w-full max-w-2xl pointer-events-auto" data-tour="ask">
         <div className="relative">
           <input
             value={input}
