@@ -41,6 +41,7 @@ import JanusPanel from "./Janus/JanusPanel";
 import InsarPanel from "./Panels/InsarPanel";
 import VesselPanel from "./Panels/VesselPanel";
 import SimulationPanel from "./Panels/SimulationPanel";
+import PanelErrorBoundary from "./ErrorBoundary";
 
 type PanelKey =
   | "layers"
@@ -337,30 +338,58 @@ export default function RightToolbar() {
         )}
       </AnimatePresence>
 
+      {/* Each panel is wrapped individually: a crash in one must never
+          take the rest of the app down with it — see ErrorBoundary.tsx. */}
       {openPanel === "simulation" && (
-        <SimulationPanel onClose={() => setOpenPanel(null)} />
+        <PanelErrorBoundary label="Forward simulation" onDismiss={() => setOpenPanel(null)}>
+          <SimulationPanel onClose={() => setOpenPanel(null)} />
+        </PanelErrorBoundary>
       )}
-      {openPanel === "layers" && <LayerPanel onClose={() => setOpenPanel(null)} />}
+      {openPanel === "layers" && (
+        <PanelErrorBoundary label="Layers" onDismiss={() => setOpenPanel(null)}>
+          <LayerPanel onClose={() => setOpenPanel(null)} />
+        </PanelErrorBoundary>
+      )}
       {openPanel === "research" && (
-        <ResearchPanel onClose={() => setOpenPanel(null)} />
+        <PanelErrorBoundary label="Research tools" onDismiss={() => setOpenPanel(null)}>
+          <ResearchPanel onClose={() => setOpenPanel(null)} />
+        </PanelErrorBoundary>
       )}
       {openPanel === "history" && (
-        <HistoryPanel onClose={() => setOpenPanel(null)} />
+        <PanelErrorBoundary label="My analyses" onDismiss={() => setOpenPanel(null)}>
+          <HistoryPanel onClose={() => setOpenPanel(null)} />
+        </PanelErrorBoundary>
       )}
       {openPanel === "batch" && (
-        <BatchPanel onClose={() => setOpenPanel(null)} />
+        <PanelErrorBoundary label="Batch mode" onDismiss={() => setOpenPanel(null)}>
+          <BatchPanel onClose={() => setOpenPanel(null)} />
+        </PanelErrorBoundary>
       )}
       {openPanel === "alerts" && (
-        <AlertsPanel onClose={() => setOpenPanel(null)} />
+        <PanelErrorBoundary label="Alerts" onDismiss={() => setOpenPanel(null)}>
+          <AlertsPanel onClose={() => setOpenPanel(null)} />
+        </PanelErrorBoundary>
       )}
       {openPanel === "analytics" && (
-        <AnalyticsPanel onClose={() => setOpenPanel(null)} />
+        <PanelErrorBoundary label="Analytics" onDismiss={() => setOpenPanel(null)}>
+          <AnalyticsPanel onClose={() => setOpenPanel(null)} />
+        </PanelErrorBoundary>
       )}
-      {openPanel === "janus" && <JanusPanel onClose={() => setOpenPanel(null)} />}
+      {openPanel === "janus" && (
+        <PanelErrorBoundary label="Janus" onDismiss={() => setOpenPanel(null)}>
+          <JanusPanel onClose={() => setOpenPanel(null)} />
+        </PanelErrorBoundary>
+      )}
       {openPanel === "vessels" && (
-        <VesselPanel onClose={() => setOpenPanel(null)} />
+        <PanelErrorBoundary label="Dark vessels" onDismiss={() => setOpenPanel(null)}>
+          <VesselPanel onClose={() => setOpenPanel(null)} />
+        </PanelErrorBoundary>
       )}
-      {openPanel === "insar" && <InsarPanel onClose={() => setOpenPanel(null)} />}
+      {openPanel === "insar" && (
+        <PanelErrorBoundary label="InSAR" onDismiss={() => setOpenPanel(null)}>
+          <InsarPanel onClose={() => setOpenPanel(null)} />
+        </PanelErrorBoundary>
+      )}
     </>
   );
 }
