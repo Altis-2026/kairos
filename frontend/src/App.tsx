@@ -20,6 +20,7 @@ import Foresight from "./components/Foresight/Foresight";
 import EmbedView from "./components/Embed/EmbedView";
 import Landing from "./components/Landing/Landing";
 import Tutorial, { TUTORIAL_SEEN_KEY } from "./components/Tutorial/Tutorial";
+import { AppErrorBoundary } from "./components/ErrorBoundary";
 import { useMapStore } from "./stores/mapStore";
 import { useSimulationStore } from "./stores/simulationStore";
 import { restoreFromHash } from "./lib/share";
@@ -90,27 +91,29 @@ export default function App() {
   }
 
   return (
-    <div className="relative h-full w-full bg-bg overflow-hidden">
-      <Globe />
-      <TopNav />
-      <Sidebar />
-      <LeftToolbar />
-      <RightToolbar />
-      <ChatBar />
-      <MapLegend />
-      <TelemetryFooter />
-      {/* AnimatePresence tracks children by key; without explicit ones it
-          falls back to positional keys and collides as these toggle. */}
-      <AnimatePresence>
-        {quickAnalysisOpen && <QuickAnalysisPanel key="quick-analysis" />}
-        {compare && <CompareSlider key="compare" />}
-        {timeline && <TimelineScrubber key="timeline" />}
-        {simulation && view3d && (
-          <SimulationView3D key="sim-3d" onClose={() => setView3d(false)} />
-        )}
-        {simulation && <SimulationScrubber key="sim-scrubber" />}
-      </AnimatePresence>
-      <Tutorial />
-    </div>
+    <AppErrorBoundary>
+      <div className="relative h-full w-full bg-bg overflow-hidden">
+        <Globe />
+        <TopNav />
+        <Sidebar />
+        <LeftToolbar />
+        <RightToolbar />
+        <ChatBar />
+        <MapLegend />
+        <TelemetryFooter />
+        {/* AnimatePresence tracks children by key; without explicit ones it
+            falls back to positional keys and collides as these toggle. */}
+        <AnimatePresence>
+          {quickAnalysisOpen && <QuickAnalysisPanel key="quick-analysis" />}
+          {compare && <CompareSlider key="compare" />}
+          {timeline && <TimelineScrubber key="timeline" />}
+          {simulation && view3d && (
+            <SimulationView3D key="sim-3d" onClose={() => setView3d(false)} />
+          )}
+          {simulation && <SimulationScrubber key="sim-scrubber" />}
+        </AnimatePresence>
+        <Tutorial />
+      </div>
+    </AppErrorBoundary>
   );
 }
