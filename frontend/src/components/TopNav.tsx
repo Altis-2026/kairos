@@ -279,7 +279,7 @@ export default function TopNav() {
             onClick={() => navigate(route)}
             title={label}
             aria-label={label}
-            data-tour={tour}
+            data-tour={tour ?? `nav-${route}`}
             className={`h-10 w-10 xl:w-auto xl:px-3.5 ${wide ? "grid" : "hidden md:grid"} grid-flow-col items-center justify-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-ink transition-colors`}
           >
             <Icon size={15} className={tone} />
@@ -288,6 +288,7 @@ export default function TopNav() {
         ))}
         <button
           onClick={() => setLocale(locale === "en" ? "es" : "en")}
+          data-tour="language"
           title={t("language")}
           aria-label={t("language")}
           className="h-10 w-10 shrink-0 grid place-items-center rounded-full bg-surface/90 ring-1 ring-line text-[11px] font-semibold text-dim hover:text-ink transition-colors"
