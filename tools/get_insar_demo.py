@@ -5,11 +5,6 @@ import struct
 import sys
 import urllib.request
 
-# COMET-LiCSAR moved off JASMIN in October 2025. The products now live in the
-# CEDA archive, and the layout changed with the move: interferogram pairs sit
-# directly under the frame directory rather than in an `interferograms/`
-# subfolder, and the per-frame `-poly.txt` corner file is gone. The frame
-# extent is read out of the GeoTIFF header instead — see `frame_bbox`.
 BASE = "https://dap.ceda.ac.uk/neodc/comet/data/licsar_products"
 BROWSE = "https://data.ceda.ac.uk/neodc/comet/data/licsar_products"
 
@@ -40,7 +35,6 @@ and looks like noise; the 192-day default gives roughly half a dozen, which is
 what makes the subsidence bowl legible.
 """
 
-#: Known-good defaults, verified against the CEDA archive.
 SITES = {
     "mexico-city": {
         "frame": "005A_07021_131313",
@@ -60,14 +54,6 @@ def fetch(url: str, dest: str) -> bool:
 
 
 def frame_bbox(track: str, frame: str) -> list | None:
-    """
-    Read the frame's geographic extent from a product GeoTIFF's header.
-
-    The corner file the old JASMIN layout provided is gone, but every frame
-    ships georeferenced metadata rasters. Only the header is needed, so this
-    asks for the first chunk of the file with a Range request rather than
-    pulling a whole raster down for four numbers.
-    """
     for kind in ("hgt", "E", "U"):
         url = f"{BASE}/{track}/{frame}/metadata/{frame}.geo.{kind}.tif"
         try:
@@ -83,7 +69,6 @@ def frame_bbox(track: str, frame: str) -> list | None:
 
 
 def _geotiff_bbox(buf: bytes) -> list:
-    """Pull width/height, pixel scale and tiepoint out of a (Big)TIFF header."""
     endian = "<" if buf[:2] == b"II" else ">"
     version = struct.unpack(endian + "H", buf[2:4])[0]
 
@@ -96,7 +81,7 @@ def _geotiff_bbox(buf: bytes) -> list:
             tag, typ = struct.unpack(endian + "HH", buf[at:at + 4])
             n = struct.unpack(endian + "I", buf[at + 4:at + 8])[0]
             return tag, typ, n, struct.unpack(endian + "I", buf[at + 8:at + 12])[0]
-    elif version == 43:                       # BigTIFF
+    elif version == 43:
         offset = struct.unpack(endian + "Q", buf[8:16])[0]
         count = struct.unpack(endian + "Q", buf[offset:offset + 8])[0]
         entry_size, header = 20, 8
@@ -115,7 +100,7 @@ def _geotiff_bbox(buf: bytes) -> list:
 
     def read(tag):
         typ, n, value = tags[tag]
-        if typ == 12:                          # DOUBLE, stored out of line
+        if typ == 12:
             return struct.unpack(endian + f"{n}d", buf[value:value + 8 * n])
         return value
 
@@ -154,8 +139,6 @@ def main():
               f"Pass --frame and --pair; see --help for how to find them.")
         return 1
 
-    # Track directories are zero-padded to at least two digits in the archive
-    # ("05", "41", "143"), while the frame id always uses three ("005A_...").
     track = f"{int(frame[:3]):02d}"
     pair_base = f"{BASE}/{track}/{frame}/{pair}"
 
