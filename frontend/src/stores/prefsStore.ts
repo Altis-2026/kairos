@@ -25,7 +25,8 @@ function write(key: string, value: string) {
 function initialLocale(): Locale {
   const saved = read(LOCALE_KEY);
   if (saved === "en" || saved === "es") return saved;
-  return navigator.language?.toLowerCase().startsWith("es") ? "es" : "en";
+  const lang = typeof navigator === "undefined" ? "" : navigator.language;
+  return lang?.toLowerCase().startsWith("es") ? "es" : "en";
 }
 
 interface PrefsState {
