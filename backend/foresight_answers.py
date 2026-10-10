@@ -1,12 +1,3 @@
-"""
-Deterministic answers for Foresight follow-up questions.
-
-The outlook already carries its own numbers, so the common questions ("is that
-bad?", "how do you know?", "when does it peak?") can be answered from the data
-alone. That makes the AI a nice-to-have rather than a dependency: a missing API
-key or an exhausted quota degrades the wording, never the substance.
-"""
-
 HAZARD_WORDS = {
     "flood": "flooding",
     "wildfire": "wildfire",
@@ -16,17 +7,13 @@ HAZARD_WORDS = {
 
 LEVEL_MEANING = {
     "low": (
-        "Low means the satellite record shows little history of this hazard "
-        "here compared with other places."
+        "Low means the satellite record shows little history of this hazard here compared with other places."
     ),
     "moderate": (
         "Moderate means there is a real but limited history of this hazard "
         "here. Worth knowing about, not worth losing sleep over."
     ),
-    "high": (
-        "High means this hazard shows up often in the record for this area. "
-        "It is worth having a plan."
-    ),
+    "high": ("High means this hazard shows up often in the record for this area. It is worth having a plan."),
     "very high": (
         "Very high means this is one of the more exposed places for this "
         "hazard in the satellite record. Preparation matters here."
@@ -35,17 +22,46 @@ LEVEL_MEANING = {
 
 TOPICS = {
     "score": (
-        "bad", "what does", "score mean", "mean?", "meaning", "how serious",
-        "worry", "worried", "compare", "average", "normal",
+        "bad",
+        "what does",
+        "score mean",
+        "mean?",
+        "meaning",
+        "how serious",
+        "worry",
+        "worried",
+        "compare",
+        "average",
+        "normal",
     ),
     "action": (
-        "what should i do", "what do i do", "prepare", "preparing", "protect",
-        "insurance", "evacuat", "safe", "safer", "next step", "action",
+        "what should i do",
+        "what do i do",
+        "prepare",
+        "preparing",
+        "protect",
+        "insurance",
+        "evacuat",
+        "safe",
+        "safer",
+        "next step",
+        "action",
     ),
     "method": (
-        "how do you know", "how is this", "how was this", "measure", "data",
-        "source", "accurate", "accuracy", "reliable", "trust", "work out",
-        "calculated", "computed", "where does",
+        "how do you know",
+        "how is this",
+        "how was this",
+        "measure",
+        "data",
+        "source",
+        "accurate",
+        "accuracy",
+        "reliable",
+        "trust",
+        "work out",
+        "calculated",
+        "computed",
+        "where does",
     ),
     "trend": ("getting worse", "worse", "trend", "over time", "improving", "better"),
     "season": ("when", "month", "season", "time of year", "peak"),
@@ -143,10 +159,7 @@ def _season_answer(ctx: dict) -> str:
 def _why_answer(ctx: dict) -> str:
     drivers = ctx.get("drivers") or []
     if drivers:
-        return (
-            f"The score for {_place(ctx)} comes from these measurements: "
-            + " ".join(drivers)
-        )
+        return f"The score for {_place(ctx)} comes from these measurements: " + " ".join(drivers)
     return _score_answer(ctx)
 
 
@@ -173,6 +186,5 @@ BUILDERS = {
 
 
 def fallback_answer(ctx: dict) -> str:
-    """Answer from the outlook's own numbers when the AI is unavailable."""
     topic = _classify(ctx.get("question") or "")
     return BUILDERS[topic](ctx)

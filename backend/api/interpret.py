@@ -1,23 +1,13 @@
-"""
-POST /interpret          — plain-language interpretation of a finished result,
-                           grounded only in the computed numbers (instant).
-POST /interpret/context  — on-demand: recent regional news / trends / concerns
-                           pulled via web search.
+from fastapi import APIRouter, Depends
 
-Both degrade gracefully: /interpret falls back to a rule-based summary when no
-AI provider is configured, and /interpret/context reports unavailability rather
-than erroring.
-"""
-
-from fastapi import APIRouter
-
-from models.requests import InterpretRequest
-from gee.registry import ANALYSIS_REGISTRY
 from ai.client import (
+    fallback_interpretation,
     interpret_result,
     search_regional_context,
-    fallback_interpretation,
 )
+from gee.registry import ANALYSIS_REGISTRY
+from models.requests import InterpretRequest
+from ratelimit import limit_ai
 
 router = APIRouter()
 
@@ -40,16 +30,14 @@ def _result_dict(req: InterpretRequest) -> dict:
     }
 
 
-@router.post("/interpret")
+@router.post("/interpret", dependencies=[Depends(limit_ai)])
 def interpret(req: InterpretRequest):
-    """Instant, grounded interpretation — works with or without an AI key."""
     result = _result_dict(req)
     description = ANALYSIS_REGISTRY.get(req.analysis_type, {}).get("description", "")
     try:
         text = interpret_result(result, description, req.place_name)
         return {"available": True, "text": text, "source": "ai"}
     except RuntimeError:
-        # No OPENROUTER_API_KEY — still useful via the rule-based summary.
         return {
             "available": True,
             "text": fallback_interpretation(result, description),
@@ -64,9 +52,8 @@ def interpret(req: InterpretRequest):
         }
 
 
-@router.post("/interpret/context")
+@router.post("/interpret/context", dependencies=[Depends(limit_ai)])
 def interpret_context(req: InterpretRequest):
-    """Web-search-backed regional context — only runs when the user asks."""
     result = _result_dict(req)
     try:
         text = search_regional_context(result, req.place_name)

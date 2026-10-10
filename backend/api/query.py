@@ -1,72 +1,65 @@
-"""
-POST /query — the natural language entry point.
+from fastapi import APIRouter, Depends, HTTPException
 
-Flow: user text -> Claude parses intent -> run the analysis -> Claude
-writes a plain-language explanation -> return everything together.
-"""
-
-from fastapi import APIRouter, HTTPException
-from models.requests import QueryRequest
+from ai.client import narrate_result, parse_natural_language
 from api.analyze import run_analysis
-from ai.client import parse_natural_language, narrate_result
+from models.requests import QueryRequest
+from ratelimit import limit_ai
 
 router = APIRouter()
 
 
-@router.post("/query")
-def query(request: QueryRequest):
-    # 1. Parse intent with Claude (prior turns give follow-ups their context)
-    history = (
-        [{"role": t.role, "content": t.content} for t in request.history]
-        if request.history
-        else None
+def _reply(understood, parsed, *, clarification=None, result=None, results=None, explanation=None):
+    return {
+        "understood": understood,
+        "clarification": clarification,
+        "parameters": parsed.model_dump() if parsed else None,
+        "result": result,
+        "results": results,
+        "explanation": explanation,
+    }
+
+
+def _fallback_narration(result: dict) -> str:
+    hs = result["headline_stat"]
+    return (
+        f"{result['display_name']} finished: {hs['label']} is {hs['value']} "
+        f"{hs['unit']}, from Sentinel-1 data dated {result['data_date']}."
     )
+
+
+@router.post("/query", dependencies=[Depends(limit_ai)])
+def query(request: QueryRequest):
+    history = [{"role": t.role, "content": t.content} for t in request.history] if request.history else None
     try:
-        parsed = parse_natural_language(
-            request.query, request.viewport_bbox, history
-        )
+        parsed = parse_natural_language(request.query, request.viewport_bbox, history, request.language)
     except RuntimeError as e:
-        # Missing API key — configuration problem, tell the user plainly
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Query parsing failed: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"The language model did not answer in time ({type(e).__name__}). Try again in a moment.",
+        )
 
-    # 2. Claude needs clarification — return the question, no analysis
     if not parsed.understood:
-        return {
-            "understood": False,
-            "clarification": parsed.clarification
-            or "Could you tell me more about what you want to analyze, and where?",
-            "parameters": parsed.model_dump(),
-            "result": None,
-            "explanation": None,
-        }
+        return _reply(
+            False,
+            parsed,
+            clarification=parsed.clarification or "Could you tell me what you want to analyze, and where?",
+        )
 
-    # Parser evaluation: stop here and report what the language layer produced.
-    # Measuring parse quality does not require paying for the analysis that
-    # would follow it.
     if request.parse_only:
-        return {
-            "understood": True,
-            "clarification": None,
-            "parameters": parsed.model_dump(),
-            "result": None,
-            "explanation": None,
-            "parse_only": True,
-        }
+        reply = _reply(True, parsed)
+        reply["parse_only"] = True
+        return reply
 
-    # Defensive: understood=true requires complete parameters
     if not (parsed.analysis_type and parsed.bbox and parsed.start_date and parsed.end_date):
-        return {
-            "understood": False,
-            "clarification": "I understood part of that, but I'm missing the "
-            "location or dates. Could you name a place and a time period?",
-            "parameters": parsed.model_dump(),
-            "result": None,
-            "explanation": None,
-        }
+        return _reply(
+            False,
+            parsed,
+            clarification="I understood part of that, but I'm missing the place or "
+            "the dates. Could you name a place and a time period?",
+        )
 
-    # 3. Run the analysis
     try:
         result = run_analysis(
             analysis_type=parsed.analysis_type,
@@ -75,32 +68,31 @@ def query(request: QueryRequest):
             end_date=parsed.end_date,
         )
     except ValueError as e:
-        # No data for this place/time — honest, helpful response, not an error page
-        return {
-            "understood": True,
-            "clarification": None,
-            "parameters": parsed.model_dump(),
-            "result": None,
-            "explanation": str(e),
-        }
+        return _reply(True, parsed, explanation=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
 
-    # 4. Narrate (non-fatal if it fails — the numbers still go back)
-    try:
-        explanation = narrate_result(result)
-    except Exception:
-        hs = result["headline_stat"]
-        explanation = (
-            f"{result['display_name']} complete: {hs['label']} = "
-            f"{hs['value']} {hs['unit']} based on Sentinel-1 data "
-            f"from {result['data_date']}."
-        )
+    results = [result]
+    extra_notes = []
+    for extra in parsed.extra_analyses or []:
+        try:
+            extra_result = run_analysis(
+                analysis_type=extra.analysis_type,
+                bbox=extra.bbox or parsed.bbox,
+                start_date=extra.start_date or parsed.start_date,
+                end_date=extra.end_date or parsed.end_date,
+            )
+        except Exception:
+            continue
+        results.append(extra_result)
+        hs = extra_result["headline_stat"]
+        extra_notes.append(f"{extra_result['display_name']}: {hs['label']} {hs['value']} {hs['unit']}")
 
-    return {
-        "understood": True,
-        "clarification": None,
-        "parameters": parsed.model_dump(),
-        "result": result,
-        "explanation": explanation,
-    }
+    try:
+        explanation = narrate_result(result, request.language)
+    except Exception:
+        explanation = _fallback_narration(result)
+    if extra_notes:
+        explanation += " Also added: " + "; ".join(extra_notes) + "."
+
+    return _reply(True, parsed, result=result, results=results, explanation=explanation)

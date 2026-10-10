@@ -1,29 +1,7 @@
-"""
-Curated showcase scenes for the wildfire simulator.
-
-Same two jobs as the flood presets: a demo that needs the user to draw a good
-box, pick a fuel model and guess a wind is a demo that fails in front of
-people, and once a scene's DEM is cached the whole thing runs with no Earth
-Engine round-trip at all.
-
-Every scene here is **a scenario, not a reconstruction**. The terrain is real
-and the locations are places that have burned, but the fuel model, wind,
-moisture and ignition point are choices — plausible ones for the landscape and
-season, and nothing more. None of these reproduces the actual fire that
-happened at that place, which depended on fuel continuity, spotting, crowning,
-wind shifts and suppression that this model does not represent. That
-distinction is not pedantry: a simulated burn over a real, named place looks
-exactly as convincing as a reconstruction, and people will read it as one
-unless told otherwise. The `disclosure` string travels with the result all the
-way to the UI for that reason.
-
-Bounding boxes frame the terrain of interest; they are not fire perimeters.
-"""
-
 from dataclasses import dataclass, field
 
 SCENARIO = (
-    "Illustrative scenario — plausible fuel, wind and ignition for this "
+    "Illustrative scenario, plausible fuel, wind and ignition for this "
     "landscape, not a reconstruction of any actual fire. The terrain is "
     "real; the fire is modelled."
 )
@@ -31,18 +9,16 @@ SCENARIO = (
 
 @dataclass(frozen=True)
 class FireScene:
-    """One showcase fire, fully specified."""
-
     id: str
     name: str
     region: str
-    bbox: tuple                      # (min_lon, min_lat, max_lon, max_lat)
+    bbox: tuple
     summary: str
     fuel_model: str
-    wind_ms: float                   # midflame, already reduced from 10 m
-    wind_from_bearing: float         # degrees the wind blows FROM
+    wind_ms: float
+    wind_from_bearing: float
     duration_hours: float
-    ignition_point: tuple            # (lon, lat)
+    ignition_point: tuple
     moisture_1h: float = 0.05
     moisture_10h: float = 0.06
     moisture_100h: float = 0.08
@@ -60,13 +36,13 @@ SCENES = {
         bbox=(-118.82, 34.06, -118.66, 34.14),
         summary=(
             "Mature chaparral on steep coastal canyons. A dry offshore wind "
-            "drives fire downslope toward the coast — the pattern behind "
+            "drives fire downslope toward the coast. The pattern behind "
             "southern California's most destructive fires, and the one that "
             "defeats the usual intuition that fire runs uphill."
         ),
         fuel_model="sh4",
         wind_ms=6.5,
-        wind_from_bearing=30.0,          # Santa Ana: offshore, from the NNE
+        wind_from_bearing=30.0,
         duration_hours=8.0,
         ignition_point=(-118.78, 34.125),
         moisture_1h=0.03,
@@ -101,7 +77,7 @@ SCENES = {
         summary=(
             "Cured short grass on rolling ground under a strong downslope "
             "windstorm. Grass fires carry almost no fuel but move faster than "
-            "anything else in the model — the reason a grassland fire can "
+            "anything else in the model. The reason a grassland fire can "
             "cross open country before anyone can respond."
         ),
         fuel_model="gr1",
@@ -123,7 +99,7 @@ SCENES = {
         bbox=(-8.30, 39.90, -8.14, 40.00),
         summary=(
             "Dense eucalyptus and pine on dissected hills. Steep, narrow "
-            "valleys with fuel continuous from valley floor to ridgeline — "
+            "valleys with fuel continuous from valley floor to ridgeline, "
             "terrain where a fire's spread is governed as much by the shape "
             "of the ground as by the wind over it."
         ),
@@ -180,17 +156,13 @@ SCENES = {
 
 
 def get_scene(scene_id: str) -> FireScene:
-    """Look up a scene, failing with the list of valid ids."""
     try:
         return SCENES[scene_id]
     except KeyError:
-        raise ValueError(
-            f"Unknown fire scene {scene_id!r}. Available: {sorted(SCENES)}"
-        ) from None
+        raise ValueError(f"Unknown fire scene {scene_id!r}. Available: {sorted(SCENES)}") from None
 
 
 def scenes_as_json() -> list:
-    """The scene catalogue, for the API and the UI picker."""
     return [
         {
             "id": s.id,
@@ -206,9 +178,6 @@ def scenes_as_json() -> list:
             "scale_m": s.scale_m,
             "disclosure": s.disclosure,
             "tags": list(s.tags),
-            # Carried on the scene itself, not only on the result. A scene
-            # list is browsed before anything is run, so this is the first
-            # place a user can be told the event is modelled.
             "mode": "simulated",
         }
         for s in SCENES.values()

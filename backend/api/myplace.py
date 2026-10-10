@@ -1,12 +1,3 @@
-"""
-Address lookup with no metered dependency.
-
-The frontend's Cmd+K search uses Mapbox geocoding, which is billed per request
-above the free tier. This endpoint is the unmetered fallback: the US Census
-geocoder first (authoritative for US addresses, free, no key), then OpenStreetMap
-Nominatim for everywhere else.
-"""
-
 import httpx
 from fastapi import APIRouter, HTTPException
 
@@ -17,7 +8,6 @@ router = APIRouter()
 CENSUS_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 
-# Roughly a 13 x 10 km box: neighbourhood scale, small enough for a fast outlook.
 HALF_LON = 0.06
 HALF_LAT = 0.045
 

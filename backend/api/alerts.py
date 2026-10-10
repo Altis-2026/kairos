@@ -1,37 +1,16 @@
-"""
-Alert mode — "watch this area; tell me when something new is detected".
-
-The persistent list of alerts lives in Firestore (per signed-in user, client
-side). This endpoint is the *checking* half: given a watched area + analysis
-type and the last acquisition we already saw, it asks Earth Engine whether a
-newer Sentinel-1 pass exists and, if so, runs the analysis on the fresh window
-and returns the result.
-
-It is callable on demand ("Check now" in the UI) and is also the exact call a
-scheduler (Cloud Scheduler -> this endpoint, one hit per alert) would make to
-turn Kairos from "check when you remember" into "tells you when it happens".
-Notification delivery (email/Slack) is intentionally left to the integration
-layer — this endpoint just reports whether there is something worth notifying.
-"""
-
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException
 
-from models.requests import AlertCheckRequest
 from api.analyze import run_analysis
+from models.requests import AlertCheckRequest
 
 router = APIRouter()
 
 
 @router.post("/alerts/check")
 def alert_check(req: AlertCheckRequest):
-    """Run the watched analysis on the most recent window; flag if it's new."""
-    end = (
-        datetime.strptime(req.end_date, "%Y-%m-%d")
-        if req.end_date
-        else datetime.now(timezone.utc)
-    )
+    end = datetime.strptime(req.end_date, "%Y-%m-%d") if req.end_date else datetime.now(timezone.utc)
     start = end - timedelta(days=req.lookback_days)
 
     try:
@@ -42,7 +21,6 @@ def alert_check(req: AlertCheckRequest):
             end_date=end.strftime("%Y-%m-%d"),
         )
     except ValueError:
-        # No Sentinel-1 acquisition in the recent window yet — nothing new.
         return {
             "new": False,
             "data_date": None,
@@ -61,12 +39,9 @@ def alert_check(req: AlertCheckRequest):
         "data_date": data_date,
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "headline_stat": result["headline_stat"],
-        # Only ship the full (heavier) result when there's actually something new.
         "result": result if is_new else None,
     }
 
-
-# --- outbound webhooks -------------------------------------------------------
 
 from pydantic import BaseModel, Field  # noqa: E402
 
@@ -82,11 +57,6 @@ class WebhookOwner(BaseModel):
 
 @router.post("/alerts/webhook")
 def set_webhook(req: WebhookRequest):
-    """
-    Register (or replace) the owner's outbound webhook. Watch findings are
-    POSTed here — Slack incoming webhooks get Slack formatting automatically;
-    any other URL receives the raw JSON event.
-    """
     import notify
     from janus import store as janus_store
 
@@ -115,7 +85,6 @@ def delete_webhook(owner: str):
 
 @router.post("/alerts/webhook/test")
 def test_webhook(req: WebhookOwner):
-    """Send a sample event so the user can prove their webhook works."""
     import notify
 
     ok = notify.notify_owner(
@@ -129,7 +98,6 @@ def test_webhook(req: WebhookOwner):
     if not ok:
         raise HTTPException(
             status_code=400,
-            detail="Delivery failed — no webhook registered, or the URL did "
-            "not accept the POST.",
+            detail="Delivery failed, no webhook registered, or the URL did not accept the POST.",
         )
     return {"delivered": True}

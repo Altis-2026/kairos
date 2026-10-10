@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Query
+import hmac
+import os
+
+from fastapi import APIRouter, Header, HTTPException, Query
 
 from watch import store, sweeper
 
@@ -25,5 +28,8 @@ def feed_status():
 
 
 @router.post("/feed/sweep")
-def trigger_sweep():
+def trigger_sweep(x_sweep_token: str | None = Header(default=None)):
+    expected = os.getenv("SWEEP_TOKEN")
+    if not expected or not x_sweep_token or not hmac.compare_digest(x_sweep_token, expected):
+        raise HTTPException(status_code=403, detail="Manual sweeps need the operator token.")
     return sweeper.trigger_sweep_async()
