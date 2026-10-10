@@ -1,8 +1,3 @@
-/**
- * My Analyses — saved cases for the signed-in user (Firestore-backed).
- * Restore re-runs a saved analysis; share copies a reproducible link; the
- * trash removes it. Degrades to a sign-in / setup prompt when unavailable.
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Clock, Loader2, RotateCcw, Share2, Trash2, X, Check } from "lucide-react";
@@ -37,7 +32,6 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
       applyResultToGlobe(result);
       onClose();
     } catch {
-      /* surfaced by the globe staying put; keep panel open */
     } finally {
       setRestoringId(null);
     }
@@ -60,15 +54,13 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
     <motion.aside
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={`${panelShell(
-        "lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-80"
-      )} space-y-4`}
+      className={`${panelShell("lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-80")} space-y-4`}
     >
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-dim">
           <Clock size={12} /> MY ANALYSES
         </span>
-        <button onClick={onClose} className="text-dim hover:text-ink" title="Close">
+        <button onClick={onClose} className="text-dim hover:text-ink" aria-label="Close" title="Close">
           <X size={15} />
         </button>
       </div>
@@ -76,13 +68,11 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
       {!casesAvailable() ? (
         <p className="text-xs text-dim leading-relaxed">
           Saved analyses need Firebase configured. Add the{" "}
-          <span className="font-mono text-teal">VITE_FIREBASE_*</span> values to
-          enable history.
+          <span className="font-mono text-teal">VITE_FIREBASE_*</span> values to enable history.
         </p>
       ) : !user ? (
         <p className="text-xs text-dim leading-relaxed">
-          Sign in to automatically save every analysis you run and pick up where
-          you left off.
+          Sign in to automatically save every analysis you run and pick up where you left off.
         </p>
       ) : loading ? (
         <div className="flex items-center gap-2 text-xs text-dim">
@@ -97,16 +87,12 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
       ) : (
         <ul className="space-y-2 max-h-[26rem] overflow-y-auto">
           {cases.map((c) => (
-            <li
-              key={c.id}
-              className="rounded-xl bg-bg/70 ring-1 ring-line p-3 space-y-2"
-            >
+            <li key={c.id} className="rounded-xl bg-bg/70 ring-1 ring-line p-3 space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-xs text-ink truncate">{c.displayName}</div>
                   <div className="font-mono text-[10px] text-dim mt-0.5">
-                    {c.headlineValue.toLocaleString()} {c.headlineUnit} ·{" "}
-                    {c.dataDate}
+                    {c.headlineValue.toLocaleString()} {c.headlineUnit} · {c.dataDate}
                   </div>
                 </div>
                 <span className="font-mono text-[9px] text-dim/70 shrink-0">
@@ -118,6 +104,7 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
                   onClick={() => restore(c)}
                   disabled={restoringId === c.id}
                   className="flex-1 h-8 rounded-lg text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-teal hover:ring-teal/40 transition disabled:opacity-50"
+                  aria-label="Re-run this analysis"
                   title="Re-run this analysis"
                 >
                   {restoringId === c.id ? (
@@ -130,17 +117,15 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
                 <button
                   onClick={() => share(c)}
                   className="h-8 w-8 grid place-items-center rounded-lg ring-1 ring-line text-dim hover:text-ink transition"
+                  aria-label="Copy shareable link"
                   title="Copy shareable link"
                 >
-                  {copiedId === c.id ? (
-                    <Check size={12} className="text-teal" />
-                  ) : (
-                    <Share2 size={12} />
-                  )}
+                  {copiedId === c.id ? <Check size={12} className="text-teal" /> : <Share2 size={12} />}
                 </button>
                 <button
                   onClick={() => deleteCase(c.id)}
                   className="h-8 w-8 grid place-items-center rounded-lg ring-1 ring-line text-dim hover:text-ink transition"
+                  aria-label="Delete"
                   title="Delete"
                 >
                   <Trash2 size={12} />

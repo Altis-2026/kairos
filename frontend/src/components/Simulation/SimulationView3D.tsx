@@ -1,18 +1,3 @@
-/**
- * Full-screen 3D view of a flood simulation.
- *
- * Draws the terrain and the water as two meshes on the solver's own grid,
- * with a hand-rolled orbit camera. Deliberately its own WebGL2 renderer
- * rather than a Mapbox custom layer: the whole point of this view is that
- * water disappears behind ridges as you orbit, and depth-testing custom
- * geometry against Mapbox's terrain depends on renderer internals that are
- * not a stable contract. Owning both meshes means the occlusion is simply
- * correct (see lib/terrainMesh.ts for how), at the cost of this view being
- * its own mode rather than an overlay on the globe.
- *
- * No 3D library: the maths is in lib/mat4.ts and lib/orbitCamera.ts, both
- * unit-checked, and the shaders below are short enough to read in one go.
- */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -29,7 +14,6 @@ import {
   X,
 } from "lucide-react";
 import { useSimulationStore } from "../../stores/simulationStore";
-import type { DecodedSimulation } from "../../types/simulation";
 import { rampCss } from "../../lib/simulation";
 import { burnRampCss } from "../../lib/fire";
 import {
@@ -59,31 +43,20 @@ import {
 
 type Basemap = "satellite" | "relief" | "none";
 
-/** Seconds the opening fly-in takes to settle into the framed view. */
 const FLY_IN_SECONDS = 2.1;
-/** How much further out the fly-in starts, as a multiple of the final radius. */
+
 const FLY_IN_START_SCALE = 2.3;
-/** Idle time before the camera starts drifting on its own. */
+
 const IDLE_BEFORE_ORBIT_S = 6;
-/** Idle orbit rate, radians per second — a full turn in about two minutes. */
+
 const IDLE_ORBIT_RATE = 0.05;
 
-/**
- * Whether the viewer has asked for less animation.
- *
- * The stylesheet already honours this for the app's CSS animations; the 3D
- * view has to check it itself, because its motion lives in a render loop
- * rather than in CSS. When set, the fly-in, the idle drift and the water
- * shimmer are all skipped and the view renders only in response to input.
- */
 function prefersReducedMotion(): boolean {
   return (
-    typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
+    typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
   );
 }
 
-/** Smoothstep-style ease so the fly-in settles instead of stopping dead. */
 function easeOutCubic(t: number): number {
   const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
   return 1 - Math.pow(1 - clamped, 3);
@@ -117,13 +90,9 @@ uniform float uHasTexture;
 uniform vec3 uLightDir;
 out vec4 outColor;
 void main() {
-  // Fixed key light from the north-west, plus enough ambient that shadowed
-  // slopes stay readable rather than going to black.
   float lambert = max(dot(normalize(vNormal), normalize(uLightDir)), 0.0);
   float shade = 0.46 + 0.54 * lambert;
   vec3 base = uHasTexture > 0.5 ? texture(uTexture, vUV).rgb : vec3(0.30, 0.35, 0.29);
-  // The cut edge gets a flat, darker face instead of a vertical smear of the
-  // basemap, so the domain reads as a clean sample of ground.
   base = mix(base, vec3(0.17, 0.19, 0.16), vSkirt);
   outColor = vec4(base * shade, 1.0);
 }`;
@@ -142,47 +111,28 @@ void main() {
   gl_Position = uViewProj * vec4(vWorldPos, 1.0);
 }`;
 
-/**
- * Water shading.
- *
- * The depth-to-colour mapping is untouched here — it is decided on the CPU in
- * `waterColors` and arrives as a vertex colour. Everything this shader adds is
- * a surface treatment on top: a slow travelling ripple and a grazing-angle
- * sheen, both of which make a flat coloured mesh read as a liquid surface
- * rather than as paint on the terrain.
- *
- * Both effects are deliberately bounded. The ripple modulates brightness by a
- * few percent and the sheen only lifts the grazing edge, so a viewer reading a
- * depth off the legend still gets the right answer. Anything stronger would be
- * decoration corrupting a measurement, and the toggle exists so the cosmetic
- * layer can be removed entirely when someone wants the raw field.
- */
 const WATER_FS = `#version 300 es
 precision highp float;
 in vec4 vColor;
 in vec3 vWorldPos;
 uniform float uOpacity;
 uniform float uTime;
-uniform float uShimmer;      // 0 = raw field, 1 = surface treatment on
+uniform float uShimmer;
 uniform vec3 uCameraPos;
 uniform float uCellSize;
 out vec4 outColor;
 void main() {
-  if (vColor.a <= 0.0) discard;   // dry vertices contribute nothing
+  if (vColor.a <= 0.0) discard;
 
   vec3 rgb = vColor.rgb;
   float alpha = vColor.a * uOpacity;
 
   if (uShimmer > 0.5) {
-    // Two travelling waves at different angles and speeds, scaled to the grid
-    // so the pattern is the same physical size whatever the resolution.
     float k = 6.2831853 / (uCellSize * 18.0);
     float w1 = sin(vWorldPos.x * k + uTime * 0.9);
     float w2 = sin((vWorldPos.z * 0.85 + vWorldPos.x * 0.28) * k * 1.37 - uTime * 0.62);
     rgb *= 1.0 + 0.055 * (w1 * w2);
 
-    // Grazing-angle sheen: real water throws back more light the closer the
-    // view gets to the surface plane. Cheap stand-in for a reflection.
     vec3 toEye = normalize(uCameraPos - vWorldPos);
     float fresnel = pow(1.0 - clamp(toEye.y, 0.0, 1.0), 4.0);
     rgb += vec3(0.16, 0.21, 0.26) * fresnel;
@@ -219,12 +169,10 @@ function link(gl: WebGL2RenderingContext, vsSrc: string, fsSrc: string) {
   return program;
 }
 
-/** Mapbox Static Images: one draped satellite image for the AOI. */
 function satelliteUrl(bbox: number[], widthM: number, depthM: number): string | null {
   const token = (import.meta.env.VITE_MAPBOX_TOKEN as string) || "";
   if (!token) return null;
-  // Match the image aspect to the domain's, or the drape stretches: the
-  // static endpoint fits the bbox into whatever size it is given.
+
   const aspect = widthM / depthM;
   const w = Math.min(1280, 1024);
   const h = Math.max(1, Math.min(1280, Math.round(w / aspect)));
@@ -236,30 +184,13 @@ function satelliteUrl(bbox: number[], widthM: number, depthM: number): string | 
   );
 }
 
-/**
- * Where the camera starts, and what "reset view" returns to.
- *
- * Frames the event — the flood, or the burn — rather than the domain.
- * Distance still accounts for relief as well as footprint: framing purely on
- * footprint put the camera down among the peaks on a canyon, where
- * exaggerated relief is a large fraction of a small domain.
- */
-function defaultOrbit(
-  mesh: GridMesh,
-  sim: AnySolve,
-  exaggeration: number
-): OrbitState {
+function defaultOrbit(mesh: GridMesh, sim: AnySolve, exaggeration: number): OrbitState {
   const domainSpan = Math.max(mesh.widthM, mesh.depthM);
   const relief = (sim.meta.dem_max - sim.meta.dem_min) * exaggeration;
   const dx = sim.meta.dx;
 
-  // Frame on whatever the model actually produced. Both are thin against
-  // the domain — a river flood covers a few percent of the grid, and a
-  // wind-driven fire is a narrow tongue — so framing the whole AOI would put
-  // the result in a corner of the view in either case.
   const extent = isFire(sim) ? burnedExtent(sim) : floodedExtent(sim);
   if (!extent) {
-    // Nothing ever got wet — show the whole domain rather than nothing.
     return createOrbit(domainSpan * 1.1 + relief, [0, relief * 0.3, 0]);
   }
 
@@ -271,12 +202,6 @@ function defaultOrbit(
   const floodWidth = (extent.maxCol - extent.minCol + 1) * dx;
   const floodHeight = (extent.maxRow - extent.minRow + 1) * dx;
 
-  // Geometric mean, not the longest side. A river flood is wide and thin —
-  // measured on the Guadalupe scene its bounding box is 11.6 x 2.6 km inside
-  // an 11.5 x 9.3 km domain, so the long axis alone is the whole domain and
-  // framing on it changes nothing. The mean pulls the camera in to suit the
-  // narrow axis and lets the long one overflow, which is the right trade: the
-  // flood fills the view and the rest is a drag away.
   const floodSpan = Math.sqrt(floodWidth * floodHeight);
 
   const radius = Math.min(
@@ -284,7 +209,6 @@ function defaultOrbit(
     domainSpan * 1.3 + relief
   );
 
-  // Pivot at the water's own level, so orbiting turns around the flood.
   const targetY = (extent.meanElevation - sim.meta.dem_min) * exaggeration;
   return createOrbit(radius, [centreX, targetY, centreZ]);
 }
@@ -304,6 +228,7 @@ interface GlScene {
   waterY: Float32Array;
   waterRgba: Uint8Array;
   dryOffset: number;
+  buffers: WebGLBuffer[];
 }
 
 export default function SimulationView3D({ onClose }: { onClose: () => void }) {
@@ -313,21 +238,19 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
   const frameRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
   const dirtyRef = useRef(true);
-  /** Wall-clock seconds since the view opened; drives the water shimmer. */
+
   const clockRef = useRef<number>(0);
   const lastTickRef = useRef<number>(0);
-  /** Progress of the opening fly-in, 0 to 1. Reaches 1 and stays there. */
+
   const flyInRef = useRef<number>(0);
-  /** Timestamp of the last real interaction, for the idle auto-orbit. */
+
   const lastInputRef = useRef<number>(0);
-  // Read once into a ref rather than every frame: matchMedia in a render loop
-  // is a needless layout query 60 times a second.
+
   const reducedMotionRef = useRef<boolean>(prefersReducedMotion());
 
   const flood = useSimulationStore((s) => s.sim);
   const fire = useSimulationStore((s) => s.fire);
-  // One handle for everything that is the same in both: the mesh, the
-  // terrain, the camera, the basemap. Only the draped surface differs.
+
   const sim: AnySolve | null = flood ?? fire;
   const frame = useSimulationStore((s) => s.frame);
   const opacity = useSimulationStore((s) => s.opacity);
@@ -341,23 +264,18 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
   const [shimmer, setShimmer] = useState(true);
   const [autoOrbit, setAutoOrbit] = useState(true);
   const [textureNote, setTextureNote] = useState<string | null>(null);
-  // Why satellite was abandoned, kept separate: switching to relief re-runs
-  // this effect, and the relief branch would otherwise overwrite the reason
-  // with its own generic note before anyone could read it.
+
   const [satelliteFailed, setSatelliteFailed] = useState<string | null>(null);
   const [loadingTexture, setLoadingTexture] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ---------- build the scene when the simulation or exaggeration changes ----
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !sim) return;
 
     const gl = canvas.getContext("webgl2", {
       antialias: true,
-      // Transparent clear so the space-theme backdrop behind the canvas shows
-      // through. premultipliedAlpha off keeps the blended water reading the
-      // same as it did against an opaque clear.
+
       alpha: true,
       premultipliedAlpha: false,
       depth: true,
@@ -373,25 +291,15 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       const demMin = sim.meta.dem_min;
       const demMax = sim.meta.dem_max;
       const dryOffsetM = dryOffsetFor(demMin, demMax);
-      // The skirt only has to reach below the deepest buried water at the
-      // boundary — its whole job is giving that water something to be hidden
-      // behind. Sizing it off the relief instead produced a plinth taller
-      // than the landscape on a high-relief scene like a canyon.
+
       const skirtDrop = dryOffsetM * 1.5 + 5;
-      const terrainY = terrainHeights(
-        sim.dem, mesh, exaggeration, demMin, skirtDrop
-      );
-      const normals = terrainNormals(
-        sim.dem, mesh, sim.ny, sim.nx, sim.meta.dx, exaggeration
-      );
+      const terrainY = terrainHeights(sim.dem, mesh, exaggeration, demMin, skirtDrop);
+      const normals = terrainNormals(sim.dem, mesh, sim.ny, sim.nx, sim.meta.dx, exaggeration);
       const dryOffset = dryOffsetM;
 
       const terrainProgram = link(gl, TERRAIN_VS, TERRAIN_FS);
       const waterProgram = link(gl, WATER_VS, WATER_FS);
 
-      // AllowSharedBufferSource, not BufferSource: the decoded arrays are
-      // views over a buffer TypeScript widens to ArrayBufferLike, and this is
-      // the overload WebGL actually exposes for them.
       const staticBuffer = (data: AllowSharedBufferSource) => {
         const buf = gl.createBuffer()!;
         gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -409,8 +317,12 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
 
       const bindAttrib = (
-        program: WebGLProgram, name: string, buffer: WebGLBuffer,
-        size: number, type: number, normalized = false
+        program: WebGLProgram,
+        name: string,
+        buffer: WebGLBuffer,
+        size: number,
+        type: number,
+        normalized = false
       ) => {
         const loc = gl.getAttribLocation(program, name);
         if (loc < 0) return;
@@ -419,7 +331,6 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
         gl.vertexAttribPointer(loc, size, type, normalized, 0, 0);
       };
 
-      // Terrain VAO — everything static.
       const vaoTerrain = gl.createVertexArray()!;
       gl.bindVertexArray(vaoTerrain);
       bindAttrib(terrainProgram, "aXZ", xzBuffer, 2, gl.FLOAT);
@@ -429,7 +340,6 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       bindAttrib(terrainProgram, "aSkirt", skirtBuffer, 1, gl.FLOAT);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
 
-      // Water VAO — height and colour are rewritten every frame.
       const waterY = new Float32Array(mesh.gridVertexCount);
       const waterRgba = new Uint8Array(mesh.gridVertexCount * 4);
       const waterYBuffer = gl.createBuffer()!;
@@ -449,17 +359,47 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
 
       const texture = gl.createTexture()!;
       gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA,
-        gl.UNSIGNED_BYTE, new Uint8Array([80, 90, 78, 255]));
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        1,
+        1,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        new Uint8Array([80, 90, 78, 255])
+      );
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
       scene = {
-        gl, terrainProgram, waterProgram, vaoTerrain, vaoWater, indexBuffer,
-        waterYBuffer, waterColorBuffer, texture, mesh, terrainY, waterY,
-        waterRgba, dryOffset,
+        gl,
+        terrainProgram,
+        waterProgram,
+        vaoTerrain,
+        vaoWater,
+        indexBuffer,
+        waterYBuffer,
+        waterColorBuffer,
+        texture,
+        mesh,
+        terrainY,
+        waterY,
+        waterRgba,
+        dryOffset,
+        buffers: [
+          xzBuffer,
+          uvBuffer,
+          normalBuffer,
+          terrainYBuffer,
+          skirtBuffer,
+          indexBuffer,
+          waterYBuffer,
+          waterColorBuffer,
+        ],
       };
       sceneRef.current = scene;
       setError(null);
@@ -468,7 +408,6 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       return;
     }
 
-    // Frame the whole domain.
     orbitRef.current = defaultOrbit(scene.mesh, sim, exaggeration);
     flyInRef.current = 0;
     clockRef.current = 0;
@@ -485,11 +424,22 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       g.deleteVertexArray(s.vaoTerrain);
       g.deleteVertexArray(s.vaoWater);
       g.deleteTexture(s.texture);
+      for (const b of s.buffers) g.deleteBuffer(b);
       sceneRef.current = null;
     };
   }, [sim, exaggeration]);
 
-  // ---------- basemap texture ------------------------------------------------
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onLost = (e: Event) => {
+      e.preventDefault();
+      setError("The graphics driver reset the 3D view. Close it and open it again.");
+    };
+    canvas.addEventListener("webglcontextlost", onLost);
+    return () => canvas.removeEventListener("webglcontextlost", onLost);
+  }, []);
+
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene || !sim) return;
@@ -511,27 +461,32 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       c.height = sim.ny;
       c.getContext("2d")?.putImageData(shade, 0, 0);
       upload(c);
-      setTextureNote(
-        satelliteFailed ?? "Shaded relief computed from the elevation model."
-      );
+      setTextureNote(satelliteFailed ?? "Shaded relief computed from the elevation model.");
       return;
     }
 
     if (basemap === "none") {
       gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA,
-        gl.UNSIGNED_BYTE, new Uint8Array([80, 90, 78, 255]));
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        1,
+        1,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        new Uint8Array([80, 90, 78, 255])
+      );
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       setTextureNote(null);
       dirtyRef.current = true;
       return;
     }
 
-    const url = satelliteUrl(
-      sim.meta.bbox ?? [], scene.mesh.widthM, scene.mesh.depthM
-    );
+    const url = satelliteUrl(sim.meta.bbox ?? [], scene.mesh.widthM, scene.mesh.depthM);
     if (!url) {
-      setSatelliteFailed("No Mapbox token configured — showing shaded relief.");
+      setSatelliteFailed("No Mapbox token configured. Showing shaded relief.");
       setBasemap("relief");
       return;
     }
@@ -550,8 +505,8 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
     img.onerror = () => {
       if (cancelled) return;
       setLoadingTexture(false);
-      // Falling back keeps the view usable rather than showing a blank drape.
-      setSatelliteFailed("Satellite imagery unavailable — showing shaded relief.");
+
+      setSatelliteFailed("Satellite imagery unavailable. Showing shaded relief.");
       setBasemap("relief");
     };
     img.src = url;
@@ -560,7 +515,6 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
     };
   }, [basemap, sim, satelliteFailed]);
 
-  // ---------- keep the frame index in a ref for the render loop --------------
   useEffect(() => {
     frameRef.current = frame;
     dirtyRef.current = true;
@@ -569,7 +523,6 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
     dirtyRef.current = true;
   }, [opacity, depthScaleM, showFlood, occlude]);
 
-  // ---------- render loop ----------------------------------------------------
   const render = useCallback(() => {
     rafRef.current = requestAnimationFrame(render);
     const scene = sceneRef.current;
@@ -586,9 +539,6 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       dirtyRef.current = true;
     }
 
-    // ---- time-driven motion --------------------------------------------
-    // Everything below runs off wall-clock delta rather than frame count, so
-    // the fly-in takes the same two seconds on a 60Hz and a 144Hz display.
     const now = performance.now();
     const dt = lastTickRef.current ? (now - lastTickRef.current) / 1000 : 0;
     lastTickRef.current = now;
@@ -597,25 +547,16 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
     if (!reduced) {
       clockRef.current += dt;
 
-      // Opening fly-in: ease the camera in from further out.
       if (flyInRef.current < 1) {
         flyInRef.current = Math.min(flyInRef.current + dt / FLY_IN_SECONDS, 1);
         dirtyRef.current = true;
       }
 
-      // Idle drift, once the viewer has left it alone for a moment. Any
-      // interaction pushes lastInput forward and stops this immediately.
-      if (
-        autoOrbit &&
-        flyInRef.current >= 1 &&
-        now - lastInputRef.current > IDLE_BEFORE_ORBIT_S * 1000
-      ) {
+      if (autoOrbit && flyInRef.current >= 1 && now - lastInputRef.current > IDLE_BEFORE_ORBIT_S * 1000) {
         orbitRef.current = orbitBy(orbit, IDLE_ORBIT_RATE * dt, 0);
         dirtyRef.current = true;
       }
 
-      // The shimmer is animated, so it needs a frame even when nothing else
-      // changed — but only while there is water on screen to shimmer.
       if (shimmer && showFlood && !fire) dirtyRef.current = true;
     }
 
@@ -624,16 +565,12 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
 
     const { gl, mesh } = scene;
 
-    // The fly-in only scales distance; the framed target is already correct,
-    // so easing the radius alone reads as a dolly rather than a swing.
     const live = orbitRef.current ?? orbit;
-    const flyScale =
-      1 + (FLY_IN_START_SCALE - 1) * (1 - easeOutCubic(flyInRef.current));
+    const flyScale = 1 + (FLY_IN_START_SCALE - 1) * (1 - easeOutCubic(flyInRef.current));
     const camera: OrbitState = { ...live, radius: live.radius * flyScale };
 
     gl.viewport(0, 0, canvas.width, canvas.height);
-    // Transparent clear: the space-theme gradient behind the canvas shows
-    // through, matching the globe rather than sitting on a flat slab.
+
     gl.clearColor(0, 0, 0, 0);
     gl.clearDepth(1);
     gl.enable(gl.DEPTH_TEST);
@@ -645,44 +582,32 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
     const vp = viewProjection(camera, canvas.width / Math.max(canvas.height, 1));
     const eye = eyePosition(camera);
 
-    // --- terrain ---
     gl.useProgram(scene.terrainProgram);
-    gl.uniformMatrix4fv(
-      gl.getUniformLocation(scene.terrainProgram, "uViewProj"), false, vp
-    );
-    gl.uniform3f(
-      gl.getUniformLocation(scene.terrainProgram, "uLightDir"), -0.6, 0.72, -0.35
-    );
-    gl.uniform1f(
-      gl.getUniformLocation(scene.terrainProgram, "uHasTexture"),
-      basemap === "none" ? 0 : 1
-    );
+    gl.uniformMatrix4fv(gl.getUniformLocation(scene.terrainProgram, "uViewProj"), false, vp);
+    gl.uniform3f(gl.getUniformLocation(scene.terrainProgram, "uLightDir"), -0.6, 0.72, -0.35);
+    gl.uniform1f(gl.getUniformLocation(scene.terrainProgram, "uHasTexture"), basemap === "none" ? 0 : 1);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, scene.texture);
     gl.uniform1i(gl.getUniformLocation(scene.terrainProgram, "uTexture"), 0);
     gl.bindVertexArray(scene.vaoTerrain);
-    gl.drawElements(gl.TRIANGLES, mesh.indexCount, gl.UNSIGNED_INT, 0);   // + skirt
+    gl.drawElements(gl.TRIANGLES, mesh.indexCount, gl.UNSIGNED_INT, 0);
 
-    // --- water ---
     if (showFlood) {
       if (fire) {
-        // A fire has no frames: the scrubber position is a time, and the
-        // surface is a threshold of the one arrival-time grid.
-        const minutes = fire.times[
-          Math.min(frameRef.current, fire.times.length - 1)
-        ];
+        const minutes = fire.times[Math.min(frameRef.current, fire.times.length - 1)];
         burnHeights(
-          fire, minutes, scene.terrainY, exaggeration,
-          scene.dryOffset, fire.meta.dem_max - fire.meta.dem_min,
+          fire,
+          minutes,
+          scene.terrainY,
+          exaggeration,
+          scene.dryOffset,
+          fire.meta.dem_max - fire.meta.dem_min,
           scene.waterY
         );
         burnColors(fire, minutes, frontMinutes, scene.waterRgba);
       } else if (flood) {
-      waterHeights(
-        flood, frameRef.current, scene.terrainY, exaggeration,
-        scene.dryOffset, scene.waterY
-      );
-      waterColors(flood, frameRef.current, depthScaleM, scene.waterRgba);
+        waterHeights(flood, frameRef.current, scene.terrainY, exaggeration, scene.dryOffset, scene.waterY);
+        waterColors(flood, frameRef.current, depthScaleM, scene.waterRgba);
       }
       gl.bindBuffer(gl.ARRAY_BUFFER, scene.waterYBuffer);
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, scene.waterY);
@@ -690,37 +615,23 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, scene.waterRgba);
 
       gl.useProgram(scene.waterProgram);
-      gl.uniformMatrix4fv(
-        gl.getUniformLocation(scene.waterProgram, "uViewProj"), false, vp
-      );
-      gl.uniform1f(
-        gl.getUniformLocation(scene.waterProgram, "uOpacity"), opacity
-      );
-      gl.uniform1f(
-        gl.getUniformLocation(scene.waterProgram, "uTime"), clockRef.current
-      );
+      gl.uniformMatrix4fv(gl.getUniformLocation(scene.waterProgram, "uViewProj"), false, vp);
+      gl.uniform1f(gl.getUniformLocation(scene.waterProgram, "uOpacity"), opacity);
+      gl.uniform1f(gl.getUniformLocation(scene.waterProgram, "uTime"), clockRef.current);
       gl.uniform1f(
         gl.getUniformLocation(scene.waterProgram, "uShimmer"),
         shimmer && !reduced && !fire ? 1 : 0
       );
-      gl.uniform3f(
-        gl.getUniformLocation(scene.waterProgram, "uCameraPos"),
-        eye[0], eye[1], eye[2]
-      );
-      gl.uniform1f(
-        gl.getUniformLocation(scene.waterProgram, "uCellSize"), sim.meta.dx
-      );
+      gl.uniform3f(gl.getUniformLocation(scene.waterProgram, "uCameraPos"), eye[0], eye[1], eye[2]);
+      gl.uniform1f(gl.getUniformLocation(scene.waterProgram, "uCellSize"), sim.meta.dx);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      // Depth *test* on so ridges hide the water behind them; depth *write*
-      // off so the translucent surface does not occlude itself. Turning the
-      // test off is the "occlude behind terrain" toggle: the full modelled
-      // extent then shows through the landscape.
+
       if (occlude) gl.enable(gl.DEPTH_TEST);
       else gl.disable(gl.DEPTH_TEST);
       gl.depthMask(false);
       gl.bindVertexArray(scene.vaoWater);
-      // Surface triangles only — the skirt is terrain, not water.
+
       gl.drawElements(gl.TRIANGLES, mesh.gridIndexCount, gl.UNSIGNED_INT, 0);
       gl.depthMask(true);
       gl.enable(gl.DEPTH_TEST);
@@ -729,8 +640,18 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
 
     gl.bindVertexArray(null);
   }, [
-    sim, flood, fire, basemap, showFlood, opacity, depthScaleM, exaggeration,
-    occlude, shimmer, autoOrbit, frontMinutes,
+    sim,
+    flood,
+    fire,
+    basemap,
+    showFlood,
+    opacity,
+    depthScaleM,
+    exaggeration,
+    occlude,
+    shimmer,
+    autoOrbit,
+    frontMinutes,
   ]);
 
   useEffect(() => {
@@ -738,7 +659,6 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
     return () => cancelAnimationFrame(rafRef.current);
   }, [render]);
 
-  // ---------- orbit interaction ---------------------------------------------
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -780,9 +700,7 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       const span = sceneRef.current
         ? Math.max(sceneRef.current.mesh.widthM, sceneRef.current.mesh.depthM)
         : 1000;
-      orbitRef.current = dollyBy(
-        orbitRef.current, Math.exp(e.deltaY * 0.0012), span * 0.18, span * 6
-      );
+      orbitRef.current = dollyBy(orbitRef.current, Math.exp(e.deltaY * 0.0012), span * 0.18, span * 6);
       dirtyRef.current = true;
     };
 
@@ -816,14 +734,8 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      // Above the floating panels (z-40): this is a full-screen mode, not an
-      // overlay, and its own controls duplicate everything the tools panel
-      // offers. The scrubber sits above it at z-50 so playback stays reachable.
       className="absolute inset-0 z-[45] bg-bg"
     >
-      {/* Space-theme backdrop, so entering the 3D view feels like the same
-          product as the globe rather than a flat slab behind a mesh. The
-          canvas clears transparent and composites over this. */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -839,13 +751,10 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
 
       {error && (
         <div className="absolute inset-0 grid place-items-center px-6">
-          <p className="max-w-sm text-center text-xs text-amber leading-relaxed">
-            {error}
-          </p>
+          <p className="max-w-sm text-center text-xs text-amber leading-relaxed">{error}</p>
         </div>
       )}
 
-      {/* Title block */}
       <div className="absolute left-5 top-5 z-10 max-w-[22rem] rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel px-4 py-3">
         <span className="inline-flex items-center gap-1.5 rounded-md bg-amber/15 ring-1 ring-amber/40 px-2 py-[3px] font-mono text-[9px] tracking-[0.18em] text-amber">
           <Waves size={10} />
@@ -855,8 +764,8 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
           {sim.meta.scene_name ?? (fire ? "Wildfire simulation" : "Flood simulation")}
         </h2>
         <p className="font-mono text-[10px] text-dim mt-0.5">
-          {sim.nx}×{sim.ny} @ {sim.meta.dx.toFixed(0)} m ·{" "}
-          {(sim.meta.dem_min ?? 0).toFixed(0)}–{(sim.meta.dem_max ?? 0).toFixed(0)} m
+          {sim.nx}×{sim.ny} @ {sim.meta.dx.toFixed(0)} m · {(sim.meta.dem_min ?? 0).toFixed(0)}–
+          {(sim.meta.dem_max ?? 0).toFixed(0)} m
         </p>
         <p className="text-[10px] text-dim leading-relaxed mt-1.5">
           {fire
@@ -865,13 +774,15 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
         </p>
       </div>
 
-      {/* Controls */}
       <div className="absolute right-5 top-5 z-10 w-[16.5rem] rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-3.5 space-y-3">
         <div className="flex items-center justify-between">
-          <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
-            3D VIEW
-          </span>
-          <button onClick={onClose} className="text-dim hover:text-ink" title="Exit 3D view">
+          <span className="font-mono text-[10px] tracking-[0.2em] text-dim">3D VIEW</span>
+          <button
+            onClick={onClose}
+            className="text-dim hover:text-ink"
+            aria-label="Exit 3D view"
+            title="Exit 3D view"
+          >
             <X size={15} />
           </button>
         </div>
@@ -882,9 +793,7 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
               key={b}
               onClick={() => setBasemap(b)}
               className={`flex-1 h-8 rounded-lg text-[11px] capitalize ring-1 transition ${
-                basemap === b
-                  ? "bg-raised text-teal ring-teal/50"
-                  : "text-dim ring-line hover:text-ink"
+                basemap === b ? "bg-raised text-teal ring-teal/50" : "text-dim ring-line hover:text-ink"
               }`}
             >
               {b === "none" ? "Plain" : b}
@@ -897,9 +806,7 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
             loading imagery…
           </p>
         )}
-        {textureNote && (
-          <p className="text-[10px] text-dim leading-snug">{textureNote}</p>
-        )}
+        {textureNote && <p className="text-[10px] text-dim leading-snug">{textureNote}</p>}
 
         <Toggle
           icon={fire ? Flame : Waves}
@@ -913,17 +820,9 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
           on={occlude}
           onClick={() => setOcclude(!occlude)}
         />
-        {/* The shimmer is a water surface treatment — a travelling ripple and
-            a grazing-angle sheen. Both are specific to a liquid surface, so
-            the toggle is hidden rather than relabelled for a fire, where it
-            would make the burn read as wet. */}
+
         {!fire && (
-          <Toggle
-            icon={Sparkles}
-            label="Water shimmer"
-            on={shimmer}
-            onClick={() => setShimmer(!shimmer)}
-          />
+          <Toggle icon={Sparkles} label="Water shimmer" on={shimmer} onClick={() => setShimmer(!shimmer)} />
         )}
         <Toggle
           icon={Orbit}
@@ -1001,7 +900,6 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      {/* Interaction hint */}
       <div className="absolute left-5 bottom-5 z-10 flex items-center gap-3 rounded-xl bg-surface/80 backdrop-blur ring-1 ring-line px-3 py-2 font-mono text-[10px] text-dim">
         <span className="flex items-center gap-1.5">
           <Compass size={11} /> drag to orbit
@@ -1018,9 +916,15 @@ export default function SimulationView3D({ onClose }: { onClose: () => void }) {
 }
 
 function Toggle({
-  icon: Icon, label, on, onClick,
+  icon: Icon,
+  label,
+  on,
+  onClick,
 }: {
-  icon: typeof Waves; label: string; on: boolean; onClick: () => void;
+  icon: typeof Waves;
+  label: string;
+  on: boolean;
+  onClick: () => void;
 }) {
   return (
     <button
@@ -1039,10 +943,21 @@ function Toggle({
 }
 
 function Range({
-  label, value, min, max, step, display, onChange,
+  label,
+  value,
+  min,
+  max,
+  step,
+  display,
+  onChange,
 }: {
-  label: string; value: number; min: number; max: number; step: number;
-  display: string; onChange: (v: number) => void;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  display: string;
+  onChange: (v: number) => void;
 }) {
   return (
     <label className="block space-y-1">

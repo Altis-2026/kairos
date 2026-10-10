@@ -1,4 +1,3 @@
-/** Layer management: visibility, opacity, removal, base style, overlays. */
 import { useState } from "react";
 import { AlertTriangle, Eye, EyeOff, Loader2, Trash2, X } from "lucide-react";
 import { motion } from "framer-motion";
@@ -9,7 +8,6 @@ import { panelShell } from "../../lib/responsive";
 const EVENTS_LAYER_ID = "historical-events";
 
 export default function LayerPanel({ onClose }: { onClose: () => void }) {
-  // Compare/timeline frames are managed by their own floating controls.
   const layers = useMapStore((s) => s.layers.filter((l) => !l.group));
   const pointLayers = useMapStore((s) => s.pointLayers);
   const baseStyle = useMapStore((s) => s.baseStyle);
@@ -65,29 +63,22 @@ export default function LayerPanel({ onClose }: { onClose: () => void }) {
     <motion.aside
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={`${panelShell(
-        "lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-80"
-      )} space-y-4`}
+      className={`${panelShell("lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-80")} space-y-4`}
     >
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
-          LAYERS
-        </span>
-        <button onClick={onClose} className="text-dim hover:text-ink" title="Close">
+        <span className="font-mono text-[10px] tracking-[0.2em] text-dim">LAYERS</span>
+        <button onClick={onClose} className="text-dim hover:text-ink" aria-label="Close" title="Close">
           <X size={15} />
         </button>
       </div>
 
-      {/* Base style */}
       <div className="flex gap-2">
         {(["satellite", "dark", "terrain"] as const).map((s) => (
           <button
             key={s}
             onClick={() => setBaseStyle(s)}
             className={`flex-1 h-9 rounded-lg text-xs capitalize transition ring-1 ${
-              baseStyle === s
-                ? "bg-raised text-teal ring-teal/50"
-                : "text-dim ring-line hover:text-ink"
+              baseStyle === s ? "bg-raised text-teal ring-teal/50" : "text-dim ring-line hover:text-ink"
             }`}
           >
             {s}
@@ -95,49 +86,36 @@ export default function LayerPanel({ onClose }: { onClose: () => void }) {
         ))}
       </div>
 
-      {/* Context overlays */}
       <div className="space-y-1.5">
         <button
           onClick={toggleHistoricalEvents}
           disabled={eventsBusy}
           className={`w-full flex items-center gap-2.5 rounded-xl ring-1 px-3 py-2.5 text-left transition disabled:opacity-60 ${
-            eventsOn
-              ? "bg-raised text-amber ring-amber/50"
-              : "bg-bg/70 text-dim ring-line hover:text-ink"
+            eventsOn ? "bg-raised text-amber ring-amber/50" : "bg-bg/70 text-dim ring-line hover:text-ink"
           }`}
+          aria-label="Show past floods, fires and storms near this view (NASA EONET)"
           title="Show past floods, fires and storms near this view (NASA EONET)"
         >
           <span className={eventsOn ? "text-amber" : "text-dim"}>
-            {eventsBusy ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <AlertTriangle size={14} />
-            )}
+            {eventsBusy ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
           </span>
           <span className="min-w-0">
             <span className="block text-xs text-ink">Historical disasters</span>
-            <span className="block text-[10px] text-dim leading-tight">
-              Past events in view · NASA EONET
-            </span>
+            <span className="block text-[10px] text-dim leading-tight">Past events in view · NASA EONET</span>
           </span>
           <span
-            className={`ml-auto font-mono text-[9px] tracking-wider ${
-              eventsOn ? "text-amber" : "text-dim"
-            }`}
+            className={`ml-auto font-mono text-[9px] tracking-wider ${eventsOn ? "text-amber" : "text-dim"}`}
           >
             {eventsOn ? "ON" : "OFF"}
           </span>
         </button>
-        {eventsNote && (
-          <p className="text-[10px] text-dim leading-snug px-1">{eventsNote}</p>
-        )}
+        {eventsNote && <p className="text-[10px] text-dim leading-snug px-1">{eventsNote}</p>}
       </div>
 
-      {/* Analysis layers */}
       {layers.length === 0 ? (
         <p className="text-xs text-dim leading-relaxed">
-          No analysis layers yet. Run an analysis from the sidebar or ask a
-          question below — results appear here.
+          No analysis layers yet. Run an analysis from the sidebar or ask a question below, results appear
+          here.
         </p>
       ) : (
         <ul className="space-y-3 max-h-72 overflow-y-auto">
@@ -145,16 +123,14 @@ export default function LayerPanel({ onClose }: { onClose: () => void }) {
             <li key={l.id} className="rounded-xl bg-bg/70 ring-1 ring-line p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 text-xs text-ink truncate">
-                  <span
-                    className="h-2 w-2 rounded-full shrink-0"
-                    style={{ background: l.color }}
-                  />
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: l.color }} />
                   {l.name}
                 </span>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => toggleLayerVisible(l.id)}
                     className="text-dim hover:text-ink"
+                    aria-label={l.visible ? "Hide layer" : "Show layer"}
                     title={l.visible ? "Hide layer" : "Show layer"}
                   >
                     {l.visible ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -162,6 +138,7 @@ export default function LayerPanel({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => removeLayer(l.id)}
                     className="text-dim hover:text-ink"
+                    aria-label="Remove layer"
                     title="Remove layer"
                   >
                     <Trash2 size={14} />

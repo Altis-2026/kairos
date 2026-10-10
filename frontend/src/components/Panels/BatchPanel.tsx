@@ -1,30 +1,10 @@
-/**
- * Bulk / CSV batch mode — run many sites at once.
- *
- * Paste or upload a CSV of locations + date windows, run them all through the
- * normal analysis pipeline with live progress, then export the results table.
- * Click any finished row to drop its result on the globe.
- */
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Download,
-  FileSpreadsheet,
-  Loader2,
-  Play,
-  Upload,
-  X,
-} from "lucide-react";
+import { Download, FileSpreadsheet, Loader2, Play, Upload, X } from "lucide-react";
 import { fetchRegistry } from "../../api/registry";
 import { useMapStore } from "../../stores/mapStore";
-import {
-  BATCH_TEMPLATE,
-  batchResultsToCsv,
-  parseBatchCsv,
-  runBatch,
-  type BatchRow,
-} from "../../lib/batch";
+import { BATCH_TEMPLATE, batchResultsToCsv, parseBatchCsv, runBatch, type BatchRow } from "../../lib/batch";
 import { panelShell } from "../../lib/responsive";
 
 const STATUS_STYLE: Record<string, string> = {
@@ -46,10 +26,7 @@ export default function BatchPanel({ onClose }: { onClose: () => void }) {
     queryFn: fetchRegistry,
     staleTime: Infinity,
   });
-  const validTypes = useMemo(
-    () => new Set((registry ?? []).map((r) => r.id)),
-    [registry]
-  );
+  const validTypes = useMemo(() => new Set((registry ?? []).map((r) => r.id)), [registry]);
 
   const done = rows.filter((r) => r.status !== "pending" && r.status !== "running");
   const okCount = rows.filter((r) => r.status === "ok").length;
@@ -61,9 +38,7 @@ export default function BatchPanel({ onClose }: { onClose: () => void }) {
       .filter((i) => validTypes.size > 0 && !validTypes.has(i.analysis_type))
       .map((i) => `Unknown analysis_type "${i.analysis_type}" for ${i.label}.`);
     setParseErrors([...errors, ...extra]);
-    setRows(
-      inputs.map((input, idx) => ({ id: idx, input, status: "pending" as const }))
-    );
+    setRows(inputs.map((input, idx) => ({ id: idx, input, status: "pending" as const })));
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -124,15 +99,13 @@ export default function BatchPanel({ onClose }: { onClose: () => void }) {
     <motion.aside
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={`${panelShell(
-        "lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-96"
-      )} space-y-3`}
+      className={`${panelShell("lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-96")} space-y-3`}
     >
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-dim">
           <FileSpreadsheet size={12} /> BATCH MODE
         </span>
-        <button onClick={onClose} className="text-dim hover:text-ink" title="Close">
+        <button onClick={onClose} className="text-dim hover:text-ink" aria-label="Close" title="Close">
           <X size={15} />
         </button>
       </div>
@@ -184,11 +157,7 @@ export default function BatchPanel({ onClose }: { onClose: () => void }) {
               disabled={running}
               className="flex-1 h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 bg-amber text-bg font-medium hover:brightness-110 transition disabled:opacity-60"
             >
-              {running ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <Play size={13} />
-              )}
+              {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
               {running
                 ? `Running ${done.length}/${rows.length}…`
                 : `Run ${rows.length} ${rows.length === 1 ? "site" : "sites"}`}
@@ -196,6 +165,7 @@ export default function BatchPanel({ onClose }: { onClose: () => void }) {
             <button
               onClick={downloadResults}
               disabled={okCount === 0 && done.length === 0}
+              aria-label="Download results as CSV"
               title="Download results as CSV"
               className="h-9 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
             >
@@ -214,9 +184,7 @@ export default function BatchPanel({ onClose }: { onClose: () => void }) {
                 title={r.status === "ok" ? "Click to view on the globe" : r.error}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-ink truncate">
-                    {r.input.label}
-                  </span>
+                  <span className="text-[11px] text-ink truncate">{r.input.label}</span>
                   <span
                     className={`font-mono text-[9px] uppercase tracking-wider shrink-0 ${
                       STATUS_STYLE[r.status] ?? "text-dim"

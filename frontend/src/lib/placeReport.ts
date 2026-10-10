@@ -13,11 +13,7 @@ export interface ReportInput {
 }
 
 function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 const LEVEL_COLOR: Record<string, string> = {
@@ -33,15 +29,9 @@ function outlookBlock(o: RiskOutlook): string {
   const peaks = o.seasonal.peak_months.length
     ? `<p class="meta">Peak months: ${escapeHtml(o.seasonal.peak_months.join(", "))}</p>`
     : "";
-  const trend = o.trend
-    ? `<p class="meta">Trend test: ${escapeHtml(o.trend.summary)}</p>`
-    : "";
-  const drivers = o.drivers
-    .map((d) => `<li>${escapeHtml(d)}</li>`)
-    .join("");
-  const before = (PLAYBOOKS[o.hazard]?.before ?? [])
-    .map((t) => `<li>${escapeHtml(t)}</li>`)
-    .join("");
+  const trend = o.trend ? `<p class="meta">Trend test: ${escapeHtml(o.trend.summary)}</p>` : "";
+  const drivers = o.drivers.map((d) => `<li>${escapeHtml(d)}</li>`).join("");
+  const before = (PLAYBOOKS[o.hazard]?.before ?? []).map((t) => `<li>${escapeHtml(t)}</li>`).join("");
 
   return `
     <section class="hazard">
@@ -80,9 +70,7 @@ export function buildPlaceReport(input: ReportInput): string {
 
   const outlooks = (input.outlooks ?? []).map(outlookBlock).join("");
 
-  const highest = (input.outlooks ?? [])
-    .slice()
-    .sort((a, b) => b.score - a.score)[0];
+  const highest = (input.outlooks ?? []).slice().sort((a, b) => b.score - a.score)[0];
 
   const headline = highest
     ? `The biggest measured exposure here is ${(
@@ -146,11 +134,7 @@ export function buildPlaceReport(input: ReportInput): string {
 
 ${headline ? `<p class="headline">${escapeHtml(headline)}</p>` : ""}
 
-${
-  scanRows
-    ? `<h2>What the satellites see right now</h2><table>${scanRows}</table>`
-    : ""
-}
+${scanRows ? `<h2>What the satellites see right now</h2><table>${scanRows}</table>` : ""}
 
 ${outlooks ? `<h2>Long-term exposure</h2>${outlooks}` : ""}
 

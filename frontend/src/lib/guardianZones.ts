@@ -1,21 +1,12 @@
-/**
- * Kairos Guardian — curated watch zones.
- *
- * Real, well-documented regions where illegal mining, clearing or fishing is a
- * known public-interest concern. Guardian runs the matching Sentinel-1 analysis
- * over each zone and asks people to help vet what the radar flags. This is an
- * environmental-transparency tool: it surfaces candidate activity for human
- * review, never an accusation about any individual.
- */
 import type { BBox } from "../types/map";
 
 export interface GuardianZone {
   id: string;
   name: string;
   country: string;
-  /** What's at stake here, in one line. */
+
   brief: string;
-  /** What the radar looks for. */
+
   watchingFor: string;
   analysisType: string;
   bbox: BBox;
@@ -55,7 +46,7 @@ export const GUARDIAN_ZONES: GuardianZone[] = [
     name: "Central Kalimantan",
     country: "Indonesia",
     brief:
-      "Borneo's peat rainforest is cleared for palm oil and timber — often " +
+      "Borneo's peat rainforest is cleared for palm oil and timber, often " +
       "illegally and under haze that hides it from optical satellites.",
     watchingFor: "Recent forest loss against a 12-month baseline",
     analysisType: "deforestation",

@@ -1,37 +1,18 @@
-/**
- * Forward-simulation view state, for both the flood and wildfire models.
- *
- * Kept separate from mapStore because a simulation is a fundamentally
- * different kind of thing from an analysis layer: it is a time series of
- * modelled fields rather than a single observed raster, and — the part that
- * matters — it is NOT an observation. Keeping it in its own store means no
- * code path can accidentally treat a simulated frame as one of the SAR
- * detection layers.
- */
 import { create } from "zustand";
 import { suggestedDepthScaleM } from "../lib/simulation";
 import type { DecodedFire, DecodedSimulation } from "../types/simulation";
 
 export type SimStatus = "idle" | "running" | "ready" | "error";
 
-/** Playback rates offered by the scrubber. */
 export const SPEEDS = [0.5, 1, 2, 4] as const;
 
 interface SimulationState {
   sim: DecodedSimulation | null;
-  /**
-   * The wildfire solve, held alongside rather than in a union with `sim`.
-   *
-   * Only one is ever non-null: loading either clears the other. Separate
-   * fields rather than a tagged union because every existing consumer of
-   * `sim` reads flood-shaped fields directly, and a union would make each of
-   * them narrow first — a large change to code that is already correct, for
-   * no behaviour a runtime invariant does not already give.
-   */
+
   fire: DecodedFire | null;
   status: SimStatus;
   error: string | null;
-  /** What the backend is doing right now, for the running state. */
+
   progressNote: string | null;
 
   frame: number;
@@ -40,12 +21,12 @@ interface SimulationState {
 
   showFlood: boolean;
   showTerrain: boolean;
-  /** Minutes behind the fire front still drawn as actively burning. */
+
   frontMinutes: number;
-  /** The 3D view is a mode, not an overlay — see SimulationView3D. */
+
   view3d: boolean;
   opacity: number;
-  /** Depth (m) mapped to the top of the colour ramp. */
+
   depthScaleM: number;
 
   setStatus: (status: SimStatus, error?: string | null) => void;
@@ -98,9 +79,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       progressNote: null,
       frame: 0,
       playing: true,
-      // Scale the ramp to the depths that actually cover ground, not to the
-      // single deepest cell — otherwise every scene renders as flat blue with
-      // one magenta pixel. The slider still reaches the true peak.
+
       depthScaleM: suggestedDepthScaleM(sim),
     }),
 
@@ -142,8 +121,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
   setPlaying: (playing) => set({ playing }),
   togglePlaying: () => set((s) => ({ playing: !s.playing })),
-  cycleSpeed: () =>
-    set((s) => ({ speed: SPEEDS[(SPEEDS.indexOf(s.speed as 1) + 1) % SPEEDS.length] })),
+  cycleSpeed: () => set((s) => ({ speed: SPEEDS[(SPEEDS.indexOf(s.speed as 1) + 1) % SPEEDS.length] })),
 
   setView3d: (view3d) => set({ view3d }),
   setShowFlood: (showFlood) => set({ showFlood }),

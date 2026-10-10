@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import type { BBox } from "../types/map";
 
-/** A saved analysis ("case") persisted per signed-in user in Firestore. */
 export interface SavedCase {
   id: string;
   userId: string;
@@ -33,8 +32,7 @@ export const useCasesStore = create<CasesState>((set) => ({
   loading: false,
   error: null,
   setCases: (cases) => set({ cases }),
-  addCase: (c) =>
-    set((s) => ({ cases: [c, ...s.cases.filter((x) => x.id !== c.id)] })),
+  addCase: (c) => set((s) => ({ cases: [c, ...s.cases.filter((x) => x.id !== c.id)] })),
   removeCase: (id) => set((s) => ({ cases: s.cases.filter((c) => c.id !== id) })),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),

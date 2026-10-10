@@ -1,38 +1,10 @@
-/**
- * Playback control for a flood simulation.
- *
- * Floats above the chat bar and owns the time axis: play/pause, speed, a
- * scrubbable track, and the live readouts for the frame on screen.
- *
- * The SIMULATED badge is not decoration. This panel is the one piece of UI
- * that is always on screen while a modelled event is being displayed, so it is
- * where the observed/simulated distinction has to be impossible to miss —
- * hence the amber pill, the explicit wording, and the disclosure line rather
- * than a subtle colour cue someone could read past.
- */
 import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import {
-  Box,
-  Flame,
-  Gauge,
-  Pause,
-  Play,
-  SkipBack,
-  SkipForward,
-  Waves,
-  X,
-} from "lucide-react";
+import { Box, Flame, Gauge, Pause, Play, SkipBack, SkipForward, Waves, X } from "lucide-react";
 import { useSimulationStore } from "../../stores/simulationStore";
 import { burnColour, burnedHectares, frontFlameLength } from "../../lib/fire";
-import {
-  depthColor,
-  formatElapsed,
-  frameAreaKm2,
-  framePeakM,
-} from "../../lib/simulation";
+import { depthColor, formatElapsed, frameAreaKm2, framePeakM } from "../../lib/simulation";
 
-/** Wall-clock milliseconds per frame at 1x. */
 const FRAME_MS = 220;
 
 export default function SimulationScrubber() {
@@ -51,13 +23,6 @@ export default function SimulationScrubber() {
   const view3d = useSimulationStore((s) => s.view3d);
   const setView3d = useSimulationStore((s) => s.setView3d);
 
-  // The two forward models expose different quantities, so everything below
-  // the header reads from one shape that each fills in: a per-frame series
-  // for the sparkline, and two live readouts. Branching here rather than
-  // throughout the JSX keeps one scrubber rather than two near-copies.
-  //
-  // Per-frame peak depth, for the sparkline and the readout. Computed once
-  // per simulation — it is a full pass over every cell of every frame.
   const peaks = useMemo(() => {
     if (!sim) return [] as number[];
     return Array.from({ length: sim.frames }, (_, i) => framePeakM(sim, i));
@@ -68,8 +33,6 @@ export default function SimulationScrubber() {
     return Array.from({ length: sim.frames }, (_, i) => frameAreaKm2(sim, i));
   }, [sim]);
 
-  // Playback loop.
-  // Fire series: burned hectares and the flame length at the live front.
   const fireSeries = useMemo(() => {
     if (!fire) return { area: [] as number[], flame: [] as number[] };
     return {
@@ -79,13 +42,12 @@ export default function SimulationScrubber() {
   }, [fire, frontMinutes]);
 
   useEffect(() => {
-    if (!playing || !sim && !fire) return;
+    if (!playing || (!sim && !fire)) return;
     const id = setInterval(() => {
       const s = useSimulationStore.getState();
       const frames = s.sim?.frames ?? s.fire?.frames;
       if (!frames) return;
-      // Loop rather than stop: a flood that rises and drains reads best on
-      // repeat, and stopping dead on the last frame hides the recession.
+
       s.setFrame((s.frame + 1) % frames);
     }, FRAME_MS / speed);
     return () => clearInterval(id);
@@ -96,13 +58,12 @@ export default function SimulationScrubber() {
   const isFire = !!fire;
   const solve = (sim ?? fire)!;
 
-  // One shape, filled in by whichever model is loaded.
   const track = isFire
     ? {
         title: fire!.meta.scene_name ?? "Wildfire simulation",
         grid: `${fire!.nx}×${fire!.ny} @ ${fire!.meta.dx.toFixed(0)}m`,
         series: fireSeries.area,
-        // Elapsed is already minutes for a fire; formatElapsed takes seconds.
+
         elapsedSeconds: (fire!.times[frame] ?? 0) * 60,
         totalSeconds: (fire!.durationMin ?? 0) * 60,
         headline: {
@@ -140,20 +101,14 @@ export default function SimulationScrubber() {
       };
 
   const seriesMax = Math.max(...track.series, 0.001);
-  const peakNow = peaks[frame] ?? 0;
-  const areaNow = areas[frame] ?? 0;
-  const scenePeak = Math.max(...peaks, 0.001);
   const progress = solve.frames > 1 ? frame / (solve.frames - 1) : 0;
 
-  // Sparkline geometry over the peak-depth series.
   const W = 100;
   const H = 22;
   const points = track.series
     .map((p, i) => {
       const x = track.series.length === 1 ? 0 : (i / (track.series.length - 1)) * W;
-      // Normalised against this track's own maximum, not the flood peak.
-      // A fire's series is hectares in the thousands; dividing it by a depth
-      // in metres sent the whole polyline off the top of the viewBox.
+
       const y = H - (p / seriesMax) * H;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
@@ -161,34 +116,25 @@ export default function SimulationScrubber() {
 
   return (
     <motion.div
-      // The horizontal centring lives in the animation, not in a
-      // `-translate-x-1/2` class: framer-motion writes its own inline
-      // `transform` for the y animation, which silently overrides the
-      // Tailwind translate and leaves the panel half a width to the right —
-      // far enough to sit under the tools panel.
       initial={{ opacity: 0, y: 16, x: "-50%" }}
       animate={{ opacity: 1, y: 0, x: "-50%" }}
       exit={{ opacity: 0, y: 16, x: "-50%" }}
       transition={{ type: "spring", stiffness: 320, damping: 32 }}
       className="absolute bottom-24 left-1/2 z-50 w-[640px] max-w-[94vw] rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel px-4 py-3 pointer-events-auto"
     >
-      {/* Header — badge, scene, close */}
       <div className="flex items-center gap-2.5 mb-3">
         <span className="inline-flex items-center gap-1.5 rounded-md bg-amber/15 ring-1 ring-amber/40 px-2 py-[3px] font-mono text-[9px] tracking-[0.18em] text-amber shrink-0">
           {isFire ? <Flame size={10} /> : <Waves size={10} />}
           SIMULATED
         </span>
         <span className="text-xs text-ink truncate min-w-0">{track.title}</span>
-        <span className="font-mono text-[10px] text-dim shrink-0 hidden sm:inline">
-          {track.grid}
-        </span>
+        <span className="font-mono text-[10px] text-dim shrink-0 hidden sm:inline">{track.grid}</span>
         <button
           onClick={() => setView3d(!view3d)}
           className={`ml-auto shrink-0 h-6 px-2 rounded-md ring-1 font-mono text-[9px] tracking-wider transition ${
-            view3d
-              ? "bg-teal text-bg ring-teal"
-              : "text-dim ring-line hover:text-ink hover:ring-teal/50"
+            view3d ? "bg-teal text-bg ring-teal" : "text-dim ring-line hover:text-ink hover:ring-teal/50"
           }`}
+          aria-label={view3d ? "Back to the globe" : "Open the 3D terrain view"}
           title={view3d ? "Back to the globe" : "Open the 3D terrain view"}
         >
           <span className="inline-flex items-center gap-1">
@@ -199,6 +145,7 @@ export default function SimulationScrubber() {
         <button
           onClick={clearSimulation}
           className="text-dim hover:text-ink transition-colors shrink-0"
+          aria-label="Close simulation"
           title="Close simulation"
         >
           <X size={15} />
@@ -206,7 +153,6 @@ export default function SimulationScrubber() {
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Transport controls */}
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => {
@@ -214,6 +160,7 @@ export default function SimulationScrubber() {
               stepFrame(-1);
             }}
             className="h-7 w-7 grid place-items-center rounded-lg text-dim hover:text-ink transition-colors"
+            aria-label="Previous frame"
             title="Previous frame"
           >
             <SkipBack size={13} />
@@ -221,6 +168,7 @@ export default function SimulationScrubber() {
           <button
             onClick={togglePlaying}
             className="h-10 w-10 grid place-items-center rounded-xl bg-teal text-bg hover:brightness-110 transition shadow-glow"
+            aria-label={playing ? "Pause" : "Play"}
             title={playing ? "Pause" : "Play"}
           >
             {playing ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
@@ -231,14 +179,13 @@ export default function SimulationScrubber() {
               stepFrame(1);
             }}
             className="h-7 w-7 grid place-items-center rounded-lg text-dim hover:text-ink transition-colors"
+            aria-label="Next frame"
             title="Next frame"
           >
             <SkipForward size={13} />
           </button>
         </div>
 
-        {/* Track — styled rail with an invisible range input over it, so it
-            looks designed but still drags and takes arrow keys natively. */}
         <div className="flex-1 min-w-0">
           <div className="relative h-6 flex items-center">
             <div className="absolute inset-x-0 h-[5px] rounded-full bg-bg ring-1 ring-line overflow-hidden">
@@ -247,7 +194,7 @@ export default function SimulationScrubber() {
                 style={{ width: `${progress * 100}%` }}
               />
             </div>
-            {/* Frame ticks */}
+
             <div className="absolute inset-x-0 flex justify-between pointer-events-none px-[1px]">
               {peaks.map((_, i) =>
                 i % 6 === 0 ? (
@@ -284,16 +231,15 @@ export default function SimulationScrubber() {
           </div>
         </div>
 
-        {/* Speed */}
         <button
           onClick={cycleSpeed}
           className="shrink-0 h-8 px-2.5 rounded-lg bg-bg/70 ring-1 ring-line font-mono text-[11px] text-ink hover:ring-teal/50 transition"
+          aria-label="Playback speed"
           title="Playback speed"
         >
           {speed}×
         </button>
 
-        {/* Sparkline of peak depth over the event */}
         <svg
           viewBox={`0 0 ${W} ${H}`}
           width={84}
@@ -310,11 +256,7 @@ export default function SimulationScrubber() {
             vectorEffect="non-scaling-stroke"
           />
           <circle
-            cx={
-              track.series.length === 1
-                ? 0
-                : (frame / (track.series.length - 1)) * W
-            }
+            cx={track.series.length === 1 ? 0 : (frame / (track.series.length - 1)) * W}
             cy={H - ((track.series[frame] ?? 0) / seriesMax) * H}
             r={2.5}
             fill="#E8A318"
@@ -322,21 +264,15 @@ export default function SimulationScrubber() {
         </svg>
       </div>
 
-      {/* Live readouts for the frame on screen */}
       <div className="mt-2.5 flex items-baseline gap-4 flex-wrap">
         <span className="flex items-baseline gap-1.5">
-          <span
-            className="font-display text-2xl leading-none"
-            style={{ color: track.headline.colour }}
-          >
+          <span className="font-display text-2xl leading-none" style={{ color: track.headline.colour }}>
             {track.headline.value}
           </span>
           <span className="text-[11px] text-dim">{track.headline.unit}</span>
         </span>
         <span className="flex items-baseline gap-1.5">
-          <span className="font-display text-lg leading-none text-ink">
-            {track.secondary.value}
-          </span>
+          <span className="font-display text-lg leading-none text-ink">{track.secondary.value}</span>
           <span className="text-[11px] text-dim">{track.secondary.unit}</span>
         </span>
         <span className="ml-auto flex items-center gap-1.5 font-mono text-[9px] text-dim">

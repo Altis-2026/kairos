@@ -13,10 +13,6 @@ function median(values: number[]): number {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-// Estimates the next acquisition from the cadence Kairos actually observed in
-// the archive for this footprint, rather than propagating the orbit. With one
-// scene there is no cadence to measure, so it falls back to Sentinel-1's
-// nominal 12-day repeat.
 export function estimateNextPass(dates: string[]): PassEstimate | null {
   const times = dates
     .map((d) => Date.parse(d))

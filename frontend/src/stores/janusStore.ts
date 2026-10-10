@@ -1,7 +1,3 @@
-/**
- * Janus mentor state. Lives in a store (not panel-local state) so an open
- * conversation survives closing and reopening the panel mid-analysis.
- */
 import { create } from "zustand";
 import {
   createProject,
@@ -13,7 +9,6 @@ import {
   fetchJanusStatus,
   getProject,
   listProjects,
-  redeemAccessCode,
   sendChat,
   toggleWatch,
   type Curriculum,
@@ -35,18 +30,12 @@ interface JanusState {
   openingId: number | null;
   sending: boolean;
   watchBusy: boolean;
-  redeeming: boolean;
   error: string | null;
 
-  redeem: (code: string) => Promise<boolean>;
   loadHome: () => Promise<void>;
   open: (id: number) => Promise<void>;
   openCompanion: () => Promise<void>;
-  startProject: (
-    title: string,
-    question: string,
-    curriculumId: string | null
-  ) => Promise<void>;
+  startProject: (title: string, question: string, curriculumId: string | null) => Promise<void>;
   send: (message: string, mode: JanusMode) => Promise<void>;
   setWatch: (watch: boolean) => Promise<void>;
   dismiss: (insightId: number) => Promise<void>;
@@ -65,25 +54,7 @@ export const useJanusStore = create<JanusState>((set, get) => ({
   openingId: null,
   sending: false,
   watchBusy: false,
-  redeeming: false,
   error: null,
-
-  redeem: async (code) => {
-    set({ redeeming: true, error: null });
-    try {
-      const { entitlements } = await redeemAccessCode(code);
-      set({ entitlements, redeeming: false });
-      // Projects and curricula were empty while locked; refill them now.
-      await get().loadHome();
-      return true;
-    } catch (e) {
-      set({
-        redeeming: false,
-        error: e instanceof Error ? e.message : "That access code was not accepted.",
-      });
-      return false;
-    }
-  },
 
   loadHome: async () => {
     set({ loadingHome: true, error: null });
@@ -167,7 +138,7 @@ export const useJanusStore = create<JanusState>((set, get) => ({
   send: async (message, mode) => {
     const { bundle } = get();
     if (!bundle || get().sending) return;
-    // Optimistic user bubble; the server persists the real one.
+
     const local: JanusMessage = {
       id: -Date.now(),
       project_id: bundle.project.id,
@@ -195,15 +166,12 @@ export const useJanusStore = create<JanusState>((set, get) => ({
               hypotheses: turn.hypotheses ?? s.bundle.hypotheses,
             }
           : s.bundle,
-        projects: s.projects.map((p) =>
-          p.id === turn.project.id ? turn.project : p
-        ),
+        projects: s.projects.map((p) => (p.id === turn.project.id ? turn.project : p)),
       }));
     } catch (e) {
       set({
         sending: false,
-        error:
-          e instanceof Error ? e.message : "The mentor turn failed. Try again.",
+        error: e instanceof Error ? e.message : "The mentor turn failed. Try again.",
       });
     }
   },
@@ -223,21 +191,17 @@ export const useJanusStore = create<JanusState>((set, get) => ({
               insights: res.insights ?? s.bundle.insights,
             }
           : s.bundle,
-        projects: s.projects.map((p) =>
-          p.id === res.project.id ? res.project : p
-        ),
+        projects: s.projects.map((p) => (p.id === res.project.id ? res.project : p)),
       }));
     } catch (e) {
       set({
         watchBusy: false,
-        error:
-          e instanceof Error ? e.message : "Couldn't change monitoring.",
+        error: e instanceof Error ? e.message : "Couldn't change monitoring.",
       });
     }
   },
 
   dismiss: async (insightId) => {
-    // Optimistic removal; the row is only hidden, never deleted server-side.
     set((s) => ({
       bundle: s.bundle
         ? {
@@ -248,9 +212,7 @@ export const useJanusStore = create<JanusState>((set, get) => ({
     }));
     try {
       await dismissInsight(insightId);
-    } catch {
-      /* non-fatal: it reappears on next load if the call failed */
-    }
+    } catch {}
   },
 
   backToList: () => {

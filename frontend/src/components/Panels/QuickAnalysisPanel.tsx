@@ -1,9 +1,3 @@
-/**
- * Quick-analysis fast lane. Dropping the ⚡ pin sets a ~50 km AOI and opens
- * this compact panel: pick an analysis type, confirm the date range, hit Run.
- * It's a faster alternative to the full six-step wizard, not a replacement —
- * the result lands on the globe exactly like a chat or wizard result does.
- */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -20,8 +14,6 @@ import {
   TrendingDown,
   Sprout,
   Pickaxe,
-  Wind,
-  Factory,
   Loader2,
   Zap,
   X,
@@ -99,9 +91,7 @@ export default function QuickAnalysisPanel() {
       applyResultToGlobe(result);
       close();
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Analysis failed. Try again."
-      );
+      setError(e instanceof Error ? e.message : "Analysis failed. Try again.");
     } finally {
       setRunning(false);
     }
@@ -118,7 +108,7 @@ export default function QuickAnalysisPanel() {
         <span className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-amber">
           <Zap size={12} /> QUICK ANALYSIS
         </span>
-        <button onClick={close} className="text-dim hover:text-ink" title="Close">
+        <button onClick={close} className="text-dim hover:text-ink" aria-label="Close" title="Close">
           <X size={15} />
         </button>
       </div>
@@ -129,7 +119,6 @@ export default function QuickAnalysisPanel() {
         </p>
       )}
 
-      {/* Analysis type chips */}
       <div className="grid grid-cols-2 gap-2">
         {(tasks ?? []).map((t: AnalysisType) => {
           const Icon = ICONS[t.icon] ?? Waves;
@@ -138,6 +127,7 @@ export default function QuickAnalysisPanel() {
             <button
               key={t.id}
               onClick={() => setSelected(t.id)}
+              aria-label={t.description}
               title={t.description}
               className={`flex items-center gap-2 h-10 px-2.5 rounded-lg text-xs ring-1 transition ${
                 active
@@ -156,12 +146,9 @@ export default function QuickAnalysisPanel() {
         })}
       </div>
 
-      {/* Date range */}
       <div className="grid grid-cols-2 gap-2">
         <label className="space-y-1">
-          <span className="font-mono text-[9px] tracking-[0.18em] text-dim uppercase">
-            From
-          </span>
+          <span className="font-mono text-[9px] tracking-[0.18em] text-dim uppercase">From</span>
           <input
             type="date"
             value={startDate}
@@ -171,9 +158,7 @@ export default function QuickAnalysisPanel() {
           />
         </label>
         <label className="space-y-1">
-          <span className="font-mono text-[9px] tracking-[0.18em] text-dim uppercase">
-            To
-          </span>
+          <span className="font-mono text-[9px] tracking-[0.18em] text-dim uppercase">To</span>
           <input
             type="date"
             value={endDate}

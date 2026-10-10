@@ -1,12 +1,10 @@
-/**
- * Top navigation: Altis brand (left), menu + location search (center),
- * help + sign-in (right). Cmd/Ctrl+K focuses the search.
- */
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   ArrowLeft,
+  GraduationCap,
   HelpCircle,
+  Info,
   Menu,
   Search,
   LogIn,
@@ -22,8 +20,18 @@ import { useAuthStore } from "../stores/authStore";
 import { useIsCompact } from "../hooks/useIsCompact";
 import KairosMark from "./KairosMark";
 import { firebaseEnabled, signInWithGoogle, signOut } from "../lib/firebase";
+import { navigate } from "../lib/navigation";
+import { useT } from "../lib/i18n";
+import { usePrefsStore } from "../stores/prefsStore";
 
 const MAPBOX_TOKEN = (import.meta.env.VITE_MAPBOX_TOKEN as string) || "";
+
+interface GeocodeFeature {
+  id: string;
+  place_name: string;
+  center: number[];
+  bbox?: number[];
+}
 
 interface Suggestion {
   id: string;
@@ -42,12 +50,15 @@ export default function TopNav() {
   const [searchExpanded, setSearchExpanded] = useState(false);
   const isCompact = useIsCompact();
   const inputRef = useRef<HTMLInputElement>(null);
-  // Set right after a pick so the debounce effect doesn't re-open the dropdown.
+
   const justPickedRef = useRef(false);
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
   const setTutorialOpen = useMapStore((s) => s.setTutorialOpen);
   const toggleSidebar = useSidebarStore((s) => s.toggleSidebar);
   const user = useAuthStore((s) => s.user);
+  const t = useT();
+  const locale = usePrefsStore((s) => s.locale);
+  const setLocale = usePrefsStore((s) => s.setLocale);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -60,7 +71,6 @@ export default function TopNav() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Debounced live autocomplete: fetch suggestions as the user types.
   useEffect(() => {
     if (justPickedRef.current) {
       justPickedRef.current = false;
@@ -83,9 +93,10 @@ export default function TopNav() {
           { signal: controller.signal }
         );
         const data = await res.json();
-        const next: Suggestion[] = (data.features ?? [])
-          .filter((f: any) => Array.isArray(f.center))
-          .map((f: any) => ({
+        const features: GeocodeFeature[] = data.features ?? [];
+        const next: Suggestion[] = features
+          .filter((f) => Array.isArray(f.center))
+          .map((f) => ({
             id: f.id,
             name: f.place_name as string,
             center: [f.center[0], f.center[1]] as [number, number],
@@ -95,7 +106,6 @@ export default function TopNav() {
         setActiveIndex(-1);
         setOpen(next.length > 0);
       } catch {
-        /* aborted or network error — leave prior suggestions */
       } finally {
         setSearching(false);
       }
@@ -148,10 +158,7 @@ export default function TopNav() {
 
   const searchBox = (
     <div className="relative w-full max-w-md">
-      <Search
-        size={15}
-        className="absolute left-4 top-1/2 -translate-y-1/2 text-dim"
-      />
+      <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-dim" />
       <input
         ref={inputRef}
         value={search}
@@ -159,7 +166,8 @@ export default function TopNav() {
         onKeyDown={onSearchKeyDown}
         onFocus={() => suggestions.length > 0 && setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
-        placeholder="Search locations…"
+        placeholder={t("searchPlaceholder")}
+        aria-label={t("searchPlaceholder")}
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
@@ -174,16 +182,13 @@ export default function TopNav() {
           {suggestions.map((s, i) => (
             <li key={s.id}>
               <button
-                // onMouseDown (not onClick) so it fires before input blur
                 onMouseDown={(e) => {
                   e.preventDefault();
                   pick(s);
                 }}
                 onMouseEnter={() => setActiveIndex(i)}
                 className={`w-full text-left flex items-center gap-2.5 px-4 py-2 text-sm transition-colors ${
-                  i === activeIndex
-                    ? "bg-raised text-ink"
-                    : "text-dim hover:text-ink"
+                  i === activeIndex ? "bg-raised text-ink" : "text-dim hover:text-ink"
                 }`}
               >
                 <MapPin size={14} className="shrink-0 text-teal" />
@@ -196,9 +201,6 @@ export default function TopNav() {
     </div>
   );
 
-  // Compact + search expanded: the whole header becomes just a search row,
-  // so there is never a moment where the search box has to share space with
-  // the brand/menu/auth cluster on a narrow screen.
   if (isCompact && searchExpanded) {
     return (
       <header className="absolute top-0 inset-x-0 z-30 flex items-center gap-2 px-3 h-16 pointer-events-none">
@@ -208,7 +210,8 @@ export default function TopNav() {
             setOpen(false);
           }}
           className="shrink-0 h-10 w-10 grid place-items-center rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-ink transition-colors pointer-events-auto"
-          title="Back"
+          title={t("backToGlobe")}
+          aria-label={t("backToGlobe")}
         >
           <ArrowLeft size={17} />
         </button>
@@ -219,26 +222,21 @@ export default function TopNav() {
 
   return (
     <header className="absolute top-0 inset-x-0 z-30 flex items-center gap-2 px-3 h-16 pointer-events-none lg:gap-4 lg:px-5">
-      {/* Brand */}
       <div className="flex items-center gap-3 pointer-events-auto">
         <span className="h-9 w-9 shrink-0 grid place-items-center rounded-xl bg-surface/90 ring-1 ring-line text-[#C9E6F7]">
           <KairosMark size={24} title="Kairos" />
         </span>
         <div className="leading-tight hidden lg:block">
-          <div className="font-display font-semibold text-lg text-ink tracking-tight">
-            Kairos
-          </div>
-          <div className="font-mono text-[9px] tracking-[0.22em] text-dim">
-            SAR PLATFORM
-          </div>
+          <div className="font-display font-semibold text-lg text-ink tracking-tight">Kairos</div>
+          <div className="font-mono text-[9px] tracking-[0.22em] text-dim">SATELLITE RADAR</div>
         </div>
       </div>
 
-      {/* Menu + Search */}
       <div className="flex-1 flex items-center justify-center gap-2 lg:gap-3 pointer-events-auto min-w-0">
         <button
           onClick={toggleSidebar}
-          title="Menu"
+          title="Analysis wizard"
+          aria-label="Open the analysis wizard"
           data-tour="menu"
           className="shrink-0 flex items-center gap-2 h-10 w-10 lg:w-auto justify-center lg:px-4 rounded-full bg-surface/90 backdrop-blur ring-1 ring-line text-sm text-ink hover:ring-amber/60 transition-colors"
         >
@@ -251,7 +249,8 @@ export default function TopNav() {
               setSearchExpanded(true);
               requestAnimationFrame(() => inputRef.current?.focus());
             }}
-            title="Search locations"
+            title={t("searchPlaceholder")}
+            aria-label={t("searchPlaceholder")}
             className="shrink-0 h-10 w-10 grid place-items-center rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-ink transition-colors"
           >
             <Search size={16} />
@@ -261,45 +260,52 @@ export default function TopNav() {
         )}
       </div>
 
-      {/* Help + Auth */}
-      <div className="flex items-center gap-2 lg:gap-3 pointer-events-auto">
+      <div className="flex items-center gap-1.5 lg:gap-2 pointer-events-auto">
+        {[
+          {
+            route: "watch",
+            label: t("navWatch"),
+            icon: Radio,
+            tone: "text-amber",
+            tour: "livewatch",
+            wide: true,
+          },
+          { route: "foresight", label: t("navForesight"), icon: Telescope, tone: "text-teal", wide: true },
+          { route: "academy", label: t("navAcademy"), icon: GraduationCap, tone: "text-teal", wide: false },
+          { route: "guardian", label: t("navGuardian"), icon: Shield, tone: "text-teal", wide: false },
+        ].map(({ route, label, icon: Icon, tone, tour, wide }) => (
+          <button
+            key={route}
+            onClick={() => navigate(route)}
+            title={label}
+            aria-label={label}
+            data-tour={tour}
+            className={`h-10 w-10 xl:w-auto xl:px-3.5 ${wide ? "grid" : "hidden md:grid"} grid-flow-col items-center justify-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-ink transition-colors`}
+          >
+            <Icon size={15} className={tone} />
+            <span className="text-xs font-medium hidden xl:inline">{label}</span>
+          </button>
+        ))}
         <button
-          onClick={() => {
-            location.hash = "watch";
-            location.reload();
-          }}
-          title="Live Watch — active disasters worldwide"
-          data-tour="livewatch"
-          className="h-10 w-10 lg:w-auto lg:px-3.5 grid grid-flow-col items-center justify-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-amber transition-colors"
+          onClick={() => setLocale(locale === "en" ? "es" : "en")}
+          title={t("language")}
+          aria-label={t("language")}
+          className="h-10 w-10 shrink-0 grid place-items-center rounded-full bg-surface/90 ring-1 ring-line text-[11px] font-semibold text-dim hover:text-ink transition-colors"
         >
-          <Radio size={15} className="text-amber" />
-          <span className="text-xs font-medium hidden lg:inline">Live Watch</span>
+          {locale === "en" ? "ES" : "EN"}
         </button>
         <button
-          onClick={() => {
-            location.hash = "guardian";
-            location.reload();
-          }}
-          title="Guardian — help spot illegal activity from space"
-          className="h-10 w-10 lg:w-auto lg:px-3.5 grid grid-flow-col items-center justify-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-teal transition-colors"
+          onClick={() => navigate("about")}
+          title={t("navAbout")}
+          aria-label={t("navAbout")}
+          className="h-10 w-10 shrink-0 hidden sm:grid place-items-center rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-ink transition-colors"
         >
-          <Shield size={15} className="text-teal" />
-          <span className="text-xs font-medium hidden lg:inline">Guardian</span>
-        </button>
-        <button
-          onClick={() => {
-            location.hash = "foresight";
-            location.reload();
-          }}
-          title="Foresight — hazard exposure where you live"
-          className="h-10 w-10 lg:w-auto lg:px-3.5 grid grid-flow-col items-center justify-center gap-1.5 rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-teal transition-colors"
-        >
-          <Telescope size={15} className="text-teal" />
-          <span className="text-xs font-medium hidden lg:inline">Foresight</span>
+          <Info size={16} />
         </button>
         <button
           onClick={() => setTutorialOpen(true)}
-          title="How to use Kairos — interactive guide"
+          title={t("navGuide")}
+          aria-label={t("navGuide")}
           className="h-10 w-10 shrink-0 grid place-items-center rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-ink transition-colors"
         >
           <HelpCircle size={17} />
@@ -320,7 +326,8 @@ export default function TopNav() {
             )}
             <button
               onClick={() => signOut()}
-              title="Sign out"
+              title={t("signOut")}
+              aria-label={t("signOut")}
               className="h-10 w-10 shrink-0 grid place-items-center rounded-full bg-surface/90 ring-1 ring-line text-dim hover:text-ink transition-colors"
             >
               <LogOut size={15} />
@@ -334,10 +341,11 @@ export default function TopNav() {
                 ? "Sign in with Google"
                 : "Add Firebase config to frontend/.env to enable sign-in"
             }
+            aria-label={t("signIn")}
             className="h-10 w-10 lg:w-auto lg:px-4 grid place-items-center lg:block rounded-full bg-amber text-bg font-medium text-sm hover:brightness-110 transition disabled:opacity-60 shrink-0"
           >
             <LogIn size={16} className="lg:hidden" />
-            <span className="hidden lg:inline">Sign in</span>
+            <span className="hidden lg:inline">{t("signIn")}</span>
           </button>
         )}
       </div>

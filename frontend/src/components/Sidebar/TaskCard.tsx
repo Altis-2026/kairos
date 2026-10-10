@@ -1,4 +1,3 @@
-/** One analysis type in the Select Task step. */
 import {
   Waves,
   Ship,
@@ -39,13 +38,7 @@ const ICONS: Record<string, LucideIcon> = {
   factory: Factory,
 };
 
-export default function TaskCard({
-  task,
-  onSelect,
-}: {
-  task: AnalysisType;
-  onSelect: () => void;
-}) {
+export default function TaskCard({ task, onSelect }: { task: AnalysisType; onSelect: () => void }) {
   const Icon = ICONS[task.icon] ?? Waves;
   return (
     <button
@@ -61,9 +54,7 @@ export default function TaskCard({
         </span>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-ink font-medium truncate">
-              {task.display_name}
-            </span>
+            <span className="text-sm text-ink font-medium truncate">{task.display_name}</span>
             {task.data_sources.map((d) => (
               <span
                 key={d}
@@ -73,12 +64,8 @@ export default function TaskCard({
               </span>
             ))}
           </div>
-          <p className="mt-1 text-xs text-dim leading-relaxed line-clamp-2">
-            {task.description}
-          </p>
-          <p className="mt-1.5 font-mono text-[10px] text-dim/80">
-            ~{task.estimated_seconds}s typical run
-          </p>
+          <p className="mt-1 text-xs text-dim leading-relaxed line-clamp-2">{task.description}</p>
+          <p className="mt-1.5 font-mono text-[10px] text-dim/80">~{task.estimated_seconds}s typical run</p>
         </div>
       </div>
     </button>

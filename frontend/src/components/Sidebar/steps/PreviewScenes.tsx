@@ -1,4 +1,3 @@
-/** Step 4 — see exactly which Sentinel-1 scenes will feed the analysis. */
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { fetchScenes } from "../../../api/scenes";
@@ -25,16 +24,13 @@ export default function PreviewScenes() {
 
       {isLoading && (
         <div className="relative overflow-hidden scanline rounded-xl bg-bg/70 ring-1 ring-teal/20 p-4">
-          <p className="font-mono text-xs text-teal">
-            Searching the Sentinel-1 archive…
-          </p>
+          <p className="font-mono text-xs text-teal">Searching the Sentinel-1 archive…</p>
         </div>
       )}
 
       {isError && (
         <div className="rounded-xl bg-bg/70 ring-1 ring-line p-3 text-xs text-dim leading-relaxed">
-          Scene lookup failed — you can still run the analysis; availability is
-          re-checked server-side.
+          Scene lookup failed. You can still run the analysis; availability is re-checked server-side.
         </div>
       )}
 
@@ -42,15 +38,12 @@ export default function PreviewScenes() {
         <>
           <div className="rounded-xl bg-bg/70 ring-1 ring-line p-3 flex items-baseline justify-between">
             <span className="text-xs text-dim">Scenes available</span>
-            <span className="font-display text-2xl text-teal">
-              {data.scene_count}
-            </span>
+            <span className="font-display text-2xl text-teal">{data.scene_count}</span>
           </div>
 
           {data.scene_count === 0 && (
             <p className="text-[11px] text-amber leading-relaxed">
-              No scenes in this window. Widen the date range — Sentinel-1
-              revisits most places every 12 days.
+              No scenes in this window. Widen the date range, Sentinel-1 revisits most places every 12 days.
             </p>
           )}
 
@@ -67,16 +60,14 @@ export default function PreviewScenes() {
                   ) : (
                     <ArrowDownToLine size={11} className="text-amber" />
                   )}
-                  {s.orbit_direction.slice(0, 4)} · {s.instrument_mode} ·{" "}
-                  {s.polarizations.join("/")}
+                  {s.orbit_direction.slice(0, 4)} · {s.instrument_mode} · {s.polarizations.join("/")}
                 </span>
               </li>
             ))}
           </ul>
 
           <p className="text-[10px] text-dim leading-relaxed">
-            All matching scenes feed the composite. Per-scene exclusion ships in
-            a later update.
+            All matching scenes feed the composite. Per-scene exclusion ships in a later update.
           </p>
         </>
       )}

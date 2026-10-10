@@ -1,5 +1,3 @@
-/** Headline stats, confidence, and data provenance for the latest result —
- * plus the public accuracy scoreboard (real validation runs, aggregated). */
 import { useEffect, useState } from "react";
 import { Loader2, ShieldCheck, X } from "lucide-react";
 import { motion } from "framer-motion";
@@ -24,23 +22,18 @@ export default function AnalyticsPanel({ onClose }: { onClose: () => void }) {
     <motion.aside
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={`${panelShell(
-        "lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-80"
-      )} space-y-4`}
+      className={`${panelShell("lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-80")} space-y-4`}
     >
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
-          ANALYTICS
-        </span>
-        <button onClick={onClose} className="text-dim hover:text-ink" title="Close">
+        <span className="font-mono text-[10px] tracking-[0.2em] text-dim">ANALYTICS</span>
+        <button onClick={onClose} className="text-dim hover:text-ink" aria-label="Close" title="Close">
           <X size={15} />
         </button>
       </div>
 
       {!result ? (
         <p className="text-xs text-dim leading-relaxed">
-          Run an analysis to see statistics here: headline measurement,
-          confidence, and full data provenance.
+          Run an analysis to see statistics here: headline measurement, confidence, and full data provenance.
         </p>
       ) : (
         <>
@@ -50,24 +43,17 @@ export default function AnalyticsPanel({ onClose }: { onClose: () => void }) {
             </div>
             <div className="mt-1 font-display text-3xl text-teal">
               {result.headline_stat.value.toLocaleString()}
-              <span className="ml-1 text-base text-dim">
-                {result.headline_stat.unit}
-              </span>
+              <span className="ml-1 text-base text-dim">{result.headline_stat.unit}</span>
             </div>
           </div>
 
           <div>
             <div className="flex justify-between text-xs text-dim mb-1.5">
               <span>Confidence</span>
-              <span className="font-mono text-teal">
-                {Math.round(result.confidence * 100)}%
-              </span>
+              <span className="font-mono text-teal">{Math.round(result.confidence * 100)}%</span>
             </div>
             <div className="h-1.5 rounded-full bg-bg overflow-hidden ring-1 ring-line">
-              <div
-                className="h-full bg-teal"
-                style={{ width: `${result.confidence * 100}%` }}
-              />
+              <div className="h-full bg-teal" style={{ width: `${result.confidence * 100}%` }} />
             </div>
           </div>
 
@@ -83,17 +69,13 @@ export default function AnalyticsPanel({ onClose }: { onClose: () => void }) {
           </ul>
 
           <div className="rounded-xl bg-bg/70 ring-1 ring-line p-3 text-[11px] text-dim leading-relaxed">
-            <span className="font-mono tracking-[0.15em] text-[9px] block mb-1">
-              PROVENANCE
-            </span>
-            Sentinel-1 GRD (ESA Copernicus) · data date {result.data_date} ·
-            Kairos pipeline v0.1 · {result.start_date} → {result.end_date}
+            <span className="font-mono tracking-[0.15em] text-[9px] block mb-1">PROVENANCE</span>
+            Sentinel-1 GRD (ESA Copernicus) · data date {result.data_date} · Kairos pipeline v0.1 ·{" "}
+            {result.start_date} → {result.end_date}
           </div>
         </>
       )}
 
-      {/* Public accuracy scoreboard: every validation run ever executed,
-          aggregated per benchmark. Renders with or without a result. */}
       <div className="space-y-2">
         <h3 className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
           <ShieldCheck size={12} className="text-teal" />
@@ -106,8 +88,8 @@ export default function AnalyticsPanel({ onClose }: { onClose: () => void }) {
         )}
         {!boardLoading && board !== null && board.length === 0 && (
           <p className="text-[11px] text-dim leading-snug">
-            No validation runs logged yet. Run a benchmark from the validation
-            tools — every real run lands here, publicly.
+            No validation runs logged yet. Run a benchmark from the validation tools, every real run lands
+            here, publicly.
           </p>
         )}
         {!boardLoading && board && board.length > 0 && (
@@ -115,26 +97,19 @@ export default function AnalyticsPanel({ onClose }: { onClose: () => void }) {
             {board.map((e) => (
               <div key={e.benchmark_id} className="p-2.5">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[11px] text-ink truncate">
-                    {e.region || e.benchmark_id}
-                  </span>
-                  <span className="font-mono text-[11px] text-teal shrink-0">
-                    F1 {e.mean_f1 ?? "—"}
-                  </span>
+                  <span className="text-[11px] text-ink truncate">{e.region || e.benchmark_id}</span>
+                  <span className="font-mono text-[11px] text-teal shrink-0">F1 {e.mean_f1 ?? "n/a"}</span>
                 </div>
                 <div className="mt-0.5 font-mono text-[9px] text-dim">
-                  {e.analysis_type} · {e.runs} run{e.runs === 1 ? "" : "s"} ·
-                  IoU {e.mean_iou ?? "—"} · P {e.mean_precision ?? "—"} · R{" "}
-                  {e.mean_recall ?? "—"}
+                  {e.analysis_type} · {e.runs} run{e.runs === 1 ? "" : "s"} · IoU {e.mean_iou ?? "n/a"} · P{" "}
+                  {e.mean_precision ?? "n/a"} · R {e.mean_recall ?? "n/a"}
                 </div>
               </div>
             ))}
           </div>
         )}
         {!boardLoading && board === null && (
-          <p className="text-[11px] text-dim leading-snug">
-            Scoreboard unavailable — backend offline.
-          </p>
+          <p className="text-[11px] text-dim leading-snug">Scoreboard unavailable, backend offline.</p>
         )}
       </div>
     </motion.aside>
