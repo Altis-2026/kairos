@@ -12,10 +12,10 @@ same per-IP limits as the rest of the API apply to its conversation turns.
 
 | Mode | What it does | Model |
 |---|---|---|
-| Mentor | Conversational teaching and guidance | Claude Haiku 4.5 |
-| Study design | Turns an interest into a hypothesis, area, windows, analyses, confounders and a validation plan | Claude Sonnet 4.6 |
-| Peer review | Adversarial review of the project's reasoning and results | Claude Sonnet 4.6 |
-| Autopilot | Describe a goal and Janus runs the investigation, then reports | Claude Sonnet 4.6 |
+| Mentor | Conversational teaching and guidance | Fast model |
+| Study design | Turns an interest into a hypothesis, area, windows, analyses, confounders and a validation plan | Deeper model |
+| Peer review | Adversarial review of the project's reasoning and results | Deeper model |
+| Autopilot | Describe a goal and Janus runs the investigation, then reports | Deeper model |
 
 ## Tools
 
