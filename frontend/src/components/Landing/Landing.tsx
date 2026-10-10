@@ -605,7 +605,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
         <motion.div {...reveal} className="mx-auto max-w-3xl text-center">
           <p className="font-mono text-[11px] tracking-[0.3em] text-teal">{c.builtEyebrow}</p>
           <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold">
-            Prem Kamasani & Amogh Vinaykumar
+            Amogh Vinaykumar & Prem Kamasani
           </h2>
           <p className="mt-3 text-dim">{c.builtBody}</p>
           <p className="mx-auto mt-8 max-w-xl text-lg leading-relaxed">{c.cta}</p>
@@ -622,7 +622,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-xs text-dim sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
             <KairosMark size={18} />
-            <span>Kairos · Prem Kamasani & Amogh Vinaykumar</span>
+            <span>Kairos · Amogh Vinaykumar & Prem Kamasani</span>
           </div>
           <div className="flex flex-wrap gap-4 sm:ml-auto">
             <button onClick={() => navigate("about")} className="hover:text-ink">
