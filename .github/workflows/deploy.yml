@@ -1,26 +1,3 @@
-# Kairos CI/CD — deploys the backend to Cloud Run on every push to main, and
-# verifies that the frontend still builds.
-#
-# The frontend itself is deployed by Vercel's own GitHub integration (the live
-# site is openkairos.vercel.app), not from here. This workflow used to also
-# push it to Firebase Hosting, but that step failed on every run for months:
-# the Firebase service account lacks serviceusage.serviceUsageConsumer on the
-# project and no Hosting site was ever created, so `firebase deploy` exited 1
-# every time. A job that is always red stops carrying information — it hides
-# a real backend failure just as effectively as it reports a fake frontend
-# one — so the dead deploy steps are gone and the build check that was worth
-# keeping stays. To move hosting back here, grant that role, create the site,
-# and restore the deploy step.
-#
-# Required repository secrets (Settings → Secrets → Actions):
-#   GCP_PROJECT_ID        your Google Cloud project ID
-#   GCP_SA_KEY            JSON key for a service account with
-#                         Cloud Run Admin + Artifact Registry Writer +
-#                         Service Account User roles
-#   OPENROUTER_API_KEY    for the deployed backend (AI chat + result explainer)
-#   VITE_MAPBOX_TOKEN     baked into the frontend build check
-#   VITE_API_BASE_URL     the Cloud Run URL after first deploy
-
 name: Deploy Kairos
 
 on:
@@ -72,7 +49,6 @@ jobs:
             --service-account kairos-backend@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --set-env-vars GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
 
-  # Build-only: Vercel performs the actual frontend deploy.
   frontend:
     runs-on: ubuntu-latest
     needs: backend
