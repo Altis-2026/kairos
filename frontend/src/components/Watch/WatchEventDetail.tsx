@@ -1,48 +1,18 @@
-/**
- * Live Watch — event detail panel.
- *
- * Clicking a disaster opens this. It turns a passive marker into action:
- *   • a one-line pitch for what Kairos can reveal here,
- *   • "Analyze with Kairos" — runs the matched SAR analysis on the event
- *     footprint and lands the result on the globe,
- *   • a plain-language read of the result (works with or without the AI key),
- *   • a true-colour optical overlay,
- *   • a deep link into the full workspace.
- *
- * Login-free, like the rest of Live Watch.
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import {
-  ArrowUpRight,
-  Image as ImageIcon,
-  Loader2,
-  Radar,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { ArrowUpRight, Image as ImageIcon, Loader2, Radar, Sparkles, X } from "lucide-react";
 import { useMapStore } from "../../stores/mapStore";
 import { runAnalyze } from "../../api/analyze";
 import { fetchOptical } from "../../api/research";
 import { fetchInterpretation } from "../../api/interpret";
 import { applyResultToGlobe } from "../../lib/applyResult";
 import { buildShareUrl } from "../../lib/share";
-import {
-  eventBbox,
-  eventWindow,
-  planForEvent,
-} from "../../lib/watchAnalysis";
+import { eventBbox, eventWindow, planForEvent } from "../../lib/watchAnalysis";
 import type { AnalysisResult, EventMarker } from "../../types/analysis";
 
 const OPTICAL_ID = "watch-optical";
 
-export default function WatchEventDetail({
-  event,
-  onClose,
-}: {
-  event: EventMarker;
-  onClose: () => void;
-}) {
+export default function WatchEventDetail({ event, onClose }: { event: EventMarker; onClose: () => void }) {
   const plan = planForEvent(event);
   const bbox = eventBbox(event);
   const dates = eventWindow(event);
@@ -52,7 +22,6 @@ export default function WatchEventDetail({
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
 
-  // Reset everything when a different event is selected.
   useEffect(() => {
     setBusy(null);
     setError(null);
@@ -73,7 +42,7 @@ export default function WatchEventDetail({
       });
       setResult(res);
       applyResultToGlobe(res);
-      // Follow up with a grounded plain-language read (non-fatal).
+
       setBusy("explain");
       try {
         const ix = await fetchInterpretation({
@@ -90,14 +59,10 @@ export default function WatchEventDetail({
           stats: res.stats,
         });
         if (ix.available && ix.text) setExplanation(ix.text);
-      } catch {
-        /* explanation is a bonus — ignore failures */
-      }
+      } catch {}
     } catch (e) {
       setError(
-        e instanceof Error
-          ? e.message
-          : "No Sentinel-1 data for this footprint yet. Try the full workspace."
+        e instanceof Error ? e.message : "No Sentinel-1 data for this footprint yet. Try the full workspace."
       );
     } finally {
       setBusy(null);
@@ -140,8 +105,6 @@ export default function WatchEventDetail({
     window.location.href = url;
   }
 
-  // Render the simple markdown the interpreter returns (### headers + paras),
-  // matching the lightweight renderer used elsewhere.
   const blocks = (explanation ?? "")
     .split("\n")
     .map((l) => l.trim())
@@ -157,18 +120,13 @@ export default function WatchEventDetail({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.18em] text-amber uppercase">
-            <span
-              className="h-2 w-2 rounded-full"
-              style={{ background: event.color }}
-            />
+            <span className="h-2 w-2 rounded-full" style={{ background: event.color }} />
             {event.category}
             {event.date && ` · ${event.date}`}
           </div>
-          <h2 className="font-display text-base text-ink leading-tight mt-1">
-            {event.title}
-          </h2>
+          <h2 className="font-display text-base text-ink leading-tight mt-1">{event.title}</h2>
         </div>
-        <button onClick={onClose} className="text-dim hover:text-ink" title="Close">
+        <button onClick={onClose} className="text-dim hover:text-ink" aria-label="Close" title="Close">
           <X size={15} />
         </button>
       </div>
@@ -177,7 +135,6 @@ export default function WatchEventDetail({
         {plan.pitch}
       </p>
 
-      {/* Headline result, once analysed */}
       {result && (
         <div className="rounded-xl bg-bg/70 ring-1 ring-teal/30 p-3">
           <div className="font-mono text-[9px] tracking-[0.15em] text-dim uppercase">
@@ -185,18 +142,14 @@ export default function WatchEventDetail({
           </div>
           <div className="mt-0.5 font-display text-2xl text-teal leading-none">
             {result.headline_stat.value.toLocaleString()}
-            <span className="ml-1 text-xs text-dim">
-              {result.headline_stat.unit}
-            </span>
+            <span className="ml-1 text-xs text-dim">{result.headline_stat.unit}</span>
           </div>
           <div className="mt-1 font-mono text-[9px] text-dim">
-            {result.display_name} · {result.data_date} ·{" "}
-            {Math.round(result.confidence * 100)}% confidence
+            {result.display_name} · {result.data_date} · {Math.round(result.confidence * 100)}% confidence
           </div>
         </div>
       )}
 
-      {/* AI / template explanation */}
       {(busy === "explain" || blocks.length > 0) && (
         <div className="rounded-xl bg-bg/60 ring-1 ring-line p-3 space-y-1.5">
           {busy === "explain" ? (
@@ -206,10 +159,7 @@ export default function WatchEventDetail({
           ) : (
             blocks.map((b, i) =>
               b.startsWith("###") ? (
-                <div
-                  key={i}
-                  className="font-mono text-[9px] tracking-[0.15em] text-teal uppercase pt-1"
-                >
+                <div key={i} className="font-mono text-[9px] tracking-[0.15em] text-teal uppercase pt-1">
                   {b.replace(/^#+\s*/, "")}
                 </div>
               ) : (
@@ -222,22 +172,15 @@ export default function WatchEventDetail({
         </div>
       )}
 
-      {error && (
-        <p className="text-[10px] text-amber leading-snug px-1">{error}</p>
-      )}
+      {error && <p className="text-[10px] text-amber leading-snug px-1">{error}</p>}
 
-      {/* Actions */}
       <div className="space-y-2">
         <button
           onClick={analyze}
           disabled={busy === "analyze" || busy === "explain"}
           className="w-full h-10 rounded-xl bg-amber text-bg font-medium text-sm flex items-center justify-center gap-2 hover:brightness-110 transition disabled:opacity-60"
         >
-          {busy === "analyze" ? (
-            <Loader2 size={15} className="animate-spin" />
-          ) : (
-            <Radar size={15} />
-          )}
+          {busy === "analyze" ? <Loader2 size={15} className="animate-spin" /> : <Radar size={15} />}
           {result ? "Re-run analysis" : "Analyze with Kairos"}
         </button>
         <div className="grid grid-cols-2 gap-2">
@@ -246,11 +189,7 @@ export default function WatchEventDetail({
             disabled={busy === "optical"}
             className="h-9 rounded-xl text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
           >
-            {busy === "optical" ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <ImageIcon size={12} />
-            )}
+            {busy === "optical" ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
             Optical
           </button>
           <button

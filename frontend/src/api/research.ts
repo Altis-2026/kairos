@@ -1,10 +1,6 @@
 import { apiFetch } from "./client";
 import type { BBox } from "../types/map";
-import type {
-  CompareResponse,
-  ResearchLayerResponse,
-  TimeSeriesResponse,
-} from "../types/analysis";
+import type { CompareResponse, ResearchLayerResponse, TimeSeriesResponse } from "../types/analysis";
 
 export interface AnalysisRef {
   analysis_type: string;
@@ -31,9 +27,7 @@ export function fetchOptical(p: {
   });
 }
 
-export function fetchPopulationDensity(p: {
-  bbox: BBox;
-}): Promise<ResearchLayerResponse> {
+export function fetchPopulationDensity(p: { bbox: BBox }): Promise<ResearchLayerResponse> {
   return apiFetch<ResearchLayerResponse>("/research/population", {
     method: "POST",
     body: JSON.stringify(p),
@@ -95,7 +89,6 @@ export interface SignalResponse {
   chart_svg: string;
 }
 
-/** Per-scene signal time series + trend statistics over an AOI. */
 export function fetchSignal(p: {
   bbox: BBox;
   start_date: string;
@@ -122,7 +115,6 @@ export interface ScoreboardEntry {
   last_run_at: number;
 }
 
-/** The public accuracy scoreboard (aggregated real validation runs). */
 export function fetchScoreboard(): Promise<{
   entries: ScoreboardEntry[];
   total_runs: number;
@@ -131,7 +123,6 @@ export function fetchScoreboard(): Promise<{
   return apiFetch("/scoreboard");
 }
 
-/** Outbound webhook management (Slack-compatible alerts). */
 export function saveWebhook(owner: string, url: string): Promise<{ saved: boolean }> {
   return apiFetch("/alerts/webhook", {
     method: "POST",

@@ -1,39 +1,14 @@
-/**
- * Kairos Guide: a spotlight walkthrough of the live UI (the ? button).
- *
- * Each step points at the actual control it describes. The rest of the screen
- * dims through an SVG mask with a hole cut over the target, a ring marks it,
- * and the card places itself on whichever side has room — so the thing being
- * explained is never the thing hidden behind the explanation.
- *
- * Targets are `data-tour` hooks rather than CSS classes or visible labels.
- * Both of those change for cosmetic reasons and would break the tour silently;
- * a named hook is a deliberate contract.
- *
- * Any step whose target is missing degrades to a centred card with no
- * spotlight. That is the normal case on a narrow screen, where the right-hand
- * tool rail collapses into a single sheet launcher and most targets genuinely
- * do not exist.
- *
- * Opens on first visit (remembered in localStorage) and from the ? in the nav.
- */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Bell,
   ChevronLeft,
   ChevronRight,
   Flame,
-  FlaskConical,
-  Layers,
+  Home,
+  Landmark,
   MessageSquare,
   MousePointerSquareDashed,
-  PanelRightOpen,
-  Radar,
-  Radio,
   Satellite,
-  Ship,
-  Sparkles,
   Telescope,
   X,
 } from "lucide-react";
@@ -48,7 +23,7 @@ interface Step {
   title: string;
   body: string;
   tip?: string;
-  /** `data-tour` value of the control this step is about. */
+
   target?: string;
   action?: { label: string; run: () => void };
 }
@@ -59,169 +34,75 @@ function openSidebar() {
 function openPanel(name: string) {
   useMapStore.getState().requestPanel(name);
 }
-function openLiveWatch() {
-  location.hash = "watch";
-  location.reload();
-}
-function openGuardian() {
-  location.hash = "guardian";
-  location.reload();
-}
-
 const STEPS: Step[] = [
   {
     icon: <Satellite size={20} />,
     chip: "Welcome",
-    title: "Real radar, plain questions",
+    title: "Satellite radar, in plain language",
     body:
-      "Kairos runs Sentinel-1 satellite radar analysis on demand. Radar sees " +
-      "through cloud and darkness and covers the whole Earth every ~12 days, " +
-      "so you can ask about floods, ships, fires and more — anywhere, any time.",
-    tip: "Everything here runs on free ESA satellite data. Nothing to install.",
+      "Kairos reads free radar data from Europe's Sentinel-1 satellites. Radar sees through clouds, smoke " +
+      "and darkness, so you can check floods, fires, ships and land change anywhere on Earth.",
+    tip: "Free, no account needed, nothing to install.",
   },
   {
     icon: <MessageSquare size={20} />,
     chip: "Ask",
-    title: "Just type what you want",
+    title: "Type or say your question",
     body:
-      "“Is there flooding near Dhaka right now?” Kairos works out the analysis " +
-      "type, the place and the dates, runs it, and explains the answer back to " +
-      "you in chat.",
-    tip: "The chips just above the bar are one-tap examples to start from.",
+      'Try "Was there flooding near Kerrville in July 2025?" Kairos works out the place, the hazard and the ' +
+      "dates, runs the analysis on real radar scenes, and explains what it found.",
+    tip: "Tap the microphone to ask by voice, or switch to Spanish with the ES button.",
     target: "ask",
   },
   {
     icon: <MousePointerSquareDashed size={20} />,
     chip: "Area",
-    title: "Draw where you want to look",
+    title: "Pick exactly where to look",
     body:
-      "Use this box tool to drag an area on the globe, or the pin below it to " +
-      "drop a ~50 km box. Kairos pulls Sentinel-1 coverage for exactly that " +
-      "footprint. You can also search a place by name up top (⌘K).",
-    tip: "Smaller areas run faster and read more clearly.",
+      "Drag a box, trace any shape, or drop a pin. The wizard behind the menu button gives you full control " +
+      "over the analysis, dates and scenes.",
     target: "draw",
-  },
-  {
-    icon: <PanelRightOpen size={20} />,
-    chip: "Or build it",
-    title: "Want full control? Use the wizard",
-    body:
-      "The Menu opens a six-step builder: pick a Task, define an Area, " +
-      "Configure dates, Preview the scenes, Run, and read the Result. Every " +
-      "step is explicit, so you always know exactly what is being analysed.",
-    target: "menu",
     action: { label: "Open the wizard", run: openSidebar },
   },
   {
-    icon: <Layers size={20} />,
-    chip: "Analyses",
-    title: "22 ways to read the planet",
+    icon: <Home size={20} />,
+    chip: "Prepare",
+    title: "Check your own neighborhood",
     body:
-      "Floods (even under forest canopy), ships, burn scars, oil spills, " +
-      "deforestation, sea ice and drift, subsidence, urban growth, crops, " +
-      "biomass, methane, air quality, snow melt — even L-band archaeology. " +
-      "Flood Consensus runs radar and optical independently and maps where the " +
-      "two agree.",
-    target: "tool-layers",
-    action: { label: "Browse analysis types", run: openSidebar },
+      "My Place scans the area around any address for recent flooding, fire damage, new construction and " +
+      "sinking ground, and explains each result in a sentence.",
+    target: "tool-myplace",
+    action: { label: "Open My Place", run: () => openPanel("myplace") },
   },
   {
-    icon: <Sparkles size={20} />,
-    chip: "Results",
-    title: "Understand what you're seeing",
+    icon: <Landmark size={20} />,
+    chip: "Lead",
+    title: "A briefing for any congressional district",
     body:
-      "Every result carries a headline number, a confidence score and a " +
-      "coloured overlay, with a legend that labels each colour. “Explain this " +
-      "result” gives a plain-language read: what it shows, the trend, likely " +
-      "causes, and an optional regional news search.",
-    tip: "Radar can be fooled — wet farmland can look like flood. The explainer says so rather than hiding it.",
+      "My District loads the real boundary of any US congressional district, runs standing checks inside it, " +
+      "and produces a one-page situation briefing you can print.",
+    target: "tool-district",
+    action: { label: "Open My District", run: () => openPanel("district") },
   },
   {
     icon: <Flame size={20} />,
     chip: "Simulate",
-    title: "Forward models: flood and wildfire",
+    title: "See what could happen next",
     body:
-      "The other analyses measure what happened. These two model what would " +
-      "happen. Route a flood over real terrain with a shallow-water solver, or " +
-      "spread a wildfire with the same Rothermel physics fire agencies use — " +
-      "then scrub through time and open the 3D terrain view to watch it run " +
-      "down a valley or up a ridge.",
-    tip: "Simulated, never observed — and labelled that way at every step, because a model over real terrain looks exactly as convincing as a measurement.",
+      "Run a flood or a wildfire over real terrain with physics models, scrub through time, and open the 3D " +
+      "view to watch water fill a valley or fire climb a ridge.",
+    tip: "Simulations are always labelled as simulations, never as measurements.",
     target: "tool-simulation",
-    action: { label: "Open forward simulation", run: () => openPanel("simulation") },
-  },
-  {
-    icon: <Ship size={20} />,
-    chip: "Maritime",
-    title: "Dark vessels",
-    body:
-      "Big ships must broadcast their position over AIS radio. Radar sees every " +
-      "ship regardless. Line the two up and the gap is the interesting part: a " +
-      "bright radar return with no transponder anywhere near it.",
-    tip: "An unmatched return is not evidence of wrongdoing — small boats are not required to broadcast, and fixed platforms never do. The panel says so.",
-    target: "tool-vessels",
-    action: { label: "Open dark vessels", run: () => openPanel("vessels") },
-  },
-  {
-    icon: <Radar size={20} />,
-    chip: "Millimetres",
-    title: "InSAR: measure the ground moving",
-    body:
-      "The rest of Kairos measures radar brightness. Interferometry measures " +
-      "its phase — the shift between two passes — which reveals ground movement " +
-      "down to centimetres. The Mexico City scene shows a city sinking into its " +
-      "old lakebed, one colour cycle per 2.8 cm.",
-    tip: "Published COMET-LiCSAR research products, shown with attribution, not Kairos's own pipeline.",
-    target: "tool-insar",
-    action: { label: "Open InSAR", run: () => openPanel("insar") },
-  },
-  {
-    icon: <FlaskConical size={20} />,
-    chip: "Go deeper",
-    title: "Research tools",
-    body:
-      "Cross-check any result: raw backscatter, true-colour optical, a " +
-      "before/after cross-fade, animated time series, population impact — plus " +
-      "Signal & Trend, which extracts a full year of real observations over " +
-      "your area with trend statistics, a publication chart and a CSV.",
-    target: "tool-research",
-    action: { label: "Open research tools", run: () => openPanel("research") },
-  },
-  {
-    icon: <Bell size={20} />,
-    chip: "Keep watch",
-    title: "Monitor an area, or run hundreds",
-    body:
-      "Sign in and “Watch this area”: Kairos re-checks it on every new " +
-      "Sentinel-1 pass and flags fresh detections in Alerts. Got many places " +
-      "instead? Batch mode takes a CSV of areas and analysis types, runs them " +
-      "all, and exports one CSV back.",
-    target: "tool-alerts",
-    action: { label: "Open alerts", run: () => openPanel("alerts") },
-  },
-  {
-    icon: <Radio size={20} />,
-    chip: "Share",
-    title: "Guardian, Live Watch and sharing",
-    body:
-      "Live Watch is a login-free map of active disasters worldwide. Guardian " +
-      "is a login-free mode that spotlights hotspots of illegal mining, " +
-      "clearing and fishing for you to review. Any result copies out as a " +
-      "reproducible link or an embeddable widget.",
-    tip: "Kairos also installs to a phone or iPad home screen from the browser's Share menu.",
-    target: "livewatch",
-    action: { label: "Open Live Watch", run: openLiveWatch },
+    action: { label: "Open Simulate", run: () => openPanel("simulation") },
   },
   {
     icon: <Telescope size={20} />,
-    chip: "Research preview",
-    title: "Janus",
+    chip: "Go deeper",
+    title: "Janus, Agent mode and the Lab",
     body:
-      "Janus is the research layer: an AI that runs real analyses for you, " +
-      "mentors a project like an advisor, tracks datasets and citations, and " +
-      "exports to LaTeX, Google Docs, a Jupyter notebook or a policy brief. " +
-      "It is still in research preview rather than general release.",
-    tip: "In closed research preview: it opens for anyone, but running it needs an access code from the team.",
+      "Janus is a research mentor that runs real analyses with you. Agent mode turns a goal into a plan of " +
+      "analyses and a report. The Lab holds the research tools: accuracy benchmarks, time series, InSAR, dark " +
+      "vessels and batch runs.",
     target: "tool-janus",
     action: { label: "Open Janus", run: () => openPanel("janus") },
   },
@@ -248,9 +129,7 @@ export default function Tutorial() {
   function close() {
     try {
       localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
-    } catch {
-      /* private mode, fine */
-    }
+    } catch {}
     setOpen(false);
     setI(0);
   }
@@ -263,15 +142,10 @@ export default function Tutorial() {
     close();
   }
 
-  // Locate the highlighted control. Re-measured on resize, and once more
-  // shortly after the step changes because panels and rails animate into
-  // place — measuring only on the first frame can catch a control mid-slide.
   useLayoutEffect(() => {
     if (!open) return;
     const measure = () => {
-      const el = step.target
-        ? document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`)
-        : null;
+      const el = step.target ? document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`) : null;
       setRect(el ? el.getBoundingClientRect() : null);
     };
     measure();
@@ -283,8 +157,6 @@ export default function Tutorial() {
     };
   }, [open, i, step.target]);
 
-  // Place the card on whichever side of the target actually has room for it,
-  // so it never lands on top of the control it is pointing at.
   useLayoutEffect(() => {
     const card = cardRef.current;
     if (!open || !card) return;
@@ -305,7 +177,6 @@ export default function Tutorial() {
     const midY = clamp(rect.top + rect.height / 2 - ch / 2, MARGIN, vh - ch - MARGIN);
     const midX = clamp(rect.left + rect.width / 2 - cw / 2, MARGIN, vw - cw - MARGIN);
 
-    // Left first: most targets live on the right-hand tool rail.
     if (fitsLeft) setPos({ left: rect.left - GAP - cw, top: midY });
     else if (fitsRight) setPos({ left: rect.right + GAP, top: midY });
     else if (fitsAbove) setPos({ left: midX, top: rect.top - GAP - ch });
@@ -322,7 +193,6 @@ export default function Tutorial() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, i]);
 
   const pad = 6;
@@ -345,27 +215,12 @@ export default function Tutorial() {
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50"
         >
-          {/* Dimmer with a hole cut over the highlighted control.
-              The SVG is purely visual — an SVG mask changes what is painted,
-              not what is hit-tested, so leaving this interactive would have
-              swallowed clicks across the whole screen including the hole. The
-              four panes below it form the frame around the hole and carry the
-              click-to-close instead, which leaves the gap genuinely
-              click-through: the highlighted control stays usable while the
-              guide is explaining it. */}
           <svg className="pointer-events-none absolute inset-0 h-full w-full">
             <defs>
               <mask id="kairos-tour-mask">
                 <rect x="0" y="0" width="100%" height="100%" fill="white" />
                 {hole && (
-                  <rect
-                    x={hole.x}
-                    y={hole.y}
-                    width={hole.width}
-                    height={hole.height}
-                    rx="14"
-                    fill="black"
-                  />
+                  <rect x={hole.x} y={hole.y} width={hole.width} height={hole.height} rx="14" fill="black" />
                 )}
               </mask>
             </defs>
@@ -379,8 +234,6 @@ export default function Tutorial() {
             />
           </svg>
 
-          {/* Click-to-close frame. With a hole, four panes around it; without
-              one, a single full-screen pane. */}
           {hole ? (
             <>
               <div
@@ -432,18 +285,19 @@ export default function Tutorial() {
             style={{
               left: pos?.left ?? 0,
               top: pos?.top ?? 0,
-              // Hidden until measured, so it never flashes in the wrong place.
+
               visibility: pos ? "visible" : "hidden",
             }}
           >
             <div className="flex items-center justify-between px-5 pt-4">
               <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.22em] text-dim">
-                <Radio size={13} className="text-amber" />
+                <Satellite size={13} className="text-amber" />
                 KAIROS GUIDE
               </div>
               <button
                 onClick={close}
                 title="Close guide (Esc)"
+                aria-label="Close guide"
                 className="text-dim hover:text-ink transition-colors"
               >
                 <X size={16} />
@@ -459,9 +313,7 @@ export default function Tutorial() {
                   <div className="font-mono text-[9px] tracking-[0.2em] text-amber uppercase">
                     {i + 1} / {STEPS.length} · {step.chip}
                   </div>
-                  <h2 className="font-display text-lg text-ink leading-tight mt-0.5">
-                    {step.title}
-                  </h2>
+                  <h2 className="font-display text-lg text-ink leading-tight mt-0.5">{step.title}</h2>
                 </div>
               </div>
 
@@ -500,6 +352,7 @@ export default function Tutorial() {
                   <button
                     key={idx}
                     onClick={() => setI(idx)}
+                    aria-label={`Step ${idx + 1}`}
                     title={`Step ${idx + 1}`}
                     className={`h-1.5 rounded-full transition-all ${
                       idx === i ? "w-5 bg-teal" : "w-1.5 bg-line hover:bg-dim"
@@ -512,6 +365,7 @@ export default function Tutorial() {
                   onClick={prev}
                   disabled={i === 0}
                   className="h-9 w-9 grid place-items-center rounded-xl ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-30"
+                  aria-label="Back"
                   title="Back"
                 >
                   <ChevronLeft size={16} />

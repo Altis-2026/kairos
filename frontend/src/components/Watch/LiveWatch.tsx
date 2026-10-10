@@ -1,10 +1,3 @@
-/**
- * Public Live Watch dashboard (#watch).
- *
- * A login-free planetary view of currently active natural disasters (NASA
- * EONET, open events). Markers on the globe + a side list; click an event to
- * fly to it. Degrades gracefully when the feed is unreachable.
- */
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Loader2, Radio, X } from "lucide-react";
@@ -24,7 +17,7 @@ export default function LiveWatch() {
   const [status, setStatus] = useState<Status>("loading");
   const [note, setNote] = useState<string | null>(null);
   const [selected, setSelected] = useState<EventMarker | null>(null);
-  const home = `${location.origin}${location.pathname}`;
+  const home = "#app";
 
   useEffect(() => {
     let cancelled = false;
@@ -69,7 +62,6 @@ export default function LiveWatch() {
     <div className="relative h-full w-full bg-bg overflow-hidden">
       <Globe />
 
-      {/* Header */}
       <div className="absolute left-5 top-5 z-30 flex items-center gap-2.5 rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel px-4 py-2.5">
         <Radio size={16} className="text-amber animate-pulse" />
         <div>
@@ -82,8 +74,6 @@ export default function LiveWatch() {
         </div>
       </div>
 
-      {/* Event list: a bottom sheet below the header on phones/tablets, the
-          original top-right floating card on desktop. */}
       <aside className="absolute inset-x-3 top-24 bottom-3 z-30 rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3 overflow-hidden flex flex-col lg:inset-x-auto lg:left-auto lg:right-5 lg:top-1/2 lg:-translate-y-1/2 lg:bottom-auto lg:w-80 lg:max-h-[80vh]">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
@@ -100,9 +90,8 @@ export default function LiveWatch() {
           </div>
         ) : status === "unavailable" ? (
           <p className="text-[11px] text-dim leading-relaxed">
-            {note} The dashboard populates automatically wherever outbound access
-            to <span className="font-mono text-teal">eonet.gsfc.nasa.gov</span> is
-            allowed.
+            {note} The dashboard populates automatically wherever outbound access to{" "}
+            <span className="font-mono text-teal">eonet.gsfc.nasa.gov</span> is allowed.
           </p>
         ) : status === "empty" ? (
           <p className="text-[11px] text-dim leading-relaxed">
@@ -115,16 +104,11 @@ export default function LiveWatch() {
                 <button
                   onClick={() => flyTo(e)}
                   className={`w-full text-left rounded-xl bg-bg/70 ring-1 p-2.5 transition ${
-                    selected?.id === e.id
-                      ? "ring-teal/60"
-                      : "ring-line hover:ring-teal/40"
+                    selected?.id === e.id ? "ring-teal/60" : "ring-line hover:ring-teal/40"
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span
-                      className="h-2 w-2 rounded-full shrink-0"
-                      style={{ background: e.color }}
-                    />
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: e.color }} />
                     <span className="text-[11px] text-ink truncate">{e.title}</span>
                   </div>
                   <div className="font-mono text-[9px] text-dim mt-0.5 pl-4">
@@ -146,12 +130,7 @@ export default function LiveWatch() {
       </aside>
 
       <AnimatePresence>
-        {selected && (
-          <WatchEventDetail
-            event={selected}
-            onClose={() => setSelected(null)}
-          />
-        )}
+        {selected && <WatchEventDetail event={selected} onClose={() => setSelected(null)} />}
       </AnimatePresence>
     </div>
   );

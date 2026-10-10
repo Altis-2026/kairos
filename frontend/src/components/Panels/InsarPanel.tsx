@@ -1,12 +1,3 @@
-/**
- * InSAR deep dive — published research-grade interferograms, served as
- * georeferenced images rather than computed by Kairos.
- *
- * Every other analysis in Kairos measures radar *brightness*. Interferometry
- * measures radar *phase*, which is what actually resolves ground motion to the
- * centimetre. Kairos has no phase pipeline, so rather than implying otherwise
- * this panel shows the real thing from COMET-LiCSAR with full attribution.
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ExternalLink, Layers, Loader2, Radar, X } from "lucide-react";
@@ -25,11 +16,7 @@ export default function InsarPanel({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     fetchInsarSites()
       .then((d) => setSites(d.sites))
-      .catch((e) =>
-        setError(
-          e instanceof Error ? e.message : "Could not reach the InSAR service."
-        )
-      );
+      .catch((e) => setError(e instanceof Error ? e.message : "Could not reach the InSAR service."));
   }, []);
 
   const ifgOn = imageLayers.some((l) => l.id === IFG_ID);
@@ -70,16 +57,15 @@ export default function InsarPanel({ onClose }: { onClose: () => void }) {
         <span className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-dim">
           <Radar size={13} className="text-teal" /> INSAR DEEP DIVE
         </span>
-        <button onClick={onClose} className="text-dim hover:text-ink" title="Close">
+        <button onClick={onClose} className="text-dim hover:text-ink" aria-label="Close" title="Close">
           <X size={15} />
         </button>
       </div>
 
       <p className="text-xs text-dim leading-relaxed">
-        The rest of Kairos measures radar brightness. Interferometry measures
-        the radar's phase, the shift between two passes, which reveals ground
-        movement down to centimetres. This runs on published research-grade
-        products, not on Kairos's own pipeline.
+        The rest of Kairos measures radar brightness. Interferometry measures the radar's phase, the shift
+        between two passes, which reveals ground movement down to centimetres. This runs on published
+        research-grade products, not on Kairos's own pipeline.
       </p>
 
       {error ? (
@@ -94,9 +80,7 @@ export default function InsarPanel({ onClose }: { onClose: () => void }) {
             <div>
               <div className="text-sm text-ink font-medium">{site.name}</div>
               <div className="font-mono text-[10px] text-dim mt-0.5">
-                {site.dates
-                  ? `${site.dates[0]} → ${site.dates[1]}`
-                  : "date pair on install"}
+                {site.dates ? `${site.dates[0]} → ${site.dates[1]}` : "date pair on install"}
                 {site.frame && ` · frame ${site.frame}`}
               </div>
             </div>
@@ -107,9 +91,7 @@ export default function InsarPanel({ onClose }: { onClose: () => void }) {
                 <button
                   onClick={() => toggle(site, "interferogram")}
                   className={`h-9 rounded-lg text-[11px] flex items-center justify-center gap-1.5 ring-1 transition ${
-                    ifgOn
-                      ? "bg-raised text-teal ring-teal/50"
-                      : "text-dim ring-line hover:text-ink"
+                    ifgOn ? "bg-raised text-teal ring-teal/50" : "text-dim ring-line hover:text-ink"
                   }`}
                 >
                   <Layers size={12} /> Interferogram
@@ -118,9 +100,7 @@ export default function InsarPanel({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => toggle(site, "coherence")}
                     className={`h-9 rounded-lg text-[11px] flex items-center justify-center gap-1.5 ring-1 transition ${
-                      cohOn
-                        ? "bg-raised text-teal ring-teal/50"
-                        : "text-dim ring-line hover:text-ink"
+                      cohOn ? "bg-raised text-teal ring-teal/50" : "text-dim ring-line hover:text-ink"
                     }`}
                   >
                     <Layers size={12} /> Coherence
@@ -137,8 +117,7 @@ export default function InsarPanel({ onClose }: { onClose: () => void }) {
             ) : (
               <p className="text-[10px] text-amber leading-snug rounded-lg bg-bg ring-1 ring-line p-2">
                 Dataset not installed on this server. Run{" "}
-                <span className="font-mono">tools/get_insar_demo.py</span> to
-                download the LiCSAR product.
+                <span className="font-mono">tools/get_insar_demo.py</span> to download the LiCSAR product.
               </p>
             )}
 
