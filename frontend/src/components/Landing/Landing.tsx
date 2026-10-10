@@ -32,7 +32,6 @@ const COPY = {
     launch: "Launch Kairos",
     myPlace: "Check my place",
     myDistrict: "My district",
-    trust: "Free · No account · Works on any device",
     statAnalyses: "analyses",
     statSims: "physics simulations",
     statCoverage: "of Earth covered",
@@ -112,7 +111,6 @@ const COPY = {
     launch: "Abrir Kairos",
     myPlace: "Revisar mi casa",
     myDistrict: "Mi distrito",
-    trust: "Gratis · Sin cuenta · Funciona en cualquier dispositivo",
     statAnalyses: "análisis",
     statSims: "simulaciones físicas",
     statCoverage: "de la Tierra cubierta",
@@ -446,7 +444,6 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
                 <Landmark size={15} className="text-teal" /> {c.myDistrict}
               </button>
             </div>
-            <p className="mt-4 text-xs text-dim">{c.trust}</p>
             {installEvent && (
               <button
                 onClick={() => installEvent.prompt()}
