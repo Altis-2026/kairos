@@ -97,7 +97,7 @@ and alerts. Kairos also installs as an app from the browser.
                      │
                      ▼
  Language model ───────────► analysis type, place, dates
- (Claude Haiku via OpenRouter)
+ (via OpenRouter)
                      │
                      ▼
  Google Earth Engine ──────► filter Sentinel-1, calibrate, compare
@@ -139,7 +139,7 @@ in Kairos is a different way of reading what changed in that echo.
 | Backend | Python 3.11, FastAPI, Pydantic |
 | Satellite processing | Google Earth Engine (Sentinel-1, Sentinel-2, Sentinel-5P, Landsat, ALOS PALSAR, GLO-30) |
 | Physics | NumPy flood and wildfire solvers |
-| Language | Claude Haiku 4.5 and Claude Sonnet 4.6 through OpenRouter |
+| Language | A hosted language model through OpenRouter |
 | Accounts | Firebase Auth and Firestore (optional) |
 | Hosting | Vercel (frontend), Google Cloud Run (backend) |
 | Quality | pytest (300+ tests), Vitest, ESLint, Ruff, GitHub Actions CI |
