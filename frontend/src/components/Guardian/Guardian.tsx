@@ -1,12 +1,3 @@
-/**
- * Kairos Guardian (#guardian) — a login-free, citizen-science mode where people
- * help spot suspected illegal mining, clearing and fishing from space.
- *
- * Pick a curated watch zone; Kairos runs the matching Sentinel-1 analysis over
- * it and lands the detection on the globe. You review what the radar flagged and
- * submit a verdict — building a personal patrol log. It's an environmental-
- * transparency tool: candidate activity for human review, never an accusation.
- */
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -28,13 +19,7 @@ import { useMapStore } from "../../stores/mapStore";
 import { runAnalyze } from "../../api/analyze";
 import { applyResultToGlobe } from "../../lib/applyResult";
 import { GUARDIAN_ZONES, type GuardianZone } from "../../lib/guardianZones";
-import {
-  loadFindings,
-  patrolStats,
-  saveFinding,
-  type Finding,
-  type Verdict,
-} from "../../lib/patrol";
+import { loadFindings, patrolStats, saveFinding, type Finding, type Verdict } from "../../lib/patrol";
 import type { AnalysisResult } from "../../types/analysis";
 
 const THREAT_ICON = {
@@ -53,7 +38,7 @@ function recentWindow(): { start_date: string; end_date: string } {
 }
 
 export default function Guardian() {
-  const home = `${location.origin}${location.pathname}`;
+  const home = "#app";
   const [selected, setSelected] = useState<GuardianZone | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,9 +73,7 @@ export default function Guardian() {
       applyResultToGlobe(res);
     } catch (e) {
       setError(
-        e instanceof Error
-          ? e.message
-          : "No Sentinel-1 data for this zone right now. Try another zone."
+        e instanceof Error ? e.message : "No Sentinel-1 data for this zone right now. Try another zone."
       );
     } finally {
       setBusy(false);
@@ -120,7 +103,6 @@ export default function Guardian() {
     <div className="relative h-full w-full bg-bg overflow-hidden">
       <Globe />
 
-      {/* Header + patrol stats */}
       <div className="absolute left-5 top-5 z-30 rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel px-4 py-2.5">
         <div className="flex items-center gap-2.5">
           <Shield size={16} className="text-teal" />
@@ -140,13 +122,9 @@ export default function Guardian() {
         </div>
       </div>
 
-      {/* Zone list: a bottom sheet below the header on phones/tablets, the
-          original top-right floating card on desktop. */}
       <aside className="absolute inset-x-3 top-32 bottom-3 z-30 rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4 space-y-3 overflow-hidden flex flex-col lg:inset-x-auto lg:left-auto lg:right-5 lg:top-5 lg:bottom-auto lg:w-80 lg:max-h-[88vh]">
         <div className="flex items-center justify-between">
-          <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
-            WATCH ZONES
-          </span>
+          <span className="font-mono text-[10px] tracking-[0.2em] text-dim">WATCH ZONES</span>
           <a href={home} className="text-dim hover:text-ink" title="Exit Guardian">
             <X size={15} />
           </a>
@@ -167,13 +145,9 @@ export default function Guardian() {
                   <div className="flex items-center gap-2">
                     <Icon size={14} className="shrink-0 text-amber" />
                     <span className="text-[12px] text-ink truncate">{z.name}</span>
-                    <span className="ml-auto font-mono text-[9px] text-dim">
-                      {z.country}
-                    </span>
+                    <span className="ml-auto font-mono text-[9px] text-dim">{z.country}</span>
                   </div>
-                  <div className="text-[10px] text-dim mt-1 leading-snug">
-                    {z.watchingFor}
-                  </div>
+                  <div className="text-[10px] text-dim mt-1 leading-snug">{z.watchingFor}</div>
                 </button>
               </li>
             );
@@ -182,15 +156,10 @@ export default function Guardian() {
 
         {findings.length > 0 && (
           <div className="pt-2 border-t border-line">
-            <div className="font-mono text-[9px] tracking-[0.2em] text-dim mb-1.5">
-              RECENT FINDINGS
-            </div>
+            <div className="font-mono text-[9px] tracking-[0.2em] text-dim mb-1.5">RECENT FINDINGS</div>
             <ul className="space-y-1 max-h-32 overflow-y-auto">
               {findings.slice(0, 6).map((f) => (
-                <li
-                  key={f.id}
-                  className="flex items-center gap-2 text-[10px] text-dim"
-                >
+                <li key={f.id} className="flex items-center gap-2 text-[10px] text-dim">
                   {f.verdict === "flagged" ? (
                     <Flag size={10} className="text-amber shrink-0" />
                   ) : f.verdict === "natural" ? (
@@ -217,7 +186,6 @@ export default function Guardian() {
         </a>
       </aside>
 
-      {/* Scan + review card */}
       <AnimatePresence>
         {selected && (
           <motion.div
@@ -228,9 +196,7 @@ export default function Guardian() {
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <h2 className="font-display text-base text-ink leading-tight">
-                  {selected.name}
-                </h2>
+                <h2 className="font-display text-base text-ink leading-tight">{selected.name}</h2>
                 <div className="font-mono text-[9px] tracking-[0.15em] text-amber uppercase mt-0.5">
                   {selected.country} · {selected.threat}
                 </div>
@@ -238,6 +204,7 @@ export default function Guardian() {
               <button
                 onClick={() => setSelected(null)}
                 className="text-dim hover:text-ink"
+                aria-label="Close"
                 title="Close"
               >
                 <X size={15} />
@@ -253,9 +220,7 @@ export default function Guardian() {
                 </div>
                 <div className="mt-0.5 font-display text-2xl text-teal leading-none">
                   {result.headline_stat.value.toLocaleString()}
-                  <span className="ml-1 text-xs text-dim">
-                    {result.headline_stat.unit}
-                  </span>
+                  <span className="ml-1 text-xs text-dim">{result.headline_stat.unit}</span>
                 </div>
                 <div className="mt-1 font-mono text-[9px] text-dim">
                   {result.display_name} · {result.data_date}
@@ -263,9 +228,7 @@ export default function Guardian() {
               </div>
             )}
 
-            {error && (
-              <p className="text-[10px] text-amber leading-snug px-1">{error}</p>
-            )}
+            {error && <p className="text-[10px] text-amber leading-snug px-1">{error}</p>}
 
             {!result ? (
               <button
@@ -273,11 +236,7 @@ export default function Guardian() {
                 disabled={busy}
                 className="w-full h-10 rounded-xl bg-amber text-bg font-medium text-sm flex items-center justify-center gap-2 hover:brightness-110 transition disabled:opacity-60"
               >
-                {busy ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <Radar size={15} />
-                )}
+                {busy ? <Loader2 size={15} className="animate-spin" /> : <Radar size={15} />}
                 Scan this zone
               </button>
             ) : (
@@ -321,27 +280,13 @@ export default function Guardian() {
   );
 }
 
-function Stat({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: number;
-  accent?: boolean;
-}) {
+function Stat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
   return (
     <div className="rounded-lg bg-bg/70 ring-1 ring-line px-2 py-1.5 text-center">
-      <div
-        className={`font-display text-lg leading-none ${
-          accent ? "text-amber" : "text-teal"
-        }`}
-      >
+      <div className={`font-display text-lg leading-none ${accent ? "text-amber" : "text-teal"}`}>
         {value}
       </div>
-      <div className="font-mono text-[8px] tracking-[0.15em] text-dim uppercase mt-0.5">
-        {label}
-      </div>
+      <div className="font-mono text-[8px] tracking-[0.15em] text-dim uppercase mt-0.5">{label}</div>
     </div>
   );
 }
@@ -361,8 +306,8 @@ function ReviewButton({
     tone === "amber"
       ? "hover:ring-amber/60 hover:text-amber"
       : tone === "teal"
-      ? "hover:ring-teal/60 hover:text-teal"
-      : "hover:ring-line hover:text-ink";
+        ? "hover:ring-teal/60 hover:text-teal"
+        : "hover:ring-line hover:text-ink";
   return (
     <button
       onClick={onClick}

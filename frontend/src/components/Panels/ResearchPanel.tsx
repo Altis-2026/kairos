@@ -1,13 +1,3 @@
-/**
- * Research tools — extra ways to interrogate the latest analysis result:
- *   • Raw SAR backscatter (grayscale physics, not just the binary mask)
- *   • Sentinel-2 optical (true-color context)
- *   • Before/After comparison (cross-fade slider)
- *   • Time-series (scrub/animate the metric over time)
- *
- * Each acts on mapStore.lastResult, so it works whether the result came from
- * the wizard, the chat, or the quick-analysis pin.
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -43,12 +33,9 @@ import {
 import { fetchImpact } from "../../api/impact";
 import { buildEmbedSnippet } from "../../lib/embed";
 import ResultInsight from "../Insight/ResultInsight";
+import AccuracySection from "./AccuracySection";
 import type { ImpactResponse } from "../../types/analysis";
-import {
-  downloadGeoTIFF,
-  downloadReport,
-  type ExportSource,
-} from "../../lib/exporters";
+import { downloadGeoTIFF, downloadReport, type ExportSource } from "../../lib/exporters";
 import { buildShareUrl } from "../../lib/share";
 import { panelShell } from "../../lib/responsive";
 
@@ -115,7 +102,6 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
   const opticalOn = layers.some((l) => l.id === OPTICAL_ID);
   const populationOn = layers.some((l) => l.id === POPULATION_ID);
 
-  // A new analysis invalidates the previous impact figures + watch state.
   useEffect(() => {
     setImpact(null);
     setWatched(false);
@@ -191,8 +177,7 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
         start_date: ref.start_date,
         end_date: ref.end_date,
       });
-      const cloud =
-        data.cloud_percent != null ? ` · ${data.cloud_percent}% cloud` : "";
+      const cloud = data.cloud_percent != null ? ` · ${data.cloud_percent}% cloud` : "";
       map.addRasterLayer({
         id: OPTICAL_ID,
         name: `${data.label}${cloud}`,
@@ -300,30 +285,24 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
     <motion.aside
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={`${panelShell(
-        "lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-80"
-      )} space-y-4`}
+      className={`${panelShell("lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-80")} space-y-4`}
     >
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
-          RESEARCH TOOLS
-        </span>
-        <button onClick={onClose} className="text-dim hover:text-ink" title="Close">
+        <span className="font-mono text-[10px] tracking-[0.2em] text-dim">RESEARCH TOOLS</span>
+        <button onClick={onClose} className="text-dim hover:text-ink" aria-label="Close" title="Close">
           <X size={15} />
         </button>
       </div>
 
       {!lastResult ? (
         <p className="text-xs text-dim leading-relaxed">
-          Run an analysis first — from the sidebar, the chat, or the ⚡ quick-pin.
-          These tools build on the most recent result.
+          Run an analysis first, from the sidebar, the chat, or the ⚡ quick-pin. These tools build on the
+          most recent result.
         </p>
       ) : (
         <>
           <div className="rounded-xl bg-bg/70 ring-1 ring-line p-3">
-            <div className="text-xs text-ink truncate">
-              {lastResult.displayName}
-            </div>
+            <div className="text-xs text-ink truncate">{lastResult.displayName}</div>
             <div className="mt-0.5 font-mono text-[10px] text-dim">
               {lastResult.dataDate} · {lastResult.startDate} → {lastResult.endDate}
             </div>
@@ -346,9 +325,7 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
           />
 
           <div className="space-y-2">
-            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
-              Overlays
-            </h3>
+            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">Overlays</h3>
             <ToolRow
               icon={<Radar size={14} />}
               label="Raw SAR backscatter"
@@ -370,9 +347,7 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="space-y-2">
-            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
-              Time &amp; change
-            </h3>
+            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">Time &amp; change</h3>
             <ToolRow
               icon={<GitCompareArrows size={14} />}
               label="Before / after compare"
@@ -396,13 +371,11 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
           <SignalSection aoi={ref} />
 
           <div className="space-y-2">
-            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
-              Human impact
-            </h3>
+            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">Human impact</h3>
             <ToolRow
               icon={<UsersRound size={14} />}
               label="Population density"
-              hint="GHSL heatmap — where the people are"
+              hint="GHSL heatmap, where the people are"
               active={populationOn}
               loading={busy === "population"}
               error={errors.population}
@@ -412,29 +385,20 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
               onClick={runImpact}
               disabled={busy === "impact"}
               className="w-full flex items-center gap-2.5 rounded-xl ring-1 ring-line bg-bg/70 px-3 py-2.5 text-left text-dim hover:text-ink transition disabled:opacity-60"
+              aria-label="People and built-up area inside the detection footprint"
               title="People and built-up area inside the detection footprint"
             >
               <span className="text-dim">
-                {busy === "impact" ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Users size={14} />
-                )}
+                {busy === "impact" ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />}
               </span>
               <span className="min-w-0">
-                <span className="block text-xs text-ink">
-                  Estimate people affected
-                </span>
+                <span className="block text-xs text-ink">Estimate people affected</span>
                 <span className="block text-[10px] text-dim leading-tight">
                   Population &amp; built-up area in the footprint
                 </span>
               </span>
             </button>
-            {errors.impact && (
-              <p className="text-[10px] text-amber leading-snug px-1">
-                {errors.impact}
-              </p>
-            )}
+            {errors.impact && <p className="text-[10px] text-amber leading-snug px-1">{errors.impact}</p>}
             {impact && (
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-xl bg-bg/70 ring-1 ring-teal/30 p-3">
@@ -455,25 +419,25 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
                 <p className="col-span-2 text-[10px] text-dim leading-snug">
-                  Inside the detection footprint · GHSL 2020 · figures are
-                  modelled estimates.
+                  Inside the detection footprint · GHSL 2020 · figures are modelled estimates.
                 </p>
               </div>
             )}
           </div>
 
           <div className="space-y-2">
-            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
-              Monitor
-            </h3>
+            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">Monitor</h3>
             <button
               onClick={watchArea}
               disabled={busy === "watch" || watched || !user || !alertsAvailable()}
               className={`w-full flex items-center gap-2.5 rounded-xl ring-1 px-3 py-2.5 text-left transition disabled:opacity-60 ${
-                watched
-                  ? "bg-raised text-teal ring-teal/50"
-                  : "bg-bg/70 text-dim ring-line hover:text-ink"
+                watched ? "bg-raised text-teal ring-teal/50" : "bg-bg/70 text-dim ring-line hover:text-ink"
               }`}
+              aria-label={
+                !user
+                  ? "Sign in to watch areas for new passes"
+                  : "Re-check this area on future Sentinel-1 passes"
+              }
               title={
                 !user
                   ? "Sign in to watch areas for new passes"
@@ -494,53 +458,34 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
                   {watched ? "Watching this area" : "Watch this area"}
                 </span>
                 <span className="block text-[10px] text-dim leading-tight">
-                  {!user
-                    ? "Sign in to enable alerts"
-                    : "Alert on the next Sentinel-1 pass"}
+                  {!user ? "Sign in to enable alerts" : "Alert on the next Sentinel-1 pass"}
                 </span>
               </span>
             </button>
-            {errors.watch && (
-              <p className="text-[10px] text-amber leading-snug px-1">
-                {errors.watch}
-              </p>
-            )}
+            {errors.watch && <p className="text-[10px] text-amber leading-snug px-1">{errors.watch}</p>}
           </div>
 
           <div className="space-y-2">
-            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
-              Export &amp; share
-            </h3>
+            <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">Export &amp; share</h3>
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() =>
-                  exportSrc &&
-                  guard("geotiff", () => downloadGeoTIFF(exportSrc))
-                }
+                onClick={() => exportSrc && guard("geotiff", () => downloadGeoTIFF(exportSrc))}
                 disabled={busy === "geotiff"}
                 className="h-9 rounded-xl text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+                aria-label="Download the result raster as a GeoTIFF"
                 title="Download the result raster as a GeoTIFF"
               >
-                {busy === "geotiff" ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <Download size={12} />
-                )}
+                {busy === "geotiff" ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
                 GeoTIFF
               </button>
               <button
-                onClick={() =>
-                  exportSrc && guard("report", () => downloadReport(exportSrc))
-                }
+                onClick={() => exportSrc && guard("report", () => downloadReport(exportSrc))}
                 disabled={busy === "report"}
                 className="h-9 rounded-xl text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+                aria-label="Download a methodology report (markdown)"
                 title="Download a methodology report (markdown)"
               >
-                {busy === "report" ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <FileText size={12} />
-                )}
+                {busy === "report" ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
                 Report
               </button>
             </div>
@@ -548,36 +493,29 @@ export default function ResearchPanel({ onClose }: { onClose: () => void }) {
               <button
                 onClick={copyShare}
                 className="h-9 rounded-xl text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition"
+                aria-label="Copy a reproducible link to this analysis"
                 title="Copy a reproducible link to this analysis"
               >
-                {copied ? (
-                  <Check size={12} className="text-teal" />
-                ) : (
-                  <Share2 size={12} />
-                )}
+                {copied ? <Check size={12} className="text-teal" /> : <Share2 size={12} />}
                 {copied ? "Copied" : "Share link"}
               </button>
               <button
                 onClick={copyEmbed}
                 className="h-9 rounded-xl text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition"
+                aria-label="Copy an <iframe> snippet to embed this live result"
                 title="Copy an <iframe> snippet to embed this live result"
               >
-                {embedCopied ? (
-                  <Check size={12} className="text-teal" />
-                ) : (
-                  <Code2 size={12} />
-                )}
+                {embedCopied ? <Check size={12} className="text-teal" /> : <Code2 size={12} />}
                 {embedCopied ? "Copied" : "Embed code"}
               </button>
             </div>
             {(errors.geotiff || errors.report) && (
-              <p className="text-[10px] text-amber leading-snug px-1">
-                {errors.geotiff || errors.report}
-              </p>
+              <p className="text-[10px] text-amber leading-snug px-1">{errors.geotiff || errors.report}</p>
             )}
           </div>
         </>
       )}
+      <AccuracySection />
     </motion.aside>
   );
 }
@@ -605,9 +543,7 @@ function ToolRow({
         onClick={onClick}
         disabled={loading}
         className={`w-full flex items-center gap-2.5 rounded-xl ring-1 px-3 py-2.5 text-left transition ${
-          active
-            ? "bg-raised text-teal ring-teal/50"
-            : "bg-bg/70 text-dim ring-line hover:text-ink"
+          active ? "bg-raised text-teal ring-teal/50" : "bg-bg/70 text-dim ring-line hover:text-ink"
         } disabled:opacity-60`}
       >
         <span className={active ? "text-teal" : "text-dim"}>
@@ -615,15 +551,9 @@ function ToolRow({
         </span>
         <span className="min-w-0">
           <span className="block text-xs text-ink">{label}</span>
-          <span className="block text-[10px] text-dim leading-tight truncate">
-            {hint}
-          </span>
+          <span className="block text-[10px] text-dim leading-tight truncate">{hint}</span>
         </span>
-        <span
-          className={`ml-auto font-mono text-[9px] tracking-wider ${
-            active ? "text-teal" : "text-dim"
-          }`}
-        >
+        <span className={`ml-auto font-mono text-[9px] tracking-wider ${active ? "text-teal" : "text-dim"}`}>
           {active ? "ON" : "OFF"}
         </span>
       </button>
@@ -632,11 +562,6 @@ function ToolRow({
   );
 }
 
-/**
- * Signal & trend: per-scene time series of a chosen variable over the current
- * AOI, with formal trend statistics — the "Figure 3" of a remote-sensing
- * paper, generated server-side (chart arrives as publication SVG).
- */
 function SignalSection({ aoi }: { aoi: AnalysisRef | null }) {
   const [variable, setVariable] = useState("VV");
   const [running, setRunning] = useState(false);
@@ -651,13 +576,8 @@ function SignalSection({ aoi }: { aoi: AnalysisRef | null }) {
     setError(null);
     setResult(null);
     try {
-      // Widen to a year ending at the analysis window so a trend is visible.
       const end = aoi.end_date;
-      const start = new Date(
-        new Date(end).getTime() - 365 * 24 * 3600 * 1000
-      )
-        .toISOString()
-        .slice(0, 10);
+      const start = new Date(new Date(end).getTime() - 365 * 24 * 3600 * 1000).toISOString().slice(0, 10);
       const res = await fetchSignal({
         bbox: aoi.bbox,
         start_date: start,
@@ -700,18 +620,14 @@ function SignalSection({ aoi }: { aoi: AnalysisRef | null }) {
 
   return (
     <div className="space-y-2">
-      <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
-        Signal &amp; trend
-      </h3>
+      <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">Signal &amp; trend</h3>
       <div className="flex items-center gap-1.5">
         {["VV", "VH", "NDVI", "NDWI", "NDSI"].map((v) => (
           <button
             key={v}
             onClick={() => setVariable(v)}
             className={`flex-1 rounded-lg px-1.5 py-1.5 font-mono text-[9px] tracking-wider ring-1 transition ${
-              variable === v
-                ? "bg-raised text-teal ring-teal/50"
-                : "text-dim ring-line hover:text-ink"
+              variable === v ? "bg-raised text-teal ring-teal/50" : "text-dim ring-line hover:text-ink"
             }`}
           >
             {v}
@@ -722,19 +638,14 @@ function SignalSection({ aoi }: { aoi: AnalysisRef | null }) {
         onClick={run}
         disabled={running}
         className="w-full flex items-center gap-2.5 rounded-xl ring-1 ring-line bg-bg/70 px-3 py-2.5 text-left text-dim hover:text-ink transition disabled:opacity-60"
+        aria-label="Every usable observation over the last year, plus OLS and Mann-Kendall trend tests"
         title="Every usable observation over the last year, plus OLS and Mann-Kendall trend tests"
       >
         <span className="text-dim">
-          {running ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <Timer size={14} />
-          )}
+          {running ? <Loader2 size={14} className="animate-spin" /> : <Timer size={14} />}
         </span>
         <span className="min-w-0">
-          <span className="block text-xs text-ink">
-            Extract {variable} time series
-          </span>
+          <span className="block text-xs text-ink">Extract {variable} time series</span>
           <span className="block text-[10px] text-dim leading-tight">
             1-year series over this AOI + trend statistics
           </span>
@@ -750,11 +661,7 @@ function SignalSection({ aoi }: { aoi: AnalysisRef | null }) {
               className="w-full block"
             />
           </div>
-          {result.trend && (
-            <p className="text-[10px] text-dim leading-snug px-1">
-              {result.trend.summary}
-            </p>
-          )}
+          {result.trend && <p className="text-[10px] text-dim leading-snug px-1">{result.trend.summary}</p>}
           <div className="flex items-center gap-1.5">
             <button
               onClick={downloadCsv}

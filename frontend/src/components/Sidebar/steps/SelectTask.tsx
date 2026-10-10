@@ -1,4 +1,3 @@
-/** Step 1 — choose an analysis. Built live from GET /registry. */
 import { useQuery } from "@tanstack/react-query";
 import { fetchRegistry } from "../../../api/registry";
 import { useSidebarStore } from "../../../stores/sidebarStore";
@@ -25,9 +24,8 @@ export default function SelectTask() {
     return (
       <div className="rounded-xl bg-bg/70 ring-1 ring-line p-4 space-y-3">
         <p className="text-xs text-dim leading-relaxed">
-          Can't reach the Kairos API.{" "}
-          {error instanceof Error ? error.message : ""} Check that the backend
-          is running on port 8000, then try again.
+          Can't reach the Kairos API. {error instanceof Error ? error.message : ""} Check that the backend is
+          running on port 8000, then try again.
         </p>
         <button
           onClick={() => refetch()}
@@ -45,14 +43,12 @@ export default function SelectTask() {
   return (
     <div className="space-y-5">
       <p className="text-xs text-dim leading-relaxed">
-        Choose what to look for. Every analysis runs on Sentinel-1 radar, which
-        sees through clouds, smoke, and darkness.
+        Choose what to look for. Every analysis runs on Sentinel-1 radar, which sees through clouds, smoke,
+        and darkness.
       </p>
       {categories.map((cat) => (
         <div key={cat} className="space-y-2">
-          <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
-            {cat}
-          </h3>
+          <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">{cat}</h3>
           {tasks
             .filter((t) => t.category === cat)
             .map((t: AnalysisType) => (

@@ -3,7 +3,6 @@ import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Analytics } from "@vercel/analytics/react";
 import App from "./App";
-import { initAuthListener } from "./lib/firebase";
 import "./styles/globals.css";
 
 const queryClient = new QueryClient({
@@ -12,13 +11,11 @@ const queryClient = new QueryClient({
   },
 });
 
-initAuthListener();
+void import("./lib/firebase").then((m) => m.initAuthListener());
 
-// Installable PWA: cache the app shell so Kairos opens instantly (the data
-// itself always comes live from the API).
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.register("/sw.js").catch(() => undefined);
   });
 }
 

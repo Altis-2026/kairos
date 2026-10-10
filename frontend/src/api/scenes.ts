@@ -2,11 +2,7 @@ import { apiFetch } from "./client";
 import type { ScenesResponse } from "../types/analysis";
 import type { BBox } from "../types/map";
 
-export function fetchScenes(
-  bbox: BBox,
-  startDate: string,
-  endDate: string
-): Promise<ScenesResponse> {
+export function fetchScenes(bbox: BBox, startDate: string, endDate: string): Promise<ScenesResponse> {
   const params = new URLSearchParams({
     min_lon: String(bbox[0]),
     min_lat: String(bbox[1]),

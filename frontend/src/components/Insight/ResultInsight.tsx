@@ -1,59 +1,8 @@
-/**
- * "Explain this result" — turns a finished analysis into plain language.
- *
- * Two on-demand steps, matching the Kairos UI exactly:
- *   1. Explain        instant, grounded only in the computed numbers.
- *   2. Regional context  pulls live news / trends / concerns via web search.
- *
- * Reusable across the sidebar result step and the research panel. Degrades
- * gracefully when the AI provider or web search is unavailable.
- */
 import { useEffect, useState } from "react";
 import { Loader2, Search, Sparkles } from "lucide-react";
-import {
-  fetchInterpretation,
-  fetchRegionalContext,
-  type InterpretInput,
-} from "../../api/interpret";
+import { fetchInterpretation, fetchRegionalContext, type InterpretInput } from "../../api/interpret";
 import { reverseGeocodeBbox } from "../../lib/geocode";
-
-/** Minimal markdown: `### Header` lines become headers, blanks split paragraphs. */
-function renderInsight(text: string) {
-  const blocks: React.ReactNode[] = [];
-  const lines = text.split("\n");
-  let para: string[] = [];
-  const flush = (key: string) => {
-    if (para.length) {
-      blocks.push(
-        <p key={key} className="text-[11px] text-ink/90 leading-relaxed">
-          {para.join(" ")}
-        </p>
-      );
-      para = [];
-    }
-  };
-  lines.forEach((raw, i) => {
-    const line = raw.trim();
-    if (line.startsWith("###")) {
-      flush(`p${i}`);
-      blocks.push(
-        <h4
-          key={`h${i}`}
-          className="font-mono text-[9px] tracking-[0.18em] text-teal uppercase mt-2 first:mt-0"
-        >
-          {line.replace(/^#+\s*/, "")}
-        </h4>
-      );
-    } else if (!line) {
-      flush(`p${i}`);
-    } else {
-      // strip bold/italic markers — we render plain, styled text
-      para.push(line.replace(/\*\*/g, "").replace(/(^|\s)_([^_]+)_/g, "$1$2"));
-    }
-  });
-  flush("end");
-  return blocks;
-}
+import Markdown from "../Markdown";
 
 export default function ResultInsight({ input }: { input: InterpretInput }) {
   const [text, setText] = useState<string | null>(null);
@@ -62,7 +11,6 @@ export default function ResultInsight({ input }: { input: InterpretInput }) {
   const [err, setErr] = useState<string | null>(null);
   const [contextNote, setContextNote] = useState<string | null>(null);
 
-  // A different result invalidates any cached explanation.
   const sig = `${input.analysis_type}|${input.start_date}|${input.end_date}|${input.bbox.join(",")}`;
   useEffect(() => {
     setText(null);
@@ -100,9 +48,7 @@ export default function ResultInsight({ input }: { input: InterpretInput }) {
       if (d.available && d.text) setContext(d.text);
       else setContextNote(d.note || "No regional context found.");
     } catch (e) {
-      setContextNote(
-        e instanceof Error ? e.message : "Regional search is unavailable."
-      );
+      setContextNote(e instanceof Error ? e.message : "Regional search is unavailable.");
     } finally {
       setBusy(null);
     }
@@ -110,23 +56,18 @@ export default function ResultInsight({ input }: { input: InterpretInput }) {
 
   return (
     <div className="space-y-2">
-      <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
-        Understand
-      </h3>
+      <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">Understand</h3>
 
       {!text ? (
         <button
           onClick={explain}
           disabled={busy === "explain"}
+          aria-label="Plain-language explanation of what this result means"
           title="Plain-language explanation of what this result means"
           className="w-full flex items-center gap-2.5 rounded-xl ring-1 ring-line bg-bg/70 px-3 py-2.5 text-left text-dim hover:text-ink transition disabled:opacity-60"
         >
           <span className="text-amber">
-            {busy === "explain" ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Sparkles size={14} />
-            )}
+            {busy === "explain" ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
           </span>
           <span className="min-w-0">
             <span className="block text-xs text-ink">Explain this result</span>
@@ -137,33 +78,34 @@ export default function ResultInsight({ input }: { input: InterpretInput }) {
         </button>
       ) : (
         <div className="rounded-xl bg-bg/70 ring-1 ring-teal/30 p-3 space-y-1.5">
-          {renderInsight(text)}
+          <Markdown
+            text={text}
+            size="text-[11px]"
+            headingClass="font-mono text-[9px] tracking-[0.18em] text-teal uppercase"
+          />
 
           {!context ? (
             <button
               onClick={searchContext}
               disabled={busy === "context"}
+              aria-label="Search the web for recent news and trends in this region"
               title="Search the web for recent news and trends in this region"
               className="mt-2 w-full h-8 rounded-lg text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-teal hover:ring-teal/40 transition disabled:opacity-60"
             >
-              {busy === "context" ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : (
-                <Search size={12} />
-              )}
+              {busy === "context" ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
               Search regional context
             </button>
           ) : (
             <div className="mt-2 pt-2 border-t border-line space-y-1.5">
-              <h4 className="font-mono text-[9px] tracking-[0.18em] text-amber uppercase">
-                In the region
-              </h4>
-              {renderInsight(context)}
+              <h4 className="font-mono text-[9px] tracking-[0.18em] text-amber uppercase">In the region</h4>
+              <Markdown
+                text={context}
+                size="text-[11px]"
+                headingClass="font-mono text-[9px] tracking-[0.18em] text-teal uppercase"
+              />
             </div>
           )}
-          {contextNote && (
-            <p className="mt-1 text-[10px] text-dim leading-snug">{contextNote}</p>
-          )}
+          {contextNote && <p className="mt-1 text-[10px] text-dim leading-snug">{contextNote}</p>}
         </div>
       )}
 

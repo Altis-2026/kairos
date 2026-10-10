@@ -83,7 +83,7 @@ export default function PlaceSearch({
         setActiveIndex(-1);
         setOpen(next.length > 0);
       } catch {
-
+        setHits([]);
       }
     }, 250);
     return () => {
@@ -106,8 +106,6 @@ export default function PlaceSearch({
     });
   }
 
-  // Typing a full address and pressing Enter without touching the list should
-  // still work, so fall back to the backend geocoder when there is no hit.
   async function submitRaw() {
     const q = query.trim();
     if (q.length < 3 || busy) return;
@@ -183,11 +181,7 @@ export default function PlaceSearch({
             aria-label="Find this place"
             className="h-10 w-10 grid place-items-center rounded-xl bg-amber text-bg hover:brightness-110 transition disabled:opacity-50"
           >
-            {busy ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Search size={14} />
-            )}
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
           </button>
         </div>
 
@@ -202,9 +196,7 @@ export default function PlaceSearch({
                   }}
                   onMouseEnter={() => setActiveIndex(i)}
                   className={`w-full text-left flex items-start gap-2 px-3 py-2 text-[11px] leading-snug transition-colors ${
-                    i === activeIndex
-                      ? "bg-raised text-ink"
-                      : "text-dim hover:text-ink"
+                    i === activeIndex ? "bg-raised text-ink" : "text-dim hover:text-ink"
                   }`}
                 >
                   <MapPin size={11} className="shrink-0 text-teal mt-0.5" />

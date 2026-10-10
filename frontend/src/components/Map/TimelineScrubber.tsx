@@ -1,8 +1,3 @@
-/**
- * Time-series scrubber — drag or play through the analysis run across stepped
- * time windows. Only the current frame's layer is visible; a sparkline shows
- * how the headline metric changed over the window.
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Pause, Play, X } from "lucide-react";
@@ -15,15 +10,11 @@ export default function TimelineScrubber() {
   const setLayerVisible = useMapStore((s) => s.setLayerVisible);
   const [playing, setPlaying] = useState(false);
 
-  // Show only the current frame's layer.
   useEffect(() => {
     if (!timeline) return;
-    timeline.frames.forEach((f, i) =>
-      setLayerVisible(f.layerId, i === index)
-    );
+    timeline.frames.forEach((f, i) => setLayerVisible(f.layerId, i === index));
   }, [timeline, index, setLayerVisible]);
 
-  // Playback: advance through frames on a loop.
   useEffect(() => {
     if (!playing || !timeline) return;
     const id = setInterval(() => {
@@ -46,7 +37,6 @@ export default function TimelineScrubber() {
     map.setTimeline(null);
   }
 
-  // Sparkline geometry
   const values = frames.map((f) => f.value);
   const vmax = Math.max(...values, 1);
   const vmin = Math.min(...values, 0);
@@ -72,7 +62,12 @@ export default function TimelineScrubber() {
         <span className="font-mono text-[10px] tracking-[0.2em] text-dim">
           TIME-SERIES · {timeline.metric.toUpperCase()}
         </span>
-        <button onClick={close} className="text-dim hover:text-ink" title="Close time-series">
+        <button
+          onClick={close}
+          className="text-dim hover:text-ink"
+          aria-label="Close time-series"
+          title="Close time-series"
+        >
           <X size={14} />
         </button>
       </div>
@@ -81,6 +76,7 @@ export default function TimelineScrubber() {
         <button
           onClick={() => setPlaying((p) => !p)}
           className="h-9 w-9 shrink-0 grid place-items-center rounded-xl bg-amber text-bg hover:brightness-110 transition"
+          aria-label={playing ? "Pause" : "Play"}
           title={playing ? "Pause" : "Play"}
         >
           {playing ? <Pause size={15} /> : <Play size={15} />}
@@ -105,14 +101,7 @@ export default function TimelineScrubber() {
           </div>
         </div>
 
-        {/* Sparkline */}
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          width={88}
-          height={28}
-          preserveAspectRatio="none"
-          className="shrink-0"
-        >
+        <svg viewBox={`0 0 ${W} ${H}`} width={88} height={28} preserveAspectRatio="none" className="shrink-0">
           <polyline
             points={path}
             fill="none"
@@ -125,9 +114,7 @@ export default function TimelineScrubber() {
       </div>
 
       <div className="mt-2 flex items-baseline gap-2">
-        <span className="font-display text-2xl text-teal">
-          {current.value.toLocaleString()}
-        </span>
+        <span className="font-display text-2xl text-teal">{current.value.toLocaleString()}</span>
         <span className="text-xs text-dim">{timeline.unit}</span>
         <span className="ml-auto font-mono text-[10px] text-dim">
           {current.date} · frame {index + 1}/{frames.length}

@@ -1,10 +1,3 @@
-/**
- * Firebase Authentication — guarded initialization.
- *
- * If the VITE_FIREBASE_* variables are not set, the app runs normally
- * with sign-in disabled (the button explains how to enable it).
- * This means a missing Firebase config can never crash Kairos.
- */
 import { initializeApp, type FirebaseApp } from "firebase/app";
 import {
   getAuth,
@@ -33,7 +26,6 @@ if (firebaseEnabled) {
   firestore = getFirestore(app);
 }
 
-/** Firestore handle — null when Firebase config is absent. */
 export const db = firestore;
 
 export function initAuthListener() {

@@ -18,12 +18,7 @@ import {
 import Globe from "../Globe";
 import PlaceSearch from "../PlaceSearch";
 import { useMapStore, bboxCenterZoom } from "../../stores/mapStore";
-import {
-  askForesight,
-  runForesight,
-  type Hazard,
-  type RiskOutlook,
-} from "../../api/foresight";
+import { askForesight, runForesight, type Hazard, type RiskOutlook } from "../../api/foresight";
 import { HAZARD_NAMES, PLAYBOOKS } from "../../lib/preparedness";
 import { openPlaceReport } from "../../lib/placeReport";
 import { goToApp } from "../../lib/embed";
@@ -110,16 +105,12 @@ export default function Foresight() {
   const [hazard, setHazard] = useState<Hazard>("flood");
   const [running, setRunning] = useState<Hazard | null>(null);
   const [checkingAll, setCheckingAll] = useState(false);
-  const [outlooks, setOutlooks] = useState<Partial<Record<Hazard, RiskOutlook>>>(
-    {}
-  );
+  const [outlooks, setOutlooks] = useState<Partial<Record<Hazard, RiskOutlook>>>({});
   const [error, setError] = useState<string | null>(null);
   const [playbookOpen, setPlaybookOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
-  const [answer, setAnswer] = useState<{ text: string; source: string } | null>(
-    null
-  );
+  const [answer, setAnswer] = useState<{ text: string; source: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const answerRef = useRef<HTMLDivElement>(null);
 
@@ -232,15 +223,12 @@ export default function Foresight() {
     setRunning(which);
     try {
       const raw = await runForesight(which, target.bbox);
-      // File it under the hazard that was asked for, so labels can never drift
-      // from the tab the result lives on.
+
       const result = { ...raw, hazard: which };
       setOutlooks((o) => ({ ...o, [which]: result }));
       return result;
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "The outlook could not be computed."
-      );
+      setError(e instanceof Error ? e.message : "The outlook could not be computed.");
       return null;
     } finally {
       setRunning(null);
@@ -286,16 +274,10 @@ export default function Foresight() {
     try {
       const res = await askForesight(text, outlook, target.label);
       setAnswer({ text: res.answer, source: res.source });
-      setTimeout(
-        () => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }),
-        60
-      );
+      setTimeout(() => answerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 60);
     } catch (e) {
       setAnswer({
-        text:
-          e instanceof Error
-            ? e.message
-            : "That question could not be answered right now.",
+        text: e instanceof Error ? e.message : "That question could not be answered right now.",
         source: "error",
       });
     } finally {
@@ -348,15 +330,12 @@ export default function Foresight() {
           <>
             <div className="flex items-center gap-2 text-teal">
               <Telescope size={16} />
-              <h1 className="font-display text-lg text-ink">
-                What could happen where you live?
-              </h1>
+              <h1 className="font-display text-lg text-ink">What could happen where you live?</h1>
             </div>
             <p className="text-xs text-dim leading-relaxed">
-              Foresight reads decades of satellite records for one place and
-              answers three questions: how exposed is it, when in the year does
-              the risk peak, and is it getting worse. No simulation, just the
-              measured record, with the receipts shown.
+              Foresight reads decades of satellite records for one place and answers three questions: how
+              exposed is it, when in the year does the risk peak, and is it getting worse. No simulation, just
+              the measured record, with the receipts shown.
             </p>
             <PlaceSearch
               ariaLabel="Place to assess"
@@ -387,9 +366,7 @@ export default function Foresight() {
         ) : (
           <>
             <div className="rounded-xl bg-bg/70 ring-1 ring-teal/30 p-3">
-              <div className="text-sm text-ink font-medium break-words">
-                {target.label}
-              </div>
+              <div className="text-sm text-ink font-medium break-words">{target.label}</div>
               <div className="mt-1.5 flex items-center gap-3">
                 <button
                   onClick={() => {
@@ -406,6 +383,7 @@ export default function Foresight() {
                 </button>
                 <button
                   onClick={copyLink}
+                  aria-label="Copy a link to this outlook"
                   title="Copy a link to this outlook"
                   className="flex items-center gap-1 text-[11px] text-dim hover:text-teal transition-colors"
                 >
@@ -434,14 +412,8 @@ export default function Foresight() {
                         : "bg-bg/70 ring-line text-dim hover:text-ink"
                     }`}
                   >
-                    {running === h.id ? (
-                      <Loader2 size={15} className="animate-spin" />
-                    ) : (
-                      <h.icon size={15} />
-                    )}
-                    <span className="text-[9px] leading-tight text-center">
-                      {HAZARD_NAMES[h.id]}
-                    </span>
+                    {running === h.id ? <Loader2 size={15} className="animate-spin" /> : <h.icon size={15} />}
+                    <span className="text-[9px] leading-tight text-center">{HAZARD_NAMES[h.id]}</span>
                     {got && (
                       <span
                         className={`absolute -top-1.5 -right-1 min-w-[18px] rounded-full bg-surface ring-1 ring-line px-1 font-mono text-[9px] ${
@@ -501,9 +473,8 @@ export default function Foresight() {
 
             {!outlook && !busy && (
               <p className="text-[10px] text-dim/80 leading-snug">
-                This reads decades of satellite observations for the area, so
-                each hazard takes up to a minute. Results stay on each tab, so
-                you can compare all four.
+                This reads decades of satellite observations for the area, so each hazard takes up to a
+                minute. Results stay on each tab, so you can compare all four.
               </p>
             )}
 
@@ -518,9 +489,7 @@ export default function Foresight() {
                     if (!got) return null;
                     return (
                       <div key={h.id} className="flex items-center gap-2">
-                        <span className="w-24 shrink-0 text-[11px] text-dim">
-                          {HAZARD_NAMES[h.id]}
-                        </span>
+                        <span className="w-24 shrink-0 text-[11px] text-dim">{HAZARD_NAMES[h.id]}</span>
                         <span className="flex-1 h-1.5 rounded-full bg-line overflow-hidden">
                           <span
                             className="block h-full rounded-full bg-amber"
@@ -540,10 +509,8 @@ export default function Foresight() {
                 </div>
                 {highest && (
                   <p className="mt-2.5 text-[11px] text-dim leading-relaxed">
-                    The biggest measured exposure here is{" "}
-                    {HAZARD_NAMES[highest.hazard].toLowerCase()} at{" "}
-                    {highest.score} out of 100. Scores are per hazard and are
-                    not added together.
+                    The biggest measured exposure here is {HAZARD_NAMES[highest.hazard].toLowerCase()} at{" "}
+                    {highest.score} out of 100. Scores are per hazard and are not added together.
                   </p>
                 )}
               </div>
@@ -555,11 +522,7 @@ export default function Foresight() {
                   <div className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
                     Exposure score
                   </div>
-                  <div
-                    className={`font-display text-5xl mt-1 ${
-                      LEVEL_COLORS[outlook.level] ?? "text-ink"
-                    }`}
-                  >
+                  <div className={`font-display text-5xl mt-1 ${LEVEL_COLORS[outlook.level] ?? "text-ink"}`}>
                     {outlook.score}
                   </div>
                   <div
@@ -592,17 +555,13 @@ export default function Foresight() {
                         <div key={i} className="flex-1 flex flex-col items-center gap-1">
                           <div
                             className={`w-full rounded-sm ${
-                              v >= 0.6 * maxMonth && v > 0
-                                ? "bg-amber"
-                                : "bg-line"
+                              v >= 0.6 * maxMonth && v > 0 ? "bg-amber" : "bg-line"
                             }`}
                             style={{
                               height: `${Math.max(4, (v / maxMonth) * 52)}px`,
                             }}
                           />
-                          <span className="font-mono text-[8px] text-dim">
-                            {MONTH_LETTERS[i]}
-                          </span>
+                          <span className="font-mono text-[8px] text-dim">{MONTH_LETTERS[i]}</span>
                         </div>
                       ))}
                     </div>
@@ -619,9 +578,7 @@ export default function Foresight() {
                     <div className="font-mono text-[10px] tracking-[0.18em] text-dim uppercase mb-1">
                       Is it getting worse?
                     </div>
-                    <p className="text-[11px] text-dim leading-relaxed">
-                      {plainTrend(outlook)}
-                    </p>
+                    <p className="text-[11px] text-dim leading-relaxed">{plainTrend(outlook)}</p>
                     <p className="mt-1 font-mono text-[9px] text-dim/70">
                       Mann-Kendall + OLS on {outlook.trend_label}
                     </p>
@@ -634,14 +591,10 @@ export default function Foresight() {
                       Measured accuracy
                     </div>
                     <p className="text-[11px] text-dim leading-relaxed">
-                      {Math.round(outlook.skill.hit_rate * 100)}% of the flood
-                      extent independently mapped by the{" "}
-                      {outlook.skill.reference} in this area falls inside the
-                      zones marked here.
+                      {Math.round(outlook.skill.hit_rate * 100)}% of the flood extent independently mapped by
+                      the {outlook.skill.reference} in this area falls inside the zones marked here.
                     </p>
-                    <p className="mt-1 text-[10px] text-dim/80 leading-snug">
-                      {outlook.skill.note}
-                    </p>
+                    <p className="mt-1 text-[10px] text-dim/80 leading-snug">{outlook.skill.note}</p>
                   </div>
                 )}
 
@@ -693,8 +646,8 @@ export default function Foresight() {
                         {answer.source === "ai"
                           ? "Written by the Kairos assistant from the numbers above"
                           : answer.source === "data"
-                          ? "Answered directly from the measured numbers above"
-                          : "Could not answer"}
+                            ? "Answered directly from the measured numbers above"
+                            : "Could not answer"}
                       </p>
                     </div>
                   )}
@@ -708,9 +661,7 @@ export default function Foresight() {
                     <span className="font-mono text-[10px] tracking-[0.18em] text-amber uppercase">
                       What to do about it
                     </span>
-                    <span className="text-dim text-xs">
-                      {playbookOpen ? "hide" : "show"}
-                    </span>
+                    <span className="text-dim text-xs">{playbookOpen ? "hide" : "show"}</span>
                   </button>
                   {playbookOpen && (
                     <div className="px-3 pb-3 space-y-2.5">
@@ -742,9 +693,7 @@ export default function Foresight() {
                   <Printer size={13} /> Print or save this report
                 </button>
 
-                <p className="text-[10px] text-dim/80 leading-snug">
-                  {outlook.method}
-                </p>
+                <p className="text-[10px] text-dim/80 leading-snug">{outlook.method}</p>
               </>
             )}
           </>
