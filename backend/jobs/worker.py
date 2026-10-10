@@ -1,25 +1,14 @@
-"""
-Background job worker.
-
-Run with:  python -m jobs.worker   (from the backend/ directory, venv active)
-Requires a running Redis (REDIS_URL in .env).
-
-The worker initializes GEE itself because it is a separate process
-from the API server.
-"""
-
 import os
 
 import ee
 from dotenv import load_dotenv
 from redis import Redis
-from rq import Worker, Queue
+from rq import Queue, Worker
 
 load_dotenv()
 
 
 def job_run_analysis(analysis_type: str, bbox: list, start_date: str, end_date: str):
-    """Job function — importable by rq from this module path."""
     from api.analyze import run_analysis
 
     return run_analysis(analysis_type, bbox, start_date, end_date)
@@ -31,14 +20,6 @@ def job_run_simulation(
     params: dict | None = None,
     analysis_type: str = "flood_simulation",
 ):
-    """
-    Job function for a forward simulation — importable by rq from this module
-    path. Kept separate from `job_run_analysis` because a simulation needs its
-    parameter dict and returns a much larger payload.
-
-    `analysis_type` defaults to the flood model so that jobs enqueued by an
-    older release, which did not pass it, still run correctly after a deploy.
-    """
     from api.analyze import run_analysis
 
     return run_analysis(

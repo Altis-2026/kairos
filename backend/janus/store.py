@@ -1,16 +1,3 @@
-"""
-Janus project memory — the mentor's persistent state.
-
-A research project is a long-lived thread: the question, the evolving study
-design, every conversation turn (including what tools Janus ran and what they
-returned), and the annotated bibliography. SQLite for now, same pattern as
-watch/store.py; moves to Firestore/Cloud SQL before the paid launch
-(docs/JANUS.md §6).
-
-Projects are keyed by an `owner` string: the Firebase uid for signed-in
-users, or an anonymous per-browser id the frontend keeps in localStorage.
-"""
-
 import json
 import os
 import sqlite3
@@ -21,7 +8,6 @@ DB_PATH = os.getenv("JANUS_DB_PATH", "kairos_janus.db")
 
 _lock = threading.Lock()
 
-# Keep prompts bounded: only the most recent turns ride into the model.
 HISTORY_LIMIT = 30
 
 
@@ -78,7 +64,6 @@ def init_db():
             )
             """
         )
-        # v2: proactive insights the mentor surfaces without being asked.
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS insights (
@@ -94,8 +79,6 @@ def init_db():
             )
             """
         )
-        # v3: the research log — structured hypotheses with an evolving status
-        # and the evidence tied to each, turning the chat into a notebook.
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS hypotheses (
@@ -109,8 +92,6 @@ def init_db():
             )
             """
         )
-        # v3: per-owner skills profile Janus maintains across ALL projects, so
-        # it teaches adaptively and remembers what you already know.
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS skills (
@@ -124,8 +105,6 @@ def init_db():
             )
             """
         )
-        # v2: per-owner subscription tier (billing wired later; see
-        # janus/entitlements.py). Absence means the default early-access tier.
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS plans (
@@ -144,16 +123,10 @@ def init_db():
             )
             """
         )
-        # v2: monitoring flag added to an existing table — migrate in place.
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(projects)")}
         if "watched" not in cols:
-            conn.execute(
-                "ALTER TABLE projects ADD COLUMN watched INTEGER DEFAULT 0"
-            )
+            conn.execute("ALTER TABLE projects ADD COLUMN watched INTEGER DEFAULT 0")
         conn.commit()
-
-
-# --- projects ---------------------------------------------------------------
 
 
 def create_project(
@@ -176,9 +149,7 @@ def create_project(
 
 def get_project(project_id: int) -> dict:
     with _lock, _connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM projects WHERE id = ?", (project_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
     if not row:
         raise ValueError(f"Project {project_id} not found.")
     p = dict(row)
@@ -201,7 +172,6 @@ def list_projects(owner: str) -> list:
 
 
 def update_project(project_id: int, **fields) -> dict:
-    """Update whitelisted columns; design dicts are merged, not replaced."""
     allowed = {
         "title",
         "question",
@@ -220,9 +190,7 @@ def update_project(project_id: int, **fields) -> dict:
 
     with _lock, _connect() as conn:
         if design_patch:
-            row = conn.execute(
-                "SELECT design FROM projects WHERE id = ?", (project_id,)
-            ).fetchone()
+            row = conn.execute("SELECT design FROM projects WHERE id = ?", (project_id,)).fetchone()
             if not row:
                 raise ValueError(f"Project {project_id} not found.")
             merged = json.loads(row["design"] or "{}")
@@ -233,9 +201,7 @@ def update_project(project_id: int, **fields) -> dict:
             sets.append("updated_at = ?")
             values.append(time.time())
             values.append(project_id)
-            conn.execute(
-                f"UPDATE projects SET {', '.join(sets)} WHERE id = ?", values
-            )
+            conn.execute(f"UPDATE projects SET {', '.join(sets)} WHERE id = ?", values)
             conn.commit()
     return get_project(project_id)
 
@@ -251,28 +217,18 @@ def delete_project(project_id: int):
 
 
 def record_last_run(project_id: int, run: dict):
-    """
-    Stash the most recent real analysis (type, bbox, dates, data_date) on the
-    project so proactive monitoring knows what to re-check and from when.
-    Kept inside `design` so no schema change is needed.
-    """
     update_project(project_id, design={"last_run": run})
 
 
 def all_watched_projects() -> list:
     with _lock, _connect() as conn:
-        rows = conn.execute(
-            "SELECT * FROM projects WHERE watched = 1"
-        ).fetchall()
+        rows = conn.execute("SELECT * FROM projects WHERE watched = 1").fetchall()
     out = []
     for row in rows:
         p = dict(row)
         p["design"] = json.loads(p["design"] or "{}")
         out.append(p)
     return out
-
-
-# --- messages ---------------------------------------------------------------
 
 
 def add_message(
@@ -296,9 +252,7 @@ def add_message(
                 now,
             ),
         )
-        conn.execute(
-            "UPDATE projects SET updated_at = ? WHERE id = ?", (now, project_id)
-        )
+        conn.execute("UPDATE projects SET updated_at = ? WHERE id = ?", (now, project_id))
         conn.commit()
         message_id = int(cur.lastrowid)
     return {
@@ -315,8 +269,7 @@ def add_message(
 def get_messages(project_id: int, limit: int = 200) -> list:
     with _lock, _connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM messages WHERE project_id = ? "
-            "ORDER BY created_at ASC LIMIT ?",
+            "SELECT * FROM messages WHERE project_id = ? ORDER BY created_at ASC LIMIT ?",
             (project_id, limit),
         ).fetchall()
     out = []
@@ -328,17 +281,12 @@ def get_messages(project_id: int, limit: int = 200) -> list:
 
 
 def recent_history(project_id: int, limit: int = HISTORY_LIMIT) -> list:
-    """The tail of the conversation, oldest first, for the model context."""
     with _lock, _connect() as conn:
         rows = conn.execute(
-            "SELECT role, content FROM messages WHERE project_id = ? "
-            "ORDER BY created_at DESC LIMIT ?",
+            "SELECT role, content FROM messages WHERE project_id = ? ORDER BY created_at DESC LIMIT ?",
             (project_id, limit),
         ).fetchall()
     return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
-
-
-# --- bibliography -----------------------------------------------------------
 
 
 def add_reference(
@@ -363,14 +311,10 @@ def add_reference(
 def get_bibliography(project_id: int) -> list:
     with _lock, _connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM bibliography WHERE project_id = ? "
-            "ORDER BY created_at ASC",
+            "SELECT * FROM bibliography WHERE project_id = ? ORDER BY created_at ASC",
             (project_id,),
         ).fetchall()
     return [dict(r) for r in rows]
-
-
-# --- proactive insights -----------------------------------------------------
 
 
 def add_insight(
@@ -380,7 +324,6 @@ def add_insight(
     dedupe_key: str = None,
     action: dict = None,
 ) -> bool:
-    """Store a proactive note. dedupe_key stops the same insight recurring."""
     with _lock, _connect() as conn:
         cur = conn.execute(
             "INSERT OR IGNORE INTO insights (project_id, kind, content, "
@@ -415,14 +358,11 @@ def get_insights(project_id: int, include_dismissed: bool = False) -> list:
 
 def dismiss_insight(insight_id: int):
     with _lock, _connect() as conn:
-        conn.execute(
-            "UPDATE insights SET dismissed = 1 WHERE id = ?", (insight_id,)
-        )
+        conn.execute("UPDATE insights SET dismissed = 1 WHERE id = ?", (insight_id,))
         conn.commit()
 
 
 def unread_insight_count(owner: str) -> int:
-    """Total live insights across all of an owner's projects (for the badge)."""
     with _lock, _connect() as conn:
         row = conn.execute(
             "SELECT COUNT(*) AS n FROM insights i JOIN projects p "
@@ -432,14 +372,9 @@ def unread_insight_count(owner: str) -> int:
         return int(row["n"])
 
 
-# --- plans / entitlements ---------------------------------------------------
-
-
 def get_tier(owner: str) -> str | None:
     with _lock, _connect() as conn:
-        row = conn.execute(
-            "SELECT tier FROM plans WHERE owner = ?", (owner,)
-        ).fetchone()
+        row = conn.execute("SELECT tier FROM plans WHERE owner = ?", (owner,)).fetchone()
     return row["tier"] if row else None
 
 
@@ -452,9 +387,6 @@ def set_tier(owner: str, tier: str):
             (owner, tier, time.time()),
         )
         conn.commit()
-
-
-# --- shared projects (members) ----------------------------------------------
 
 
 def _init_members():
@@ -476,8 +408,7 @@ def add_member(project_id: int, member: str):
     _init_members()
     with _lock, _connect() as conn:
         conn.execute(
-            "INSERT OR IGNORE INTO members (project_id, member, added_at) "
-            "VALUES (?, ?, ?)",
+            "INSERT OR IGNORE INTO members (project_id, member, added_at) VALUES (?, ?, ?)",
             (project_id, member, time.time()),
         )
         conn.commit()
@@ -497,8 +428,7 @@ def list_members(project_id: int) -> list:
     _init_members()
     with _lock, _connect() as conn:
         rows = conn.execute(
-            "SELECT member, added_at FROM members WHERE project_id = ? "
-            "ORDER BY added_at",
+            "SELECT member, added_at FROM members WHERE project_id = ? ORDER BY added_at",
             (project_id,),
         ).fetchall()
     return [dict(r) for r in rows]
@@ -515,7 +445,6 @@ def is_member(project_id: int, who: str) -> bool:
 
 
 def shared_with(member: str) -> list:
-    """Projects shared TO this account (id + title), newest first."""
     _init_members()
     with _lock, _connect() as conn:
         rows = conn.execute(
@@ -525,9 +454,6 @@ def shared_with(member: str) -> list:
             (member,),
         ).fetchall()
     return [dict(r) for r in rows]
-
-
-# --- outbound webhooks -------------------------------------------------------
 
 
 def set_webhook(owner: str, url: str):
@@ -543,9 +469,7 @@ def set_webhook(owner: str, url: str):
 
 def get_webhook(owner: str) -> str | None:
     with _lock, _connect() as conn:
-        row = conn.execute(
-            "SELECT url FROM webhooks WHERE owner = ?", (owner,)
-        ).fetchone()
+        row = conn.execute("SELECT url FROM webhooks WHERE owner = ?", (owner,)).fetchone()
     return row["url"] if row else None
 
 
@@ -554,8 +478,6 @@ def delete_webhook(owner: str):
         conn.execute("DELETE FROM webhooks WHERE owner = ?", (owner,))
         conn.commit()
 
-
-# --- hypotheses (the research log) ------------------------------------------
 
 _HYP_STATUSES = {"open", "supported", "refuted", "inconclusive"}
 
@@ -575,23 +497,17 @@ def add_hypothesis(project_id: int, statement: str, evidence: str = None) -> dic
 
 def get_hypothesis(hypothesis_id: int) -> dict:
     with _lock, _connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM hypotheses WHERE id = ?", (hypothesis_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM hypotheses WHERE id = ?", (hypothesis_id,)).fetchone()
     if not row:
         raise ValueError(f"Hypothesis {hypothesis_id} not found.")
     return dict(row)
 
 
-def update_hypothesis(
-    hypothesis_id: int, status: str = None, evidence: str = None
-) -> dict:
+def update_hypothesis(hypothesis_id: int, status: str = None, evidence: str = None) -> dict:
     sets, values = [], []
     if status is not None:
         if status not in _HYP_STATUSES:
-            raise ValueError(
-                f"Invalid status '{status}'. Use one of {sorted(_HYP_STATUSES)}."
-            )
+            raise ValueError(f"Invalid status '{status}'. Use one of {sorted(_HYP_STATUSES)}.")
         sets.append("status = ?")
         values.append(status)
     if evidence is not None:
@@ -602,9 +518,7 @@ def update_hypothesis(
         values.append(time.time())
         values.append(hypothesis_id)
         with _lock, _connect() as conn:
-            conn.execute(
-                f"UPDATE hypotheses SET {', '.join(sets)} WHERE id = ?", values
-            )
+            conn.execute(f"UPDATE hypotheses SET {', '.join(sets)} WHERE id = ?", values)
             conn.commit()
     return get_hypothesis(hypothesis_id)
 
@@ -617,8 +531,6 @@ def get_hypotheses(project_id: int) -> list:
         ).fetchall()
     return [dict(r) for r in rows]
 
-
-# --- skills profile (per owner, across all projects) ------------------------
 
 _SKILL_LEVELS = {"learning", "practiced", "confident"}
 
@@ -642,8 +554,7 @@ def record_skill(owner: str, skill: str, level: str, note: str = None) -> dict:
 def get_skills(owner: str) -> list:
     with _lock, _connect() as conn:
         rows = conn.execute(
-            "SELECT skill, level, note, updated_at FROM skills WHERE owner = ? "
-            "ORDER BY updated_at DESC",
+            "SELECT skill, level, note, updated_at FROM skills WHERE owner = ? ORDER BY updated_at DESC",
             (owner,),
         ).fetchall()
     return [dict(r) for r in rows]

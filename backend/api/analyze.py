@@ -1,50 +1,34 @@
-"""POST /analyze — run a SAR analysis for a bbox + date range.
-POST /verify — check the provenance signature of a previously issued result."""
+import json
 
-from fastapi import APIRouter, HTTPException
-from models.requests import AnalyzeRequest
-from gee.registry import ANALYSIS_REGISTRY
+from fastapi import APIRouter, Depends, HTTPException
+
 import provenance
+import result_cache
+from gee import common
+from gee.registry import ANALYSIS_REGISTRY
+from models.requests import AnalyzeRequest
+from ratelimit import limit_compute
 
 router = APIRouter()
 
-# Keys that are promoted to top-level response fields; everything else
-# the GEE function returns goes into the `stats` dict.
 TOP_LEVEL_KEYS = {
     "tile_url",
     "data_date",
     "confidence",
     "headline_stat",
-    # Observation vs forward model. Promoted (and provenance-hashed) so a
-    # simulated result can never be mistaken for a detection downstream.
     "mode",
-    # The frame payload for simulation results: megabytes of base64 that
-    # belong beside `stats`, not inside it.
     "simulation",
 }
 
-# Keys that must never be serialized into the JSON response (e.g. the raw
-# ee.Image kept for GeoTIFF export).
 NON_SERIALIZED_KEYS = {"result_image"}
 
-# Analyses whose whole point is distinguishing anomalous dark water from water
-# that is permanently there. For these we attach a permanent-water reference
-# layer so a single query returns the detection PLUS its context, not one
-# isolated overlay.
 WATER_CONTEXT_TYPES = {"flood_extent", "oil_spill"}
 
 
 def _context_layers(analysis_type: str, bbox: list) -> list:
-    """
-    Build optional reference layers shipped alongside the detection result.
-    Always non-fatal: if GEE hiccups building context, we return the core
-    analysis without it rather than failing the whole request.
-    """
     layers: list = []
     if analysis_type in WATER_CONTEXT_TYPES:
         try:
-            from gee import common
-
             geometry = common.bbox_geometry(bbox)
             layers.append(
                 {
@@ -60,46 +44,60 @@ def _context_layers(analysis_type: str, bbox: list) -> list:
     return layers
 
 
+def _cache_key(analysis_type, bbox, start_date, end_date, params, polygon):
+    return json.dumps(
+        [
+            analysis_type,
+            [round(v, 4) for v in bbox],
+            start_date,
+            end_date,
+            params or {},
+            [[round(x, 4), round(y, 4)] for x, y in polygon] if polygon else None,
+        ],
+        sort_keys=True,
+    )
+
+
 def run_analysis(
     analysis_type: str,
     bbox: list,
     start_date: str,
     end_date: str,
     params: dict | None = None,
+    polygon: list | None = None,
 ) -> dict:
-    """
-    Shared analysis runner used by both /analyze and /query.
-    Raises ValueError for user-facing problems (caller maps to HTTP 400).
-    """
     if analysis_type not in ANALYSIS_REGISTRY:
-        available = list(ANALYSIS_REGISTRY.keys())
         raise ValueError(
-            f"Unknown analysis type '{analysis_type}'. Available: {available}"
+            f"Unknown analysis type '{analysis_type}'. Available: {list(ANALYSIS_REGISTRY.keys())}"
         )
-
     config = ANALYSIS_REGISTRY[analysis_type]
 
-    # Most analyses take exactly (bbox, start_date, end_date). Entries that
-    # declare `accepts_params` — currently the forward-model simulations —
-    # take an extra `params` dict described by their `params_schema`.
     call_kwargs = {"bbox": bbox, "start_date": start_date, "end_date": end_date}
     if config.get("accepts_params"):
         call_kwargs["params"] = params or {}
     elif params:
         raise ValueError(
-            f"'{analysis_type}' does not take extra parameters. "
-            f"Analyses that do: "
+            f"'{analysis_type}' does not take extra parameters. Analyses that do: "
             f"{[k for k, c in ANALYSIS_REGISTRY.items() if c.get('accepts_params')]}"
         )
 
-    raw = config["function"](**call_kwargs)
+    if polygon:
+        bbox = common.polygon_envelope(polygon)
+        call_kwargs["bbox"] = bbox
 
-    stats = {
-        k: v
-        for k, v in raw.items()
-        if k not in TOP_LEVEL_KEYS and k not in NON_SERIALIZED_KEYS
-    }
+    key = _cache_key(analysis_type, bbox, start_date, end_date, params, polygon)
+    cached = result_cache.get(key)
+    if cached is not None:
+        return cached
 
+    token = common.active_polygon.set(polygon)
+    try:
+        raw = config["function"](**call_kwargs)
+        context = _context_layers(analysis_type, bbox)
+    finally:
+        common.active_polygon.reset(token)
+
+    stats = {k: v for k, v in raw.items() if k not in TOP_LEVEL_KEYS and k not in NON_SERIALIZED_KEYS}
     response = {
         "analysis_type": analysis_type,
         "display_name": config["display_name"],
@@ -109,25 +107,22 @@ def run_analysis(
         "tile_url": raw["tile_url"],
         "data_date": raw["data_date"],
         "confidence": raw.get("confidence", 0.8),
-        "headline_stat": raw.get(
-            "headline_stat", {"label": "Result", "value": 0, "unit": ""}
-        ),
-        "context_layers": _context_layers(analysis_type, bbox),
+        "headline_stat": raw.get("headline_stat", {"label": "Result", "value": 0, "unit": ""}),
+        "context_layers": context,
         "mode": raw.get("mode", config.get("mode", "observed")),
         "stats": stats,
     }
+    if polygon:
+        response["polygon"] = polygon
     if "simulation" in raw:
         response["simulation"] = raw["simulation"]
-    return provenance.stamp(response)
+    stamped = provenance.stamp(response)
+    result_cache.put(key, stamped)
+    return stamped
 
 
-@router.post("/analyze")
+@router.post("/analyze", dependencies=[Depends(limit_compute)])
 def analyze(request: AnalyzeRequest):
-    """
-    Run a SAR analysis. Returns a Mapbox-compatible tile URL plus statistics.
-    GEE calls are blocking, so this endpoint is intentionally synchronous
-    (`def`, not `async def`) — FastAPI runs it in a threadpool.
-    """
     try:
         return run_analysis(
             analysis_type=request.analysis_type,
@@ -135,20 +130,14 @@ def analyze(request: AnalyzeRequest):
             start_date=request.start_date,
             end_date=request.end_date,
             params=request.params,
+            polygon=request.polygon,
         )
     except ValueError as e:
-        # User-facing: no data available, unknown type, bad parameters
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        # Server-side: GEE failure, timeout, quota
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
 
 
 @router.post("/verify")
 def verify_result(result: dict):
-    """
-    Verify a previously issued analysis result's provenance: recomputes the
-    content hash over the scientific fields and checks the HMAC signature.
-    Never raises — the verdict says exactly what (if anything) is wrong.
-    """
     return provenance.verify(result)

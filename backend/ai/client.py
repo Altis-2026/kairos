@@ -1,19 +1,18 @@
 import os
 from datetime import date
 from pathlib import Path
-from openai import OpenAI
-from ai.parser import ParsedQuery, parse_query_response
 
-# Claude 3.5 Haiku was retired in Feb 2026; its only remaining OpenRouter
-# provider was Amazon Bedrock's deprecated end-of-life snapshot, which 404s on
-# every call. Claude Haiku 4.5 is the current, fully-served replacement — cheap
-# ($1/$5 per Mtok) and live across providers, so no provider routing is needed.
+from openai import OpenAI
+
+from ai.parser import MissionPlan, ParsedQuery, parse_query_response
+
 MODEL = "anthropic/claude-haiku-4.5"
 _PROVIDER_PREFS = None
 _SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
 
 _client = None
 _system_prompt = None
+
 
 def _get_client() -> OpenAI:
     global _client
@@ -27,8 +26,11 @@ def _get_client() -> OpenAI:
         _client = OpenAI(
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
+            timeout=float(os.getenv("AI_TIMEOUT_SECONDS", "25")),
+            max_retries=1,
         )
     return _client
+
 
 def _get_system_prompt() -> str:
     global _system_prompt
@@ -36,13 +38,8 @@ def _get_system_prompt() -> str:
         _system_prompt = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
     return _system_prompt
 
+
 def _history_messages(history: list = None) -> list:
-    """
-    Convert prior chat turns into OpenAI-style messages so the parser can
-    resolve follow-ups ("now show fires there"). Kairos turns become assistant
-    messages; we drop the current (latest) user turn — it's sent separately as
-    the structured user_message — to avoid duplicating it.
-    """
     if not history:
         return []
     messages = []
@@ -55,7 +52,10 @@ def _history_messages(history: list = None) -> list:
 
 
 def parse_natural_language(
-    query: str, viewport_bbox: list = None, history: list = None
+    query: str,
+    viewport_bbox: list = None,
+    history: list = None,
+    language: str = None,
 ) -> ParsedQuery:
     client = _get_client()
     system = _get_system_prompt()
@@ -63,6 +63,8 @@ def parse_natural_language(
     context_lines = [f"Today's date: {date.today().isoformat()}"]
     if viewport_bbox:
         context_lines.append(f"viewport_bbox: {viewport_bbox}")
+    if language:
+        context_lines.append(f"language: {language}")
     user_message = "\n".join(context_lines) + f"\n\nUser query: {query}"
 
     prior = _history_messages(history)
@@ -100,8 +102,10 @@ def parse_natural_language(
         )
         return parse_query_response(retry.choices[0].message.content)
 
-def narrate_result(result: dict) -> str:
+
+def narrate_result(result: dict, language: str = None) -> str:
     import json as _json
+
     client = _get_client()
     system = _get_system_prompt()
 
@@ -112,27 +116,21 @@ def narrate_result(result: dict) -> str:
         if not isinstance(v, (dict, list)) or k == "headline_stat"
     }
 
+    prefix = "NARRATE: "
+    if language:
+        prefix = f"NARRATE (write in language {language}): "
+
     response = client.chat.completions.create(
         model=MODEL,
         max_tokens=400,
         messages=[
             {"role": "system", "content": system},
-            {"role": "user", "content": "NARRATE: " + _json.dumps(slim, default=str)},
+            {"role": "user", "content": prefix + _json.dumps(slim, default=str)},
         ],
         extra_body=_PROVIDER_PREFS,
     )
     return response.choices[0].message.content.strip()
 
-
-# ---------------------------------------------------------------------------
-# Result interpretation — plain-language "what does this actually mean?"
-#
-# Two levels:
-#   interpret_result()        instant, grounded only in the computed numbers.
-#   search_regional_context() on-demand, uses OpenRouter web search (:online)
-#                             to pull recent regional news / trends / concerns.
-# Both degrade gracefully — fallback_interpretation() works with no API key.
-# ---------------------------------------------------------------------------
 
 _INTERPRET_SYSTEM = (
     "You are Kairos, a satellite radar analyst explaining a finished Sentinel-1 "
@@ -161,28 +159,20 @@ def _result_facts(result: dict, method_description: str = "", place_name: str = 
     lines = [
         f"Analysis: {result.get('display_name') or result.get('analysis_type')}",
         f"Method: {method_description}" if method_description else "",
-        f"Location: {place_name}" if place_name
-        else f"Bounding box: {result.get('bbox')}",
+        f"Location: {place_name}" if place_name else f"Bounding box: {result.get('bbox')}",
         f"Dates analysed: {result.get('start_date')} to {result.get('end_date')}",
         f"Imagery date: {result.get('data_date')}",
         f"Headline result: {hs.get('label')} = {hs.get('value')} {hs.get('unit')}",
         f"Model confidence: {result.get('confidence')}",
     ]
     stats = result.get("stats") or {}
-    scalars = {
-        k: v for k, v in stats.items() if isinstance(v, (int, float, str, bool))
-    }
+    scalars = {k: v for k, v in stats.items() if isinstance(v, (int, float, str, bool))}
     if scalars:
-        lines.append(
-            "Other figures: " + ", ".join(f"{k}={v}" for k, v in scalars.items())
-        )
+        lines.append("Other figures: " + ", ".join(f"{k}={v}" for k, v in scalars.items()))
     return "\n".join(line for line in lines if line)
 
 
-def interpret_result(
-    result: dict, method_description: str = "", place_name: str = None
-) -> str:
-    """Plain-language interpretation grounded in the computed numbers only."""
+def interpret_result(result: dict, method_description: str = "", place_name: str = None) -> str:
     client = _get_client()
     response = client.chat.completions.create(
         model=MODEL,
@@ -197,7 +187,6 @@ def interpret_result(
 
 
 def search_regional_context(result: dict, place_name: str = None) -> str:
-    """Recent news / trends / concerns for the region, via web search."""
     client = _get_client()
     hs = result.get("headline_stat") or {}
     phenomenon = (result.get("display_name") or "the detected change").lower()
@@ -207,8 +196,8 @@ def search_regional_context(result: dict, place_name: str = None) -> str:
         f"reports, or environmental trends about {phenomenon} in or near {where}. "
         f"A Sentinel-1 radar analysis there found {hs.get('label')} = "
         f"{hs.get('value')} {hs.get('unit')} around {result.get('data_date')}. "
-        "Summarise anything genuinely relevant — official warnings, news coverage, "
-        "long-term trends, or local concerns — and cite each source inline like "
+        "Summarise anything genuinely relevant (official warnings, news coverage, "
+        "long-term trends, or local concerns) and cite each source inline like "
         "[source]. If nothing relevant turns up, say so plainly. 160 words max."
     )
     response = client.chat.completions.create(
@@ -224,10 +213,6 @@ def search_regional_context(result: dict, place_name: str = None) -> str:
 
 
 def fallback_interpretation(result: dict, method_description: str = "") -> str:
-    """
-    Deterministic interpretation used when no OPENROUTER_API_KEY is configured,
-    so the "Explain this result" button is useful even without the AI provider.
-    """
     hs = result.get("headline_stat") or {}
     label = hs.get("label", "Detection")
     value = hs.get("value", 0)
@@ -236,15 +221,13 @@ def fallback_interpretation(result: dict, method_description: str = "") -> str:
     conf = result.get("confidence")
     conf_pct = f"{round(conf * 100)}%" if isinstance(conf, (int, float)) else "an estimated"
     trend = (
-        "No meaningful change was detected in this window — which can be the real "
+        "No meaningful change was detected in this window, which can be the real "
         "answer for a quiet period, not a failure."
         if not value
         else f"The radar flagged {value} {unit} of change between "
         f"{result.get('start_date')} and {result.get('end_date')}."
     )
-    method = method_description or (
-        "Sentinel-1 radar backscatter was compared against a baseline period."
-    )
+    method = method_description or ("Sentinel-1 radar backscatter was compared against a baseline period.")
     return (
         f"### What this shows\n{name} measured **{label}: {value} {unit}** from "
         f"Sentinel-1 imagery dated {result.get('data_date')}, with {conf_pct} "
@@ -253,8 +236,122 @@ def fallback_interpretation(result: dict, method_description: str = "") -> str:
         "### Possible causes\nRadar measures surface roughness and moisture, not "
         "the phenomenon directly, so confirm with the Optical overlay before acting. "
         "Agricultural activity, soil moisture and wind can all mimic a real signal. "
-        "_(AI provider not configured — this is a rule-based summary.)_"
+        "_(AI provider not configured, this is a rule-based summary.)_"
     )
+
+
+_MISSION_SYSTEM = (
+    "You are the mission planner for Kairos, a Sentinel-1 satellite radar "
+    "analysis platform. The user gives one high-level goal. You break it into "
+    "1 to 4 concrete radar analyses that together answer it, each with a "
+    "specific bounding box and date window.\n\n"
+    "Respond with ONLY a JSON object, parseable by json.loads():\n"
+    '{"understood": true|false, "plan_summary": "<one sentence describing the '
+    'plan>", "steps": [{"analysis_type": "<id>", "location_name": "<place>", '
+    '"bbox": [min_lon, min_lat, max_lon, max_lat], "start_date": "YYYY-MM-DD", '
+    '"end_date": "YYYY-MM-DD", "purpose": "<why this step serves the goal>"}], '
+    '"clarification": "<one question, only when understood is false>"}\n\n'
+    "Rules:\n"
+    "- Valid analysis_type ids: {ids}\n"
+    "- Every step needs its own bbox from your geographic knowledge. Keep each "
+    "box under 5 degrees across. For a large region, pick the most relevant "
+    "sub-areas as separate steps rather than one giant box.\n"
+    "- Steps can differ in place (compare regions), in time (compare periods), "
+    "or in analysis type (different signals on one event).\n"
+    "- Today's date arrives in the user message. Default windows to the last "
+    "30 days unless the goal implies otherwise.\n"
+    "- sea_ice and ice_drift only work above roughly 55 degrees latitude.\n"
+    "- Set understood false only when the goal is impossible to act on, and "
+    "ask exactly one clarifying question."
+)
+
+
+def plan_mission(goal: str, viewport_bbox: list = None, history: list = None) -> MissionPlan:
+    from ai.parser import parse_mission_response
+    from gee.registry import ANALYSIS_REGISTRY
+
+    client = _get_client()
+    system = _MISSION_SYSTEM.replace("{ids}", ", ".join(ANALYSIS_REGISTRY.keys()))
+
+    context_lines = [f"Today's date: {date.today().isoformat()}"]
+    if viewport_bbox:
+        context_lines.append(f"viewport_bbox: {viewport_bbox}")
+    user_message = "\n".join(context_lines) + f"\n\nMission goal: {goal}"
+
+    messages = [{"role": "system", "content": system}]
+    messages.extend(_history_messages(history))
+    messages.append({"role": "user", "content": user_message})
+
+    response = client.chat.completions.create(
+        model=MODEL,
+        max_tokens=1200,
+        messages=messages,
+        extra_body=_PROVIDER_PREFS,
+    )
+    text = response.choices[0].message.content
+    try:
+        return parse_mission_response(text)
+    except Exception as first_error:
+        retry = client.chat.completions.create(
+            model=MODEL,
+            max_tokens=1200,
+            messages=[
+                *messages,
+                {"role": "assistant", "content": text},
+                {
+                    "role": "user",
+                    "content": (
+                        f"Your response failed validation: {first_error}. "
+                        "Respond again with ONLY the corrected JSON object."
+                    ),
+                },
+            ],
+            extra_body=_PROVIDER_PREFS,
+        )
+        return parse_mission_response(retry.choices[0].message.content)
+
+
+def fallback_mission_report(goal: str, outcomes: list) -> str:
+    lines = [f'Mission complete for: "{goal}".']
+    for o in outcomes:
+        name = o.get("display_name") or o.get("analysis_type", "analysis")
+        where = o.get("location_name") or "the target area"
+        if o.get("status") == "ok":
+            lines.append(
+                f"{name} over {where}: {o.get('headline_label', 'result')} "
+                f"{o.get('headline_value')} {o.get('headline_unit', '')}, "
+                f"pass {o.get('data_date')}."
+            )
+        elif o.get("status") == "no_data":
+            lines.append(f"{name} over {where}: no usable radar data in the window.")
+        else:
+            lines.append(f"{name} over {where}: the run failed.")
+    ok = sum(1 for o in outcomes if o.get("status") == "ok")
+    lines.append(f"{ok} of {len(outcomes)} analyses completed and are on the globe.")
+    return " ".join(lines)
+
+
+def write_mission_report(goal: str, plan_summary: str, outcomes: list) -> str:
+    import json as _json
+
+    client = _get_client()
+    prompt = (
+        "You are Kairos summarizing a finished multi-step satellite radar "
+        "mission for the person who requested it. Write 3 to 5 plain sentences: "
+        "lead with the direct answer to their goal, compare the step results "
+        "against each other where that is meaningful, name concrete numbers and "
+        "dates, and mention any step that failed or had no data. No JSON, no "
+        "headers, no bullet points.\n\n"
+        f"Goal: {goal}\nPlan: {plan_summary}\n"
+        f"Step outcomes: {_json.dumps(outcomes, default=str)}"
+    )
+    response = client.chat.completions.create(
+        model=MODEL,
+        max_tokens=500,
+        messages=[{"role": "user", "content": prompt}],
+        extra_body=_PROVIDER_PREFS,
+    )
+    return response.choices[0].message.content.strip()
 
 
 _FORESIGHT_SYSTEM = (
@@ -294,7 +391,6 @@ def _foresight_facts(ctx: dict) -> str:
 
 
 def answer_foresight_question(ctx: dict) -> str:
-    """Narrate a Foresight outlook. Callers fall back to foresight_answers."""
     client = _get_client()
     response = client.chat.completions.create(
         model=MODEL,

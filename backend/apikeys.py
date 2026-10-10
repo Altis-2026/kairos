@@ -1,17 +1,3 @@
-"""
-API keys — programmatic access for labs and power users.
-
-A key is minted once (`krs_` + 32 hex chars), shown in full exactly once, and
-stored only as a SHA-256 hash — standard practice, so a database leak leaks
-nothing usable. Requests carry it in the `X-API-Key` header; `resolve()` maps
-it back to the owning account and logs the call to a usage table, which is
-what future per-plan quotas and billing meters will read.
-
-Today a key identifies and meters; it does not yet gate (the public endpoints
-stay open for the free tier). That flip is one `require_key=True` away when
-the pricing switch is thrown.
-"""
-
 import hashlib
 import os
 import secrets
@@ -61,13 +47,11 @@ def _hash(key: str) -> str:
 
 
 def create_key(owner: str, label: str = "") -> dict:
-    """Mint a new key. The full key appears in this response and never again."""
     _init()
     key = "krs_" + secrets.token_hex(16)
     with _lock, _connect() as conn:
         conn.execute(
-            "INSERT INTO api_keys (key_hash, prefix, owner, label, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO api_keys (key_hash, prefix, owner, label, created_at) VALUES (?, ?, ?, ?, ?)",
             (_hash(key), key[:12], owner, label[:80], time.time()),
         )
         conn.commit()
@@ -97,7 +81,6 @@ def revoke_key(owner: str, prefix: str) -> bool:
 
 
 def resolve(key: str) -> str | None:
-    """Owner for a presented key, or None if unknown/revoked."""
     if not key or not key.startswith("krs_"):
         return None
     _init()

@@ -1,35 +1,26 @@
-"""
-The AnalysisRegistry: the single source of truth for every Kairos analysis type.
-
-To add a new analysis type:
-  1. Write the GEE function in a new file (e.g. gee/wetland.py)
-  2. Import it here
-  3. Add ONE entry to this dict
-Nothing else in the codebase changes. The /registry endpoint serializes this
-dict, and the frontend sidebar builds itself from that response.
-"""
-
-from gee.flood import detect_flood
-from gee.ships import detect_ships
-from gee.fire import detect_burn_scar
-from gee.oil import detect_oil_spill
+from gee.agriculture import monitor_crops
+from gee.archaeology import detect_anomalies
+from gee.atmosphere import detect_methane, monitor_air_quality
+from gee.biomass import estimate_biomass
+from gee.consensus import flood_consensus
+from gee.damage import assess_damage
 from gee.deforestation import detect_deforestation
+from gee.deformation import detect_deformation
+from gee.fire import detect_burn_scar
+from gee.fire_fusion import fuse_fire
+from gee.flood import detect_flood
+from gee.flood_depth import estimate_flood_depth
+from gee.flooded_forest import detect_flooded_forest
 from gee.ice import detect_sea_ice
 from gee.ice_drift import track_ice_drift
-from gee.deformation import detect_deformation
-from gee.flood_depth import estimate_flood_depth
-from gee.damage import assess_damage
+from gee.mining import detect_land_disturbance
+from gee.oil import detect_oil_spill
+from gee.ships import detect_ships
+from gee.snow import detect_wet_snow
+from gee.soil_moisture import estimate_soil_moisture
 from gee.subsidence import detect_subsidence
 from gee.urban import detect_urban_growth
-from gee.agriculture import monitor_crops
-from gee.mining import detect_land_disturbance
-from gee.biomass import estimate_biomass
-from gee.atmosphere import detect_methane, monitor_air_quality
-from gee.soil_moisture import estimate_soil_moisture
-from gee.flooded_forest import detect_flooded_forest
-from gee.snow import detect_wet_snow
-from gee.consensus import flood_consensus
-from gee.archaeology import detect_anomalies
+from gee.wind import estimate_ocean_wind
 from solver.fire_behavior import FUEL_MODELS
 from solver.fire_presets import SCENES as FIRE_SCENES
 from solver.fire_sim import simulate_fire
@@ -161,7 +152,7 @@ ANALYSIS_REGISTRY = {
         "function": detect_deformation,
         "display_name": "Surface Deformation / Change",
         "description": (
-            "Flags ground that has changed beyond its normal variability — "
+            "Flags ground that has changed beyond its normal variability, "
             "subsidence, landslide scarring, construction or ground disturbance. "
             "Uses an amplitude temporal-coherence proxy: pixels whose recent VV "
             "backscatter deviates from a 12-month stability baseline by more than "
@@ -200,7 +191,7 @@ ANALYSIS_REGISTRY = {
         "display_name": "Earthquake / Building Damage",
         "description": (
             "Maps likely-damaged buildings within hours of an earthquake, blast or "
-            "strike — through the dust and cloud that blind optical satellites. "
+            "strike, through the dust and cloud that blind optical satellites. "
             "Flags built-up pixels (JRC GHSL) whose Sentinel-1 VV signature changed "
             "sharply between a pre-event and post-event window, as collapse destroys "
             "a building's steady radar return. A rapid triage proxy for responders."
@@ -218,7 +209,7 @@ ANALYSIS_REGISTRY = {
         "function": detect_subsidence,
         "display_name": "Land Subsidence Indicator",
         "description": (
-            "Surfaces ground undergoing slow, progressive change — sinking cities, "
+            "Surfaces ground undergoing slow, progressive change, sinking cities, "
             "over-pumped aquifers, reworked land. Fits a straight-line trend to each "
             "pixel's VV backscatter, then screens it with the two tests real PSInSAR "
             "uses to pick measurement points: amplitude-dispersion stability "
@@ -257,7 +248,7 @@ ANALYSIS_REGISTRY = {
         "function": monitor_crops,
         "display_name": "Agriculture / Crop Vigour",
         "description": (
-            "Tracks crop health and cropland continuously — even through the cloud "
+            "Tracks crop health and cropland continuously, even through the cloud "
             "that blinds optical indices like NDVI for weeks. Computes the dual-pol "
             "Radar Vegetation Index (RVI) from Sentinel-1 VV+VH: a growing canopy "
             "scatters radar in all directions and raises VH, so the map reads "
@@ -317,7 +308,7 @@ ANALYSIS_REGISTRY = {
         "display_name": "Methane Monitoring",
         "description": (
             "Maps the methane column from Sentinel-5P (TROPOMI) and flags "
-            "enhancement zones well above the local background — candidate "
+            "enhancement zones well above the local background, candidate "
             "emission areas like oil and gas fields, landfills and wetlands. "
             "Coarse (~7 km) and column-integrated, so it finds regional "
             "enhancements, not a single smokestack."
@@ -368,12 +359,50 @@ ANALYSIS_REGISTRY = {
         "sar_polarization": "VV",
         "instrument_mode": "IW",
     },
+    "ocean_wind": {
+        "function": estimate_ocean_wind,
+        "display_name": "Ocean Wind (Roughness Proxy)",
+        "description": (
+            "Wind roughens the sea surface, and rougher water throws more radar "
+            "energy back at the satellite. Kairos maps that C-band backscatter "
+            "over open water to an approximate wind speed. An empirical proxy, "
+            "not a full geophysical retrieval, and it also flags the calm zones "
+            "where oil-spill detection produces false positives."
+        ),
+        "category": "Maritime and Security",
+        "data_sources": ["S1"],
+        "estimated_seconds": 30,
+        "output_type": "raster",
+        "color_palette": ["#1E6FE8", "#00BFA8", "#E8E36A", "#E8541E"],
+        "icon": "wind",
+        "sar_polarization": "VV",
+        "instrument_mode": "IW",
+    },
+    "fire_fusion": {
+        "function": fuse_fire,
+        "display_name": "Wildfire Radar + Thermal Fusion",
+        "description": (
+            "Two sensors on one map: Sentinel-1 radar outlines the burn scar "
+            "through the smoke, while Landsat 8/9 thermal imaging marks the "
+            "surface hotspots that were actively hot when a satellite passed. "
+            "Radar shows where the fire has been, thermal shows where it "
+            "still burns."
+        ),
+        "category": "Disaster Response",
+        "data_sources": ["S1", "L8/9"],
+        "estimated_seconds": 40,
+        "output_type": "raster",
+        "color_palette": ["#E8541E", "#FFD166", "#FF3B5C"],
+        "icon": "thermometer",
+        "sar_polarization": "VH",
+        "instrument_mode": "IW",
+    },
     "flooded_forest": {
         "function": detect_flooded_forest,
         "display_name": "Flooded Forest / Mangrove",
         "description": (
-            "Finds water standing UNDER tree canopy — invisible to optical "
-            "satellites — via the double-bounce brightening (VV rise > +3 dB) "
+            "Finds water standing UNDER tree canopy, invisible to optical "
+            "satellites, via the double-bounce brightening (VV rise > +3 dB) "
             "that flooded trunks produce. Runs only inside WorldCover tree and "
             "mangrove pixels. The complement of open-water flood mapping."
         ),
@@ -393,7 +422,7 @@ ANALYSIS_REGISTRY = {
             "Maps melting snow with the Nagler ratio method: liquid water in "
             "the snowpack absorbs C-band radar, so wet snow sits >3 dB below a "
             "frozen mid-winter reference. Reports melt extent and its elevation "
-            "band. Extent only — C-band cannot measure depth or snow water "
+            "band. Extent only, C-band cannot measure depth or snow water "
             "equivalent."
         ),
         "category": "Environmental",
@@ -409,8 +438,8 @@ ANALYSIS_REGISTRY = {
         "function": flood_consensus,
         "display_name": "Flood Consensus (SAR + Optical)",
         "description": (
-            "Runs two independent flood methods — Sentinel-1 backscatter drop "
-            "and Sentinel-2 NDWI — and maps where they agree (teal), where only "
+            "Runs two independent flood methods, Sentinel-1 backscatter drop "
+            "and Sentinel-2 NDWI, and maps where they agree (teal), where only "
             "radar sees water (amber) and where only optical does (blue). "
             "Needs a usable cloud-free optical share; refuses to fake a "
             "consensus when clouds block it."
@@ -431,7 +460,7 @@ ANALYSIS_REGISTRY = {
             "SIMULATED, not observed. Routes an assumed inflow hydrograph over "
             "real Copernicus GLO-30 terrain with a local-inertial shallow-water "
             "solver, producing an animated rise and recession instead of a "
-            "single snapshot. Answers 'where would water go?' — the question "
+            "single snapshot. Answers 'where would water go?'. The question "
             "radar cannot answer, because the flood has not happened. For a "
             "flood that did happen, use Flood Extent Mapping."
         ),
@@ -452,44 +481,78 @@ ANALYSIS_REGISTRY = {
                 "default": None,
             },
             "peak_discharge_m3s": {
-                "type": "number", "label": "Peak inflow", "unit": "m3/s",
-                "default": 300.0, "min": 1.0, "max": 20000.0,
+                "type": "number",
+                "label": "Peak inflow",
+                "unit": "m3/s",
+                "default": 300.0,
+                "min": 1.0,
+                "max": 20000.0,
             },
             "rise_minutes": {
-                "type": "number", "label": "Rise to peak", "unit": "min",
-                "default": 30.0, "min": 0.0, "max": 1440.0,
+                "type": "number",
+                "label": "Rise to peak",
+                "unit": "min",
+                "default": 30.0,
+                "min": 0.0,
+                "max": 1440.0,
             },
             "peak_minutes": {
-                "type": "number", "label": "Time at peak", "unit": "min",
-                "default": 30.0, "min": 0.0, "max": 1440.0,
+                "type": "number",
+                "label": "Time at peak",
+                "unit": "min",
+                "default": 30.0,
+                "min": 0.0,
+                "max": 1440.0,
             },
             "recession_minutes": {
-                "type": "number", "label": "Recession", "unit": "min",
-                "default": 120.0, "min": 0.0, "max": 2880.0,
+                "type": "number",
+                "label": "Recession",
+                "unit": "min",
+                "default": 120.0,
+                "min": 0.0,
+                "max": 2880.0,
             },
             "duration_hours": {
-                "type": "number", "label": "Simulated duration", "unit": "h",
-                "default": 6.0, "min": 0.25, "max": 72.0,
+                "type": "number",
+                "label": "Simulated duration",
+                "unit": "h",
+                "default": 6.0,
+                "min": 0.25,
+                "max": 72.0,
             },
             "n_manning": {
-                "type": "number", "label": "Manning roughness",
+                "type": "number",
+                "label": "Manning roughness",
                 "help": "0.03 smooth channel, 0.05 typical, 0.10 dense vegetation.",
-                "default": 0.05, "min": 0.01, "max": 0.2,
+                "default": 0.05,
+                "min": 0.01,
+                "max": 0.2,
             },
             "rain_mm_per_hour": {
-                "type": "number", "label": "Uniform rainfall", "unit": "mm/h",
-                "default": 0.0, "min": 0.0, "max": 300.0,
+                "type": "number",
+                "label": "Uniform rainfall",
+                "unit": "mm/h",
+                "default": 0.0,
+                "min": 0.0,
+                "max": 300.0,
             },
             "scale_m": {
-                "type": "number", "label": "Grid resolution", "unit": "m",
-                "default": 30.0, "enum": [10, 30, 60, 90],
+                "type": "number",
+                "label": "Grid resolution",
+                "unit": "m",
+                "default": 30.0,
+                "enum": [10, 30, 60, 90],
             },
             "n_frames": {
-                "type": "integer", "label": "Animation frames",
-                "default": 48, "min": 2, "max": 240,
+                "type": "integer",
+                "label": "Animation frames",
+                "default": 48,
+                "min": 2,
+                "max": 240,
             },
             "fill_dem_pits": {
-                "type": "boolean", "label": "Fill DEM depressions",
+                "type": "boolean",
+                "label": "Fill DEM depressions",
                 "help": (
                     "Removes sensor artefacts that trap water and stop the flood "
                     "receding. Changes the terrain; always reported in the result."
@@ -507,7 +570,7 @@ ANALYSIS_REGISTRY = {
             "Finney minimum-travel-time propagation, producing an animated "
             "burn with arrival times, flame lengths and a growth curve. "
             "Answers 'where would a fire go from here, in this fuel, under "
-            "this wind?' — the question a satellite cannot answer, because "
+            "this wind?'. The question a satellite cannot answer, because "
             "the fire has not happened. For a fire that did happen, use "
             "Wildfire Burn Scar Mapping."
         ),
@@ -528,60 +591,89 @@ ANALYSIS_REGISTRY = {
                 "default": None,
             },
             "fuel_model": {
-                "type": "string", "label": "Fuel model",
+                "type": "string",
+                "label": "Fuel model",
                 "help": "Anderson (1982) standard fuel models.",
                 "enum": sorted(FUEL_MODELS),
                 "default": "sh5",
             },
             "wind_ms": {
-                "type": "number", "label": "Midflame wind", "unit": "m/s",
-                "help": (
-                    "Wind AT THE FLAME, not the 10 m weather wind — typically "
-                    "a third to a half of it."
-                ),
-                "default": 5.0, "min": 0.0, "max": 25.0,
+                "type": "number",
+                "label": "Midflame wind",
+                "unit": "m/s",
+                "help": ("Wind AT THE FLAME, not the 10 m weather wind, typically a third to a half of it."),
+                "default": 5.0,
+                "min": 0.0,
+                "max": 25.0,
             },
             "wind_from_bearing": {
-                "type": "number", "label": "Wind from", "unit": "deg",
+                "type": "number",
+                "label": "Wind from",
+                "unit": "deg",
                 "help": "Compass bearing the wind blows FROM. 270 is a westerly.",
-                "default": 270.0, "min": 0.0, "max": 360.0,
+                "default": 270.0,
+                "min": 0.0,
+                "max": 360.0,
             },
             "duration_hours": {
-                "type": "number", "label": "Duration", "unit": "h",
-                "default": 8.0, "min": 0.25, "max": 72.0,
+                "type": "number",
+                "label": "Duration",
+                "unit": "h",
+                "default": 8.0,
+                "min": 0.25,
+                "max": 72.0,
             },
             "moisture_1h": {
-                "type": "number", "label": "1-hour fuel moisture",
+                "type": "number",
+                "label": "1-hour fuel moisture",
                 "help": "Fraction, not percent: 0.06 is 6%.",
-                "default": 0.06, "min": 0.01, "max": 0.5,
+                "default": 0.06,
+                "min": 0.01,
+                "max": 0.5,
             },
             "moisture_10h": {
-                "type": "number", "label": "10-hour fuel moisture",
-                "default": 0.07, "min": 0.01, "max": 0.5,
+                "type": "number",
+                "label": "10-hour fuel moisture",
+                "default": 0.07,
+                "min": 0.01,
+                "max": 0.5,
             },
             "moisture_100h": {
-                "type": "number", "label": "100-hour fuel moisture",
-                "default": 0.08, "min": 0.01, "max": 0.5,
+                "type": "number",
+                "label": "100-hour fuel moisture",
+                "default": 0.08,
+                "min": 0.01,
+                "max": 0.5,
             },
             "moisture_live": {
-                "type": "number", "label": "Live fuel moisture",
+                "type": "number",
+                "label": "Live fuel moisture",
                 "help": "1.0 is fully green; 0.3 is cured.",
-                "default": 1.0, "min": 0.3, "max": 3.0,
+                "default": 1.0,
+                "min": 0.3,
+                "max": 3.0,
             },
             "scale_m": {
-                "type": "number", "label": "Grid resolution", "unit": "m",
-                "default": 30.0, "min": 10.0, "max": 200.0,
+                "type": "number",
+                "label": "Grid resolution",
+                "unit": "m",
+                "default": 30.0,
+                "min": 10.0,
+                "max": 200.0,
             },
             "neighbours": {
-                "type": "number", "label": "Spread directions",
+                "type": "number",
+                "label": "Spread directions",
                 "help": (
                     "More directions, less lattice bias: 8 overestimates "
                     "off-axis travel by 8%, 16 by 2.8%, 32 by 1.3%."
                 ),
-                "enum": [8, 16, 32], "default": 32,
+                "enum": [8, 16, 32],
+                "default": 32,
             },
             "ignition_point": {
-                "type": "point", "label": "Ignition point",
+                "type": "point",
+                "label": "Ignition point",
                 "help": "Where the fire starts. Defaults to the AOI centre.",
                 "default": None,
             },
@@ -594,7 +686,7 @@ ANALYSIS_REGISTRY = {
             "L-band radar (ALOS PALSAR) penetrates dry sand and forest canopy, "
             "so buried or vegetation-hidden structure can surface as texture "
             "anomalies against the natural neighbourhood pattern. Produces "
-            "CANDIDATE targets for ground survey — modern tracks and field "
+            "CANDIDATE targets for ground survey, modern tracks and field "
             "boundaries look identical from orbit."
         ),
         "category": "Research",
@@ -610,7 +702,6 @@ ANALYSIS_REGISTRY = {
 
 
 def registry_as_json() -> list:
-    """Serializable registry for the GET /registry endpoint (drops the callables)."""
     return [
         {
             "id": analysis_id,
@@ -622,13 +713,7 @@ def registry_as_json() -> list:
             "output_type": cfg["output_type"],
             "color_palette": cfg["color_palette"],
             "icon": cfg["icon"],
-            # Observation vs forward model. Every entry that does not say
-            # otherwise measures something a satellite actually recorded; the
-            # frontend and the AI layer both key off this to keep simulated
-            # output from ever being described as a detection.
             "mode": cfg.get("mode", "observed"),
-            # Entries with a parameter schema take an extra `params` object;
-            # the sidebar renders a form from it.
             "accepts_params": cfg.get("accepts_params", False),
             "params_schema": cfg.get("params_schema"),
         }

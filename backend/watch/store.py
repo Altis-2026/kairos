@@ -93,9 +93,7 @@ def save_finding(f: dict) -> bool:
 
 def recent_findings(limit: int = 40) -> list:
     with _lock, _connect() as conn:
-        rows = conn.execute(
-            "SELECT * FROM findings ORDER BY created_at DESC LIMIT ?", (limit,)
-        ).fetchall()
+        rows = conn.execute("SELECT * FROM findings ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
     out = []
     for row in rows:
         item = dict(row)
@@ -113,9 +111,7 @@ def finding_count() -> int:
 
 def start_sweep() -> int:
     with _lock, _connect() as conn:
-        cur = conn.execute(
-            "INSERT INTO sweeps (started_at) VALUES (?)", (time.time(),)
-        )
+        cur = conn.execute("INSERT INTO sweeps (started_at) VALUES (?)", (time.time(),))
         conn.commit()
         return int(cur.lastrowid)
 

@@ -1,15 +1,3 @@
-"""
-The public accuracy scoreboard.
-
-Every ground-truth validation run — whoever triggered it, UI button or Janus
-tool — is logged here, and GET /scoreboard aggregates the full history per
-benchmark: how many times it has been run, the latest and mean skill scores,
-and when. Published openly and rebuilt from real runs only, it is the
-anti-cherry-picked-demo: if the numbers were bad, they would be bad in public.
-
-Storage piggybacks on the same lightweight SQLite pattern as the watch feed.
-"""
-
 import os
 import sqlite3
 import threading
@@ -43,8 +31,6 @@ def init_db():
 
 
 def log_run(benchmark: dict, metrics: dict):
-    """Record one completed validation run. Never raises — logging must not
-    be able to break the validation that produced it."""
     try:
         init_db()
         with _lock, _connect() as conn:
@@ -69,7 +55,6 @@ def log_run(benchmark: dict, metrics: dict):
 
 
 def summary() -> dict:
-    """Aggregate skill per benchmark across every run ever logged."""
     init_db()
     with _lock, _connect() as conn:
         rows = conn.execute(
@@ -85,9 +70,7 @@ def summary() -> dict:
             """
         ).fetchall()
         latest = {}
-        for r in conn.execute(
-            "SELECT benchmark_id, f1 FROM validation_runs ORDER BY ran_at"
-        ):
+        for r in conn.execute("SELECT benchmark_id, f1 FROM validation_runs ORDER BY ran_at"):
             latest[r["benchmark_id"]] = r["f1"]
 
     def _r(v):
@@ -113,6 +96,6 @@ def summary() -> dict:
         "total_runs": sum(e["runs"] for e in entries),
         "note": (
             "Every row aggregates real, reproducible validation runs against "
-            "independently mapped events — nothing here is hand-entered."
+            "independently mapped events. Nothing here is hand-entered."
         ),
     }

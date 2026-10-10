@@ -1,11 +1,3 @@
-"""
-Dark-vessel screening: radar ship detections matched against AIS broadcasts.
-
-GET  /vessels/cases   — the curated screening cases and whether their AIS
-                        record is installed on this server
-POST /vessels/screen  — run the screening pass for one case
-"""
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -22,8 +14,7 @@ def list_cases():
 
     return {
         "cases": [
-            {**{k: v for k, v in case.items()}, "available": case_available(case["id"])}
-            for case in CASES
+            {**{k: v for k, v in case.items()}, "available": case_available(case["id"])} for case in CASES
         ]
     }
 

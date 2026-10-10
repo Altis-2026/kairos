@@ -32,9 +32,7 @@ def _window(analysis_type: str) -> tuple:
 def _eonet_targets(limit: int) -> list:
     try:
         with httpx.Client(timeout=15.0) as client:
-            resp = client.get(
-                EONET_URL, params={"status": "open", "days": 30, "limit": 100}
-            )
+            resp = client.get(EONET_URL, params={"status": "open", "days": 30, "limit": 100})
             resp.raise_for_status()
             events = resp.json().get("events", [])
     except Exception:
@@ -168,8 +166,7 @@ def run_sweep_once() -> dict:
             saved = store.save_finding(
                 {
                     "dedupe_key": (
-                        f"{target['source_id']}:{target['analysis_type']}:"
-                        f"{result.get('data_date')}"
+                        f"{target['source_id']}:{target['analysis_type']}:{result.get('data_date')}"
                     ),
                     "source": target["source"],
                     "source_title": target["source_title"],
@@ -191,10 +188,7 @@ def run_sweep_once() -> dict:
             if saved:
                 findings_saved += 1
 
-        print(
-            f"[kairos] sweep done: {targets_run} targets, "
-            f"{findings_saved} new findings, {errors} errors"
-        )
+        print(f"[kairos] sweep done: {targets_run} targets, {findings_saved} new findings, {errors} errors")
         return {
             "started": True,
             "targets": targets_run,

@@ -1,25 +1,5 @@
-"""
-Ground-truth validation — how accurate is Kairos, measured, not asserted.
-
-Each benchmark is a real historical event where an independent reference map
-exists inside Earth Engine. We re-run the exact production detector over the
-event window, rasterize the reference, and compute pixel-area agreement
-metrics (IoU, precision, recall, F1) server-side. Numbers are computed live
-on every run — nothing here is hardcoded or fabricated.
-
-References:
-    GLOBAL_FLOOD_DB/MODIS_EVENTS/V1      913 mapped flood events, 250 m
-                                         (Tellman et al. 2021, Nature)
-    MODIS/061/MCD64A1                    monthly burned area, 500 m
-    UMD/hansen/global_forest_change_*    annual forest loss, 30 m
-
-Honest caveats, returned with every result: the references are coarser than
-Sentinel-1 (250-500 m vs 30 m), built from different sensors with their own
-error, and agreement is computed at the reference's native scale. These are
-indicative accuracy figures, not survey-grade truth.
-"""
-
 import ee
+
 from gee import common
 from gee.registry import ANALYSIS_REGISTRY
 
@@ -32,7 +12,7 @@ BENCHMARKS = [
     {
         "id": "bangladesh-monsoon-2017",
         "analysis_type": "flood_extent",
-        "region": "Brahmaputra floodplain, Bangladesh — August 2017 monsoon",
+        "region": "Brahmaputra floodplain, Bangladesh, August 2017 monsoon",
         "bbox": [89.3, 25.0, 89.9, 25.5],
         "start_date": "2017-08-10",
         "end_date": "2017-08-31",
@@ -42,7 +22,7 @@ BENCHMARKS = [
     {
         "id": "camp-fire-2018",
         "analysis_type": "wildfire_burn_scar",
-        "region": "Camp Fire, Butte County, California — November 2018",
+        "region": "Camp Fire, Butte County, California, November 2018",
         "bbox": [-121.75, 39.65, -121.35, 39.95],
         "start_date": "2018-11-08",
         "end_date": "2018-12-08",
@@ -52,20 +32,17 @@ BENCHMARKS = [
     {
         "id": "rondonia-clearing-2020",
         "analysis_type": "deforestation",
-        "region": "Rondônia, Brazil — 2020 clearing season",
+        "region": "Rondônia, Brazil, 2020 clearing season",
         "bbox": [-63.6, -9.8, -63.1, -9.4],
         "start_date": "2020-06-01",
         "end_date": "2020-09-30",
         "reference": "Hansen Global Forest Change loss year (Landsat, 30 m)",
         "reference_scale_m": 30,
     },
-    # Point-based, not raster. Ship detection returns vessel positions rather
-    # than an area, so this benchmark scores detections against transponder
-    # broadcasts instead of computing pixel-area overlap. See run_benchmark.
     {
         "id": "gulf-vessels-2023",
         "analysis_type": "ship_detection",
-        "region": "Mississippi River delta, Gulf of Mexico — 15 January 2023",
+        "region": "Mississippi River delta, Gulf of Mexico, 15 January 2023",
         "bbox": [-89.6, 28.6, -88.9, 29.2],
         "start_date": "2023-01-15",
         "end_date": "2023-01-16",
@@ -78,13 +55,9 @@ BENCHMARKS = [
 
 
 def _reference_mask(bm: dict, geometry: ee.Geometry) -> ee.Image:
-    """Binary reference mask for a benchmark, from its ground-truth dataset."""
     analysis_type = bm["analysis_type"]
 
     if analysis_type == "flood_extent":
-        # Event rasters carry began/ended metadata; a widened date filter
-        # catches events overlapping our window. Permanent water is excluded
-        # the same way the detector excludes it.
         events = (
             ee.ImageCollection(GLOBAL_FLOOD_DB)
             .filterBounds(geometry)
@@ -94,9 +67,7 @@ def _reference_mask(bm: dict, geometry: ee.Geometry) -> ee.Image:
             )
         )
         if events.size().getInfo() == 0:
-            raise ValueError(
-                "No Global Flood Database event overlaps this benchmark window."
-            )
+            raise ValueError("No Global Flood Database event overlaps this benchmark window.")
         flooded = events.select("flooded").max().gt(0)
         return flooded.where(common.permanent_water_mask(75), 0)
 
@@ -104,9 +75,7 @@ def _reference_mask(bm: dict, geometry: ee.Geometry) -> ee.Image:
         burns = (
             ee.ImageCollection(MCD64A1)
             .filterBounds(geometry)
-            .filterDate(
-                bm["start_date"], ee.Date(bm["end_date"]).advance(60, "day")
-            )
+            .filterDate(bm["start_date"], ee.Date(bm["end_date"]).advance(60, "day"))
         )
         if burns.size().getInfo() == 0:
             raise ValueError("No MCD64A1 burned-area data for this window.")
@@ -115,22 +84,14 @@ def _reference_mask(bm: dict, geometry: ee.Geometry) -> ee.Image:
     if analysis_type == "deforestation":
         year = int(bm["start_date"][:4])
         if year > _HANSEN_LAST_YEAR:
-            raise ValueError(
-                f"Hansen reference currently ends at {_HANSEN_LAST_YEAR}."
-            )
+            raise ValueError(f"Hansen reference currently ends at {_HANSEN_LAST_YEAR}.")
         lossyear = ee.Image(HANSEN).select("lossyear")
         return lossyear.eq(year - 2000)
 
     raise ValueError(f"No reference dataset wired for '{analysis_type}'.")
 
 
-def _agreement_metrics(
-    ours: ee.Image, ref: ee.Image, geometry: ee.Geometry, scale: int
-) -> dict:
-    """
-    IoU / precision / recall / F1 by pixel area, in ONE combined reduceRegion
-    (a 4-band area image) so the whole comparison is a single round-trip.
-    """
+def _agreement_metrics(ours: ee.Image, ref: ee.Image, geometry: ee.Geometry, scale: int) -> dict:
     ours_b = ours.unmask(0).gt(0).rename("ours")
     ref_b = ref.unmask(0).gt(0).rename("ref")
     inter = ours_b.And(ref_b).rename("inter")
@@ -179,27 +140,10 @@ def get_benchmark(benchmark_id: str) -> dict:
     for bm in BENCHMARKS:
         if bm["id"] == benchmark_id:
             return bm
-    raise ValueError(
-        f"Unknown benchmark '{benchmark_id}'. "
-        f"Available: {[b['id'] for b in BENCHMARKS]}"
-    )
+    raise ValueError(f"Unknown benchmark '{benchmark_id}'. Available: {[b['id'] for b in BENCHMARKS]}")
 
 
 def _run_point_benchmark(bm: dict) -> dict:
-    """
-    Score a point detector against transponder broadcasts.
-
-    Ship detection returns vessel positions, so pixel-area overlap is the wrong
-    instrument. Instead we reuse the production dark-vessel screening, which
-    already matches each radar return to the AIS broadcast nearest in time
-    within a drift-widened radius, and read agreement off that matching.
-
-    Both numbers are bounds, not accuracy, and the caveat matters more than the
-    figure: an unmatched radar return is not necessarily a false positive,
-    because small craft are not required to broadcast AIS and this area holds
-    hundreds of fixed platforms that each read as a bright return. Precision is
-    therefore a LOWER bound on correctness. Recall is the cleaner of the two.
-    """
     from gee import dark_vessels
 
     screen = dark_vessels.screen_case(bm["dark_vessel_case"])
@@ -226,9 +170,6 @@ def _run_point_benchmark(bm: dict) -> dict:
         "precision": precision,
         "recall": recall,
         "f1": f1,
-        # Area overlap is undefined for a point detector; the scoreboard stores
-        # None rather than a number that would invite comparison with the
-        # raster benchmarks.
         "iou": None,
     }
 
@@ -258,10 +199,6 @@ def _run_point_benchmark(bm: dict) -> dict:
 
 
 def run_benchmark(benchmark_id: str) -> dict:
-    """
-    Run one benchmark end-to-end: production detector vs reference dataset.
-    Slow (one full GEE analysis + comparison, typically 30-90 s).
-    """
     bm = get_benchmark(benchmark_id)
 
     if bm.get("kind") == "points":
@@ -269,21 +206,15 @@ def run_benchmark(benchmark_id: str) -> dict:
 
     geometry = common.bbox_geometry(bm["bbox"])
 
-    # The exact production detector — not a special validation path.
     detector = ANALYSIS_REGISTRY[bm["analysis_type"]]["function"]
-    raw = detector(
-        bbox=bm["bbox"], start_date=bm["start_date"], end_date=bm["end_date"]
-    )
+    raw = detector(bbox=bm["bbox"], start_date=bm["start_date"], end_date=bm["end_date"])
     ours = raw["result_image"]
 
     ref = _reference_mask(bm, geometry).clip(geometry)
     metrics = _agreement_metrics(ours, ref, geometry, bm["reference_scale_m"])
 
-    ref_tile = common.tile_url(
-        ref.selfMask(), {"palette": ["#E8A318"], "min": 0, "max": 1}
-    )
+    ref_tile = common.tile_url(ref.selfMask(), {"palette": ["#E8A318"], "min": 0, "max": 1})
 
-    # Every real run feeds the public accuracy scoreboard (never fatal).
     import scoreboard
 
     scoreboard.log_run(bm, metrics)
@@ -297,7 +228,7 @@ def run_benchmark(benchmark_id: str) -> dict:
         "caveats": (
             "Reference maps are coarser than Sentinel-1 and come from "
             "different sensors with their own error. Agreement is computed at "
-            f"the reference's native {bm['reference_scale_m']} m scale — "
+            f"the reference's native {bm['reference_scale_m']} m scale, "
             "indicative accuracy, not absolute truth."
         ),
     }

@@ -1,30 +1,8 @@
-"""
-Trend statistics for extracted time series — pure Python, no scipy/numpy.
-
-Two complementary tests, because reviewers expect both:
-
-  * OLS linear regression — slope (per year), r², and a two-sided p-value for
-    the slope computed from the exact Student-t distribution (regularized
-    incomplete beta via continued fractions, Numerical-Recipes style), not a
-    normal approximation.
-  * Mann-Kendall — the field-standard nonparametric monotonic-trend test
-    (robust to outliers and non-normality), with the tie-corrected variance
-    and the usual normal approximation for its Z statistic, plus Sen's slope
-    (median of pairwise slopes) as the robust rate estimate.
-
-Dates are converted to fractional years so both slopes read "per year".
-"""
-
 import math
 from datetime import datetime
 
-# ---------------------------------------------------------------------------
-# Student-t p-value machinery (exact, via the regularized incomplete beta).
-# ---------------------------------------------------------------------------
-
 
 def _betacf(a: float, b: float, x: float) -> float:
-    """Continued fraction for the incomplete beta function."""
     MAXIT, EPS, FPMIN = 200, 3e-12, 1e-300
     qab, qap, qam = a + b, a + 1.0, a - 1.0
     c, d = 1.0, 1.0 - qab * x / qap
@@ -59,18 +37,11 @@ def _betacf(a: float, b: float, x: float) -> float:
 
 
 def _betai(a: float, b: float, x: float) -> float:
-    """Regularized incomplete beta I_x(a, b)."""
     if x <= 0.0:
         return 0.0
     if x >= 1.0:
         return 1.0
-    ln_bt = (
-        math.lgamma(a + b)
-        - math.lgamma(a)
-        - math.lgamma(b)
-        + a * math.log(x)
-        + b * math.log(1.0 - x)
-    )
+    ln_bt = math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b) + a * math.log(x) + b * math.log(1.0 - x)
     bt = math.exp(ln_bt)
     if x < (a + 1.0) / (a + b + 2.0):
         return bt * _betacf(a, b, x) / a
@@ -78,7 +49,6 @@ def _betai(a: float, b: float, x: float) -> float:
 
 
 def _t_sf_two_sided(t: float, df: float) -> float:
-    """Two-sided p-value for a Student-t statistic with df degrees of freedom."""
     if df <= 0:
         return 1.0
     return _betai(df / 2.0, 0.5, df / (df + t * t))
@@ -89,19 +59,12 @@ def _norm_sf_two_sided(z: float) -> float:
 
 
 def _to_years(dates: list) -> list:
-    """ISO date strings -> fractional years since the first observation."""
     ts = [datetime.strptime(d, "%Y-%m-%d") for d in dates]
     t0 = ts[0]
     return [(t - t0).days / 365.25 for t in ts]
 
 
-# ---------------------------------------------------------------------------
-# The public API.
-# ---------------------------------------------------------------------------
-
-
 def ols_trend(dates: list, values: list) -> dict:
-    """Least-squares line through (t_years, value); slope in units/year."""
     n = len(values)
     if n < 3:
         raise ValueError("Need at least 3 points for a trend.")
@@ -116,9 +79,7 @@ def ols_trend(dates: list, values: list) -> dict:
 
     slope = sxy / sxx
     intercept = mean_y - slope * mean_x
-    ss_res = sum(
-        (yi - (intercept + slope * xi)) ** 2 for xi, yi in zip(x, values)
-    )
+    ss_res = sum((yi - (intercept + slope * xi)) ** 2 for xi, yi in zip(x, values))
     r2 = 1.0 - ss_res / syy if syy > 0 else 0.0
 
     df = n - 2
@@ -139,7 +100,6 @@ def ols_trend(dates: list, values: list) -> dict:
 
 
 def mann_kendall(dates: list, values: list) -> dict:
-    """Tie-corrected Mann-Kendall test + Sen's slope (units/year)."""
     n = len(values)
     if n < 4:
         raise ValueError("Mann-Kendall needs at least 4 points.")
@@ -150,7 +110,6 @@ def mann_kendall(dates: list, values: list) -> dict:
             d = values[j] - values[i]
             s += (d > 0) - (d < 0)
 
-    # Tie-corrected variance.
     counts = {}
     for v in values:
         counts[v] = counts.get(v, 0) + 1
@@ -167,7 +126,6 @@ def mann_kendall(dates: list, values: list) -> dict:
         z = 0.0
     p = _norm_sf_two_sided(z)
 
-    # Sen's slope: median of all pairwise slopes over fractional years.
     x = _to_years(dates)
     slopes = []
     for i in range(n - 1):
@@ -177,11 +135,7 @@ def mann_kendall(dates: list, values: list) -> dict:
                 slopes.append((values[j] - values[i]) / dt)
     slopes.sort()
     m = len(slopes)
-    sen = (
-        slopes[m // 2]
-        if m % 2 == 1
-        else (slopes[m // 2 - 1] + slopes[m // 2]) / 2.0
-    ) if m else 0.0
+    sen = (slopes[m // 2] if m % 2 == 1 else (slopes[m // 2 - 1] + slopes[m // 2]) / 2.0) if m else 0.0
 
     if p < 0.05:
         trend = "increasing" if s > 0 else "decreasing"
@@ -199,7 +153,6 @@ def mann_kendall(dates: list, values: list) -> dict:
 
 
 def trend_report(points: list) -> dict:
-    """Both tests over [{date, value}...] plus a one-line plain reading."""
     dates = [p["date"] for p in points]
     values = [float(p["value"]) for p in points]
     ols = ols_trend(dates, values)
@@ -208,7 +161,7 @@ def trend_report(points: list) -> dict:
     if mk["p_value"] < 0.05 and ols["p_value"] < 0.05:
         strength = "Both tests agree"
     elif mk["p_value"] < 0.05 or ols["p_value"] < 0.05:
-        strength = "Only one test reaches significance — treat with caution"
+        strength = "Only one test reaches significance, treat with caution"
     else:
         strength = "Neither test finds a significant trend"
     summary = (

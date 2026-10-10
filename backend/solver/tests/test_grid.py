@@ -1,5 +1,3 @@
-"""Grid conventions, edge resolution, and DEM conditioning."""
-
 import numpy as np
 import pytest
 
@@ -7,7 +5,6 @@ from solver import grid
 
 
 def test_edge_slices_match_the_documented_orientation():
-    """Row 0 is north, row -1 south, column 0 west, column -1 east."""
     dem = np.arange(9, dtype=float).reshape(3, 3)
     assert list(dem[grid.EDGES["north"]]) == [0, 1, 2]
     assert list(dem[grid.EDGES["south"]]) == [6, 7, 8]
@@ -16,13 +13,12 @@ def test_edge_slices_match_the_documented_orientation():
 
 
 def test_lowest_edge_finds_the_outlet():
-    dem = np.tile(np.linspace(100.0, 0.0, 10)[:, None], (1, 10))  # drops southward
+    dem = np.tile(np.linspace(100.0, 0.0, 10)[:, None], (1, 10))
     assert grid.lowest_edge(dem) == "south"
     assert grid.lowest_edge(dem.T) == "east"
 
 
 def test_lowest_edge_uses_the_mean_not_one_stray_pixel():
-    """One anomalous low pixel on a high wall must not claim the outlet."""
     dem = np.tile(np.linspace(100.0, 0.0, 10)[:, None], (1, 10))
     dem[0, 4] = -500.0
     assert grid.lowest_edge(dem) == "south"
@@ -38,7 +34,7 @@ def test_open_edges_are_normalised_and_validated():
 
 def test_pit_filling_removes_an_interior_sink_and_leaves_the_rest_alone():
     dem = np.tile(np.linspace(10.0, 0.0, 12)[:, None], (1, 12))
-    dem[6, 6] = -20.0                       # an artefact sink
+    dem[6, 6] = -20.0
     before = dem.copy()
 
     filled = grid.fill_pits(dem)
@@ -52,7 +48,6 @@ def test_pit_filling_removes_an_interior_sink_and_leaves_the_rest_alone():
 
 
 def test_pit_filling_preserves_a_genuine_drainable_valley():
-    """A valley that already drains to the border must come back unchanged."""
     dem = np.tile(np.linspace(10.0, 0.0, 12)[:, None], (1, 12))
     assert grid.fill_pits(dem) == pytest.approx(dem)
 

@@ -1,14 +1,3 @@
-"""
-Janus curricula — structured teaching tracks the mentor walks a student
-through, one conversational session at a time. Every session ends in a live
-exercise the student actually runs on real Sentinel-1 data via the mentor's
-run_analysis tool, so nothing stays theoretical.
-
-The mentor reads these via its get_curriculum tool; it teaches FROM this
-structure rather than inventing a syllabus, so two students on the same
-track get the same course.
-"""
-
 CURRICULA = {
     "sar-fundamentals": {
         "id": "sar-fundamentals",
@@ -314,15 +303,15 @@ CURRICULA = {
         ),
         "outcome": (
             "You can explain why L-band penetrates where optical and C-band "
-            "cannot, run an anomaly survey over a candidate landscape, and — "
-            "crucially — argue why a given anomaly is probably NOT a lost city."
+            "cannot, run an anomaly survey over a candidate landscape, and, "
+            "crucially, argue why a given anomaly is probably NOT a lost city."
         ),
         "sessions": [
             {
                 "title": "The physics of seeing under the surface",
                 "goals": [
                     "Wavelength vs penetration: why L-band (24 cm) reaches where C-band (5.5 cm) stops",
-                    "The 1982 SIR-A Sahara paleochannels — the founding result",
+                    "The 1982 SIR-A Sahara paleochannels. The founding result",
                     "The dryness requirement: why moisture kills penetration",
                 ],
                 "exercise": {
@@ -387,8 +376,5 @@ def curricula_summary() -> list:
 
 def get_curriculum(curriculum_id: str) -> dict:
     if curriculum_id not in CURRICULA:
-        raise ValueError(
-            f"Unknown curriculum '{curriculum_id}'. "
-            f"Available: {list(CURRICULA.keys())}"
-        )
+        raise ValueError(f"Unknown curriculum '{curriculum_id}'. Available: {list(CURRICULA.keys())}")
     return CURRICULA[curriculum_id]

@@ -1,5 +1,3 @@
-"""Showcase scenes: every one must be runnable and honestly labelled."""
-
 import pytest
 
 from gee.raster_fetch import plan_grid
@@ -14,10 +12,6 @@ class TestEveryScene:
         assert values.max() == SCENES[scene_id].peak_discharge_m3s
 
     def test_run_outlasts_the_hydrograph_so_it_can_recede(self, scene_id):
-        """
-        If the run ends when the inflow does, the animation stops at the peak
-        and the flood never visibly drains — the whole point of the feature.
-        """
         scene = SCENES[scene_id]
         assert scene.duration_s() > scene.hydrograph()[-1][0]
 
@@ -30,8 +24,7 @@ class TestEveryScene:
 
         plan = plan_grid(list(scene.bbox), scene.scale_m)
         assert plan.cells <= 150_000, (
-            f"{scene_id} is {plan.cells:,} cells — too slow for a demo scene; "
-            f"raise its scale_m"
+            f"{scene_id} is {plan.cells:,} cells, too slow for a demo scene; raise its scale_m"
         )
         assert not plan.downscaled
 
@@ -39,10 +32,6 @@ class TestEveryScene:
         assert 0.01 <= SCENES[scene_id].n_manning <= 0.2
 
     def test_carries_its_disclosure(self, scene_id):
-        """
-        A synthetic hydrograph over real terrain looks exactly as convincing
-        as a real one. The difference has to be stated on every scene.
-        """
         scene = SCENES[scene_id]
         assert scene.disclosure
         assert "not a gauge record" in scene.disclosure

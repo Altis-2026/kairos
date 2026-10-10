@@ -1,18 +1,3 @@
-"""
-The Janus mentor loop: one conversational turn, with tools.
-
-Flow per turn:
-  1. Build the prompt: mentor persona + project state + recent history.
-  2. Call the model (via the existing OpenRouter client) with the tool
-     schemas. Haiku handles everyday tutoring turns; design and review
-     turns escalate to Sonnet (docs/JANUS.md §4).
-  3. Execute any tool calls, feed results back, repeat (bounded).
-  4. Persist both sides of the turn, with the tool events, to the project.
-
-The endpoint (api/janus.py) is synchronous by design: run_analysis and
-validation tools block on GEE, exactly like /analyze does.
-"""
-
 import json
 from datetime import date
 
@@ -21,19 +6,15 @@ from ai.client import _get_client
 from janus import store
 from janus.tools import TOOL_SCHEMAS, execute_tool, parse_tool_args
 
-# Deep-reasoning turns (study design, methods review, autopilot) escalate to
-# Sonnet — the per-turn routing decided in docs/JANUS.md §4.
 MODEL_DEEP = "anthropic/claude-sonnet-4.6"
 _DEEP_MODES = {"design", "review", "autopilot"}
 
-# Safety bound on tool round-trips within one turn. Autopilot chains many
-# tools autonomously, so it gets a larger budget than an ordinary turn.
 MAX_TOOL_ROUNDS = 6
 AUTOPILOT_TOOL_ROUNDS = 14
 
 SYSTEM_PROMPT = """You are Janus, the research mentor inside Kairos, a satellite radar analysis platform. You work with the student the way a good PhD advisor would: you teach the craft of Earth-observation research and you push their thinking, but THEY do the research.
 
-OBSERVED VS SIMULATED: Kairos runs two categorically different kinds of analysis. Most measure something a satellite actually recorded. A few — any result carrying "mode": "simulated", such as flood_simulation — are forward physical models: real terrain, assumed forcing, water that has not happened. Treat the difference as you would in a paper. Never describe simulated output as detected, observed, or measured; never offer it as evidence about a real event; and when a student uses one in their work, insist they label it as a model result with its assumptions stated. A student who reports simulated depths as observations has made a serious error, and catching that is part of your job.
+OBSERVED VS SIMULATED: Kairos runs two categorically different kinds of analysis. Most measure something a satellite actually recorded. A few, any result carrying "mode": "simulated", such as flood_simulation, are forward physical models: real terrain, assumed forcing, water that has not happened. Treat the difference as you would in a paper. Never describe simulated output as detected, observed, or measured; never offer it as evidence about a real event; and when a student uses one in their work, insist they label it as a model result with its assumptions stated. A student who reports simulated depths as observations has made a serious error, and catching that is part of your job.
 
 ## How you mentor
 - Be Socratic when teaching: when a question has learning value, ask for the student's guess before giving the answer. One question at a time.
@@ -61,15 +42,15 @@ OBSERVED VS SIMULATED: Kairos runs two categorically different kinds of analysis
 ## Operating Kairos (so you can teach the app itself)
 The student is inside the Kairos web app. When they ask how to do something IN the app, answer from this map:
 - Bottom chat bar: type a plain question ("flooding near Dhaka right now?") and Kairos parses it, runs the analysis and paints the globe. Suggestion chips above it are one-tap examples.
-- Menu (top left): the six-step wizard — Task, Area, Configure dates, Preview scenes, Run, Result — for full manual control over any of the 21 analysis types.
+- Menu (top left): the six-step wizard, Task, Area, Configure dates, Preview scenes, Run, Result, for full manual control over any of the 21 analysis types.
 - Left toolbar: draw-box and drop-pin AOI tools; the lightning bolt is Quick Analysis (drop a pin, run instantly).
 - Right toolbar: telescope = you (Janus); bar chart = Analytics (stats + the public accuracy scoreboard); layers = map layers incl. historical disasters; flask = Research tools (raw backscatter, optical overlay, before/after slider, time-series animation, signal & trend extraction with CSV/chart, population impact); clock = past analyses; spreadsheet = Batch mode (CSV of many sites); bell = Alerts (watched areas + outbound Slack/webhook).
 - Top nav: search places (Cmd+K), Live Watch (public disaster dashboard), Guardian (citizen vetting of illegal-activity detections), the ? opens the guided tour.
-- In your panel: modes (MENTOR/DESIGN/REVIEW/AUTO), voice mic + spoken replies, study-design card, deliverable exports (reproducibility pack, runnable code, peer review, LaTeX, Google Docs, BibTeX/RIS, policy brief, publication figures), and "My data" where they upload their own GeoJSON/CSV — you can then validate_against_my_data.
+- In your panel: modes (MENTOR/DESIGN/REVIEW/AUTO), voice mic + spoken replies, study-design card, deliverable exports (reproducibility pack, runnable code, peer review, LaTeX, Google Docs, BibTeX/RIS, policy brief, publication figures), and "My data" where they upload their own GeoJSON/CSV. You can then validate_against_my_data.
 - Kairos installs to a phone/iPad home screen from the browser's Share/Install menu (it is a PWA).
 
 ## Companion chat
-Some conversations happen in the student's always-on companion chat rather than a research project (the context will say so). There: be a warm, direct guide, not a thesis advisor. Answer ANY question on ANY topic honestly and helpfully — casual curiosity is welcome; skip the Socratic pushback unless they are clearly trying to learn a skill. Run tools whenever asked ("check X for flooding" means run it). Teach the app freely. When a thread turns into sustained real research (a hypothesis, repeated runs on one site), suggest creating a dedicated project for it so the design, log and exports live somewhere permanent.
+Some conversations happen in the student's always-on companion chat rather than a research project (the context will say so). There: be a warm, direct guide, not a thesis advisor. Answer ANY question on ANY topic honestly and helpfully, casual curiosity is welcome; skip the Socratic pushback unless they are clearly trying to learn a skill. Run tools whenever asked ("check X for flooding" means run it). Teach the app freely. When a thread turns into sustained real research (a hypothesis, repeated runs on one site), suggest creating a dedicated project for it so the design, log and exports live somewhere permanent.
 
 ## Formatting
 Markdown-lite only: '### ' section headers, short paragraphs, '- ' bullets. No tables, no images, no em dashes.
@@ -77,7 +58,6 @@ Markdown-lite only: '### ' section headers, short paragraphs, '- ' bullets. No t
 
 
 def _project_context(project: dict) -> str:
-    """Compact project state injected each turn (the mentor's memory aid)."""
     lines = [
         f"Today's date: {date.today().isoformat()}",
         f"Project: {project['title']} (stage: {project['stage']})",
@@ -95,11 +75,7 @@ def _project_context(project: dict) -> str:
             f"Curriculum: {project['curriculum_id']}, current session index: "
             f"{project.get('curriculum_session', 0)} (0-based)"
         )
-    design = {
-        k: v
-        for k, v in (project.get("design") or {}).items()
-        if k not in ("last_run", "companion")
-    }
+    design = {k: v for k, v in (project.get("design") or {}).items() if k not in ("last_run", "companion")}
     if design:
         lines.append("Current study design: " + json.dumps(design))
     biblio = store.get_bibliography(project["id"])
@@ -107,17 +83,13 @@ def _project_context(project: dict) -> str:
         titles = "; ".join(b["title"] for b in biblio[-8:])
         lines.append(f"Bibliography so far: {titles}")
 
-    # The research log: hypotheses with ids so the mentor can update them.
     hyps = store.get_hypotheses(project["id"])
     if hyps:
         lines.append(
             "Research log (hypotheses): "
-            + "; ".join(
-                f"#{h['id']} [{h['status']}] {h['statement']}" for h in hyps
-            )
+            + "; ".join(f"#{h['id']} [{h['status']}] {h['statement']}" for h in hyps)
         )
 
-    # The cross-project skills profile — the mentor's memory of this student.
     skills = store.get_skills(project["owner"])
     if skills:
         lines.append(
@@ -129,10 +101,6 @@ def _project_context(project: dict) -> str:
 
 
 def run_turn(project_id: int, user_message: str, mode: str = "mentor") -> dict:
-    """
-    One full mentor turn. Persists the user message, runs the agent loop,
-    persists and returns the reply plus tool events for the UI.
-    """
     project = store.get_project(project_id)
     client = _get_client()
     model = MODEL_DEEP if mode in _DEEP_MODES else MODEL_FAST
@@ -140,8 +108,6 @@ def run_turn(project_id: int, user_message: str, mode: str = "mentor") -> dict:
     store.add_message(project_id, "user", user_message, mode=mode)
 
     history = store.recent_history(project_id)
-    # Anthropic models need the first non-system message to be the user's;
-    # a fresh project's history starts with the mentor's kickoff message.
     if history and history[0]["role"] == "assistant":
         history.insert(0, {"role": "user", "content": "(project started)"})
 
@@ -150,7 +116,6 @@ def run_turn(project_id: int, user_message: str, mode: str = "mentor") -> dict:
         {"role": "system", "content": _project_context(project)},
         *history,
     ]
-    # history already includes the user message we just persisted.
 
     events = []
     reply = ""
@@ -170,7 +135,6 @@ def run_turn(project_id: int, user_message: str, mode: str = "mentor") -> dict:
             reply = (msg.content or "").strip()
             break
 
-        # Record the assistant's tool-call message, then answer each call.
         messages.append(
             {
                 "role": "assistant",
@@ -211,9 +175,7 @@ def run_turn(project_id: int, user_message: str, mode: str = "mentor") -> dict:
     if not reply:
         reply = "(Janus returned no text. Try rephrasing, or send the message again.)"
 
-    saved = store.add_message(
-        project_id, "assistant", reply, mode=mode, tool_events=events
-    )
+    saved = store.add_message(project_id, "assistant", reply, mode=mode, tool_events=events)
     return {
         "message": saved,
         "project": store.get_project(project_id),
@@ -223,11 +185,6 @@ def run_turn(project_id: int, user_message: str, mode: str = "mentor") -> dict:
 
 
 def project_kickoff(project: dict) -> str:
-    """
-    The mentor's opening move for a fresh project, generated without waiting
-    for the student to speak first. Deterministic (no model call) so project
-    creation is instant and cannot fail on provider hiccups.
-    """
     if project.get("curriculum_id"):
         from janus.curriculum import get_curriculum
 

@@ -1,41 +1,16 @@
-"""
-Sentinel-2 optical fusion — cross-sensor confirmation inside the detection
-pipelines (not just a side-by-side overlay).
-
-Radar backscatter is a proxy: rain-wet farmland can mimic flooding, harvests
-can mimic burn scars. Where a cloud-free Sentinel-2 view exists inside the
-analysis window, we test the SAR detection against the independent optical
-signal (NDWI for water, dNBR for burns) and report the agreement, which the
-caller folds into its confidence score. Clouds are expected — every function
-here is called inside try/except and the SAR result stands alone when optical
-is unavailable. That degradation is the whole reason Kairos leads with radar.
-
-Data sources:
-    COPERNICUS/S2_SR_HARMONIZED           surface reflectance
-    GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED   per-pixel cloud score
-"""
-
 import ee
-from gee import common
 
 S2_COLLECTION = "COPERNICUS/S2_SR_HARMONIZED"
 CLOUD_SCORE_PLUS = "GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED"
 
-# Cloud Score+ 'cs': 1 = definitely clear. 0.6 is the dataset's recommended
-# default for masking.
 _CS_CLEAR = 0.6
-# NDWI (McFeeters, (G-NIR)/(G+NIR)) above zero reads as open water.
 _NDWI_WATER = 0.0
-# dNBR above ~0.27 is moderate-or-worse burn severity (Key & Benson, FIREMON).
 _DNBR_BURN = 0.27
-# NDVI drop of more than 0.2 between windows reads as vegetation loss.
 _NDVI_LOSS = 0.2
-# NDSI above 0.4 is the standard optical snow test (Dozier).
 _NDSI_SNOW = 0.4
 
 
 def _masked_composite(geometry: ee.Geometry, start_date: str, end_date: str) -> ee.Image:
-    """Cloud-masked median Sentinel-2 composite; raises ValueError if no scenes."""
     s2 = (
         ee.ImageCollection(S2_COLLECTION)
         .filterBounds(geometry)
@@ -55,26 +30,18 @@ def _agreement_stats(
     geometry: ee.Geometry,
     scale: int = 20,
 ) -> dict:
-    """
-    Fraction of the SAR detection confirmed by optical, computed only where a
-    cloud-free optical view exists. One combined reduceRegion keeps this to a
-    single round-trip.
-    """
     sar = sar_mask.unmask(0).gt(0).rename("sar")
     opt = optical_mask.unmask(0).gt(0).rename("opt")
     both = sar.And(opt).rename("both")
     valid_px = valid.rename("valid")
 
-    stack = (
-        ee.Image.cat(
-            [
-                sar.updateMask(valid_px),
-                both.updateMask(valid_px),
-                valid_px,
-            ]
-        )
-        .multiply(ee.Image.pixelArea())
-    )
+    stack = ee.Image.cat(
+        [
+            sar.updateMask(valid_px),
+            both.updateMask(valid_px),
+            valid_px,
+        ]
+    ).multiply(ee.Image.pixelArea())
     sums = stack.reduceRegion(
         reducer=ee.Reducer.sum(),
         geometry=geometry,
@@ -94,23 +61,12 @@ def _agreement_stats(
 
 
 def confidence_adjustment(agreement_pct, coverage_pct) -> float:
-    """
-    Modest, symmetric confidence nudge from optical agreement. Only meaningful
-    when optical actually saw a decent share of the AOI; capped at ±0.08 so
-    radar remains the primary evidence.
-    """
     if agreement_pct is None or coverage_pct < 20:
         return 0.0
     return round(max(-0.08, min(0.08, 0.16 * (agreement_pct / 100 - 0.5))), 2)
 
 
-def confirm_water(
-    sar_mask: ee.Image, geometry: ee.Geometry, start_date: str, end_date: str
-) -> dict:
-    """
-    Confirm a SAR water/flood mask against Sentinel-2 NDWI in the same window.
-    Raises ValueError when no usable optical exists (caller catches).
-    """
+def confirm_water(sar_mask: ee.Image, geometry: ee.Geometry, start_date: str, end_date: str) -> dict:
     composite = _masked_composite(geometry, start_date, end_date)
     ndwi = composite.normalizedDifference(["B3", "B8"])
     optical_water = ndwi.gt(_NDWI_WATER)
@@ -132,10 +88,6 @@ def confirm_vegetation_loss(
     pre_start: str,
     pre_end: str,
 ) -> dict:
-    """
-    Confirm a SAR vegetation-loss mask (deforestation, land disturbance)
-    against a Sentinel-2 NDVI drop between the pre and post windows.
-    """
     post = _masked_composite(geometry, start_date, end_date)
     pre = _masked_composite(geometry, pre_start, pre_end)
 
@@ -152,14 +104,7 @@ def confirm_vegetation_loss(
     }
 
 
-def confirm_snow(
-    sar_mask: ee.Image, geometry: ee.Geometry, start_date: str, end_date: str
-) -> dict:
-    """
-    Confirm a SAR wet-snow mask against the Sentinel-2 NDSI snow test in the
-    same window. Optical sees ALL snow (wet or dry) so agreement here means
-    "the melt zone is at least snow-covered", not "the snow is wet".
-    """
+def confirm_snow(sar_mask: ee.Image, geometry: ee.Geometry, start_date: str, end_date: str) -> dict:
     composite = _masked_composite(geometry, start_date, end_date)
     ndsi = composite.normalizedDifference(["B3", "B11"])
     optical_snow = ndsi.gt(_NDSI_SNOW)
@@ -181,10 +126,6 @@ def confirm_burn(
     pre_start: str,
     pre_end: str,
 ) -> dict:
-    """
-    Confirm a SAR burn-scar mask against Sentinel-2 dNBR (pre-fire NBR minus
-    post-fire NBR). Needs a usable composite in BOTH windows.
-    """
     post = _masked_composite(geometry, start_date, end_date)
     pre = _masked_composite(geometry, pre_start, pre_end)
 

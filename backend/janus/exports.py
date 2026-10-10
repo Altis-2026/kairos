@@ -1,35 +1,10 @@
-"""
-Researcher-tool exports (docs/JANUS.md v5).
-
-The reproducibility pack and notebook already document a project in Markdown and
-runnable Python. This closes the last mile into the tools researchers actually
-finish a paper in:
-
-  * build_latex   — a complete, Overleaf-ready LaTeX article (title, question,
-                    study design, a results table, figures via \\includesvg,
-                    validation, honest limitations, and a thebibliography). It
-                    compiles as-is; the reader drops in the figure SVGs Janus
-                    exports alongside.
-  * build_bibtex  — a .bib file of the project bibliography (Zotero, Mendeley,
-                    BibLaTeX, and the LaTeX export itself).
-  * build_ris     — an RIS file of the bibliography (Zotero / Mendeley / EndNote
-                    "Import" understand RIS directly).
-  * build_gdoc_html — a clean, self-contained HTML document whose headings map
-                    onto Google Docs styles, so File → Open (or paste) lands a
-                    properly-structured doc, not a wall of text.
-
-All deterministic string building from stored project data — no model call, no
-new dependency — so every export is fast and can only describe runs that
-actually happened.
-"""
-
 from __future__ import annotations
 
 import html
 import re
 from datetime import date
 
-from janus import store, figures
+from janus import figures, store
 
 _LATEX_SPECIAL = {
     "\\": r"\textbackslash{}",
@@ -51,14 +26,10 @@ def _tex(s) -> str:
     out = []
     for ch in str(s):
         out.append(_LATEX_SPECIAL.get(ch, ch))
-    # ° reads fine in LaTeX as \textdegree when siunitx/textcomp is present; keep
-    # it human by substituting the degree word-free symbol.
     return "".join(out).replace("°", r"\textdegree{}")
 
 
 def _slug(project: dict) -> str:
-    # Same slug the figures module and the frontend use, so cross-references
-    # (e.g. a LaTeX \includesvg pointing at a downloaded figure) line up.
     return figures.project_slug(project)
 
 
@@ -70,13 +41,6 @@ def _cite_key(ref: dict, index: int) -> str:
     return f"{first.lower()}{year}_{index}"
 
 
-# --------------------------------------------------------------------------- #
-# LaTeX.
-# --------------------------------------------------------------------------- #
-
-# Journal-flavoured document setups. "article" is the neutral default;
-# "ieee" targets IEEE TGRS/JSTARS-style submissions (IEEEtran is bundled with
-# every TeX distribution and on Overleaf).
 LATEX_JOURNALS = ("article", "ieee")
 
 
@@ -87,12 +51,11 @@ def build_latex(project_id: int, journal: str = "article") -> str:
     vals = figures.collect_validations(project_id)
     biblio = store.get_bibliography(project_id)
     avail = figures.available_figures(project_id)
-    slug = _slug(project)
     journal = journal if journal in LATEX_JOURNALS else "article"
 
     L: list[str] = []
     add = L.append
-    add(r"% Kairos + Janus — Overleaf-ready manuscript.")
+    add(r"% Kairos + Janus, Overleaf-ready manuscript.")
     add(r"% Generated " + date.today().isoformat() + r" by Janus, the Kairos research mentor.")
     add(r"% Figures: download the SVGs Janus exports for this project and place")
     add(r"%   them next to this .tex file. Names are referenced below.")
@@ -113,13 +76,11 @@ def build_latex(project_id: int, journal: str = "article") -> str:
     add(r"\begin{document}")
     add(r"\maketitle")
 
-    # Abstract-ish research question.
     if project.get("question"):
         add(r"\begin{abstract}")
         add(_tex(project["question"]))
         add(r"\end{abstract}")
 
-    # Introduction / study design.
     add(r"\section{Study design}")
     design_rows = []
     if design.get("hypothesis"):
@@ -144,7 +105,6 @@ def build_latex(project_id: int, journal: str = "article") -> str:
     else:
         add(r"\emph{Study design not yet specified.}")
 
-    # Methods (general, honest about the sensor).
     add(r"\section{Methods}")
     add(
         "All analyses were run in Kairos on free Copernicus Sentinel-1 GRD "
@@ -154,13 +114,16 @@ def build_latex(project_id: int, journal: str = "article") -> str:
         "parameters given."
     )
 
-    # Results table + figures.
     add(r"\section{Results}")
     if runs:
         if "results" in avail:
             add(r"\begin{figure}[h]")
             add(r"  \centering")
-            add(r"  \includesvg[width=0.9\textwidth]{" + figures.figure_filename(project, "results").rsplit(".", 1)[0] + r"}")
+            add(
+                r"  \includesvg[width=0.9\textwidth]{"
+                + figures.figure_filename(project, "results").rsplit(".", 1)[0]
+                + r"}"
+            )
             add(r"  \caption{Headline results for each analysis run in this project.}")
             add(r"\end{figure}")
         add(r"\begin{table}[h]")
@@ -201,17 +164,24 @@ def build_latex(project_id: int, journal: str = "article") -> str:
     if "study_area" in avail:
         add(r"\begin{figure}[h]")
         add(r"  \centering")
-        add(r"  \includesvg[width=0.9\textwidth]{" + figures.figure_filename(project, "study_area").rsplit(".", 1)[0] + r"}")
+        add(
+            r"  \includesvg[width=0.9\textwidth]{"
+            + figures.figure_filename(project, "study_area").rsplit(".", 1)[0]
+            + r"}"
+        )
         add(r"  \caption{Study area and global location.}")
         add(r"\end{figure}")
 
-    # Validation.
     if vals:
         add(r"\section{Validation}")
         if "validation" in avail:
             add(r"\begin{figure}[h]")
             add(r"  \centering")
-            add(r"  \includesvg[width=0.8\textwidth]{" + figures.figure_filename(project, "validation").rsplit(".", 1)[0] + r"}")
+            add(
+                r"  \includesvg[width=0.8\textwidth]{"
+                + figures.figure_filename(project, "validation").rsplit(".", 1)[0]
+                + r"}"
+            )
             add(r"  \caption{Detector skill against independent benchmark events.}")
             add(r"\end{figure}")
         for v in vals:
@@ -219,15 +189,8 @@ def build_latex(project_id: int, journal: str = "article") -> str:
             for k in ("iou", "precision", "recall", "f1"):
                 if v.get(k) is not None:
                     parts.append(f"{k.upper()} {figures._fmt(v[k])}")
-            add(
-                r"\noindent\textbf{"
-                + _tex(v["region"])
-                + r":} "
-                + _tex(", ".join(parts))
-                + r"\\"
-            )
+            add(r"\noindent\textbf{" + _tex(v["region"]) + r":} " + _tex(", ".join(parts)) + r"\\")
 
-    # Limitations.
     add(r"\section{Limitations}")
     add(r"\begin{itemize}")
     add(
@@ -245,7 +208,6 @@ def build_latex(project_id: int, journal: str = "article") -> str:
     )
     add(r"\end{itemize}")
 
-    # Bibliography.
     if biblio:
         add(r"\begin{thebibliography}{99}")
         for i, ref in enumerate(biblio, 1):
@@ -267,19 +229,7 @@ def build_latex(project_id: int, journal: str = "article") -> str:
     return "\n".join(L)
 
 
-# --------------------------------------------------------------------------- #
-# Author parsing.
-# --------------------------------------------------------------------------- #
 def _split_authors(authors: str) -> list[str]:
-    """
-    Split an author string into individual authors, handling the two formats
-    the app actually produces:
-      * literature pipeline: comma-separated full names ("John Smith, Alice Doe")
-      * manual entry:        "and"-joined, possibly "Last, First" ("Smith, J. and Doe, A.")
-    When " and " / " & " is present we treat that as the separator and keep any
-    "Last, First" comma inside each name; otherwise we split on commas /
-    semicolons.
-    """
     if not authors:
         return []
     if re.search(r"\s+and\s+|\s*&\s*", authors):
@@ -289,11 +239,7 @@ def _split_authors(authors: str) -> list[str]:
     return [a.strip() for a in parts if a.strip()]
 
 
-# --------------------------------------------------------------------------- #
-# BibTeX.
-# --------------------------------------------------------------------------- #
 def _bib_authors(authors: str) -> str:
-    # BibTeX joins authors with " and ".
     return " and ".join(_split_authors(authors))
 
 
@@ -301,7 +247,7 @@ def build_bibtex(project_id: int) -> str:
     biblio = store.get_bibliography(project_id)
     if not biblio:
         return "% No references saved in this project yet.\n"
-    out = ["% Kairos + Janus bibliography — import into Zotero, Mendeley, or \\input into LaTeX.", ""]
+    out = ["% Kairos + Janus bibliography, import into Zotero, Mendeley, or \\input into LaTeX.", ""]
     for i, ref in enumerate(biblio, 1):
         key = _cite_key(ref, i)
         entry_type = "article" if ref.get("venue") else "misc"
@@ -322,9 +268,6 @@ def build_bibtex(project_id: int) -> str:
     return "\n".join(out)
 
 
-# --------------------------------------------------------------------------- #
-# RIS (Zotero / Mendeley / EndNote).
-# --------------------------------------------------------------------------- #
 def build_ris(project_id: int) -> str:
     biblio = store.get_bibliography(project_id)
     if not biblio:
@@ -348,9 +291,6 @@ def build_ris(project_id: int) -> str:
     return "\n".join(out)
 
 
-# --------------------------------------------------------------------------- #
-# Google Docs-friendly HTML.
-# --------------------------------------------------------------------------- #
 def _h(s) -> str:
     return html.escape(str(s or ""))
 
@@ -439,8 +379,10 @@ def build_gdoc_html(project_id: int) -> str:
         P.append("<p class='muted'>No analyses have been run in this project yet.</p>")
 
     if vals:
-        P.append("<h2>Validation</h2><table><tr><th>Benchmark</th><th>IoU</th>"
-                 "<th>Precision</th><th>Recall</th><th>F1</th></tr>")
+        P.append(
+            "<h2>Validation</h2><table><tr><th>Benchmark</th><th>IoU</th>"
+            "<th>Precision</th><th>Recall</th><th>F1</th></tr>"
+        )
         for v in vals:
             P.append(
                 "<tr><td>{r}</td><td>{iou}</td><td>{p}</td><td>{re}</td><td>{f1}</td></tr>".format(
@@ -454,9 +396,15 @@ def build_gdoc_html(project_id: int) -> str:
         P.append("</table>")
 
     P.append("<h2>Limitations</h2><ul>")
-    P.append("<li>SAR amplitude backscatter is a proxy for surface conditions, not a direct measurement; detections carry known false-positive modes.</li>")
-    P.append("<li>Confidence scores and uncertainty ranges are model estimates, not formal statistical intervals.</li>")
-    P.append("<li>Reproducing a result re-runs against the live Sentinel-1 archive; a reprocessed scene may differ slightly.</li>")
+    P.append(
+        "<li>SAR amplitude backscatter is a proxy for surface conditions, not a direct measurement; detections carry known false-positive modes.</li>"
+    )
+    P.append(
+        "<li>Confidence scores and uncertainty ranges are model estimates, not formal statistical intervals.</li>"
+    )
+    P.append(
+        "<li>Reproducing a result re-runs against the live Sentinel-1 archive; a reprocessed scene may differ slightly.</li>"
+    )
     P.append("</ul>")
 
     if biblio:
@@ -464,7 +412,7 @@ def build_gdoc_html(project_id: int) -> str:
         for ref in biblio:
             cite = _h(ref.get("title"))
             if ref.get("authors"):
-                cite = f"{_h(ref['authors'])} — {cite}"
+                cite = f"{_h(ref['authors'])}, {cite}"
             if ref.get("year"):
                 cite += f" ({_h(ref['year'])})"
             if ref.get("venue"):
@@ -481,9 +429,6 @@ def build_gdoc_html(project_id: int) -> str:
     return "\n".join(P)
 
 
-# --------------------------------------------------------------------------- #
-# Filenames.
-# --------------------------------------------------------------------------- #
 def latex_filename(project: dict) -> str:
     return f"kairos-manuscript-{_slug(project)}.tex"
 
@@ -500,16 +445,7 @@ def gdoc_filename(project: dict) -> str:
     return f"kairos-doc-{_slug(project)}.html"
 
 
-# --------------------------------------------------------------------------- #
-# Policy brief — the non-academic deliverable.
-# --------------------------------------------------------------------------- #
 def build_policy_brief_html(project_id: int) -> str:
-    """
-    A one-page decision-maker brief: headline finding, what was measured, why
-    it matters, recommended next steps, and an honesty box. Deliberately free
-    of jargon — the audience is an NGO programme lead, an emergency manager or
-    a local official, not a reviewer. Opens cleanly in Google Docs / Word.
-    """
     project = store.get_project(project_id)
     design = project.get("design") or {}
     runs = figures.collect_runs(project_id)
@@ -539,7 +475,6 @@ def build_policy_brief_html(project_id: int) -> str:
         "· free Copernicus Sentinel satellite data</p>",
     ]
 
-    # Headline: the strongest single number we actually have.
     if runs:
         lead = runs[-1]
         val = (
@@ -557,7 +492,7 @@ def build_policy_brief_html(project_id: int) -> str:
         )
     else:
         P.append(
-            "<div class='headline'>No completed measurements yet — this brief "
+            "<div class='headline'>No completed measurements yet. This brief "
             "updates automatically once analyses run.</div>"
         )
 
@@ -585,8 +520,7 @@ def build_policy_brief_html(project_id: int) -> str:
             "<p>The same method was scored against an independently mapped real "
             f"event ({_h(v['region'])})"
             + (
-                f", where it reached an F1 accuracy of {figures._fmt(f1)} "
-                "(1.0 = perfect)."
+                f", where it reached an F1 accuracy of {figures._fmt(f1)} (1.0 = perfect)."
                 if f1 is not None
                 else "."
             )
@@ -604,7 +538,7 @@ def build_policy_brief_html(project_id: int) -> str:
         "change, not causes; wet ground can resemble flooding and cleared "
         "fields can resemble damage. Confidence percentages are model "
         "estimates, not guarantees. Every number above can be independently "
-        "reproduced — the methods trail is attached to this project.</div>"
+        "reproduced. The methods trail is attached to this project.</div>"
     )
     P.append("<p class='muted'>Generated by Janus, the Kairos research mentor.</p>")
     P.append("</body></html>")

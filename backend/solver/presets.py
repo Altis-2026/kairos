@@ -1,27 +1,7 @@
-"""
-Curated showcase scenes for the flood simulator.
-
-Two jobs. First, a demo that depends on the user drawing a good box and
-guessing a discharge is a demo that fails in front of people; these are AOIs
-picked because their terrain routes water legibly. Second, once the DEM for a
-scene is cached, the whole simulation runs with no Earth Engine round-trip at
-all, so a showcase works on a bad conference network.
-
-Every hydrograph here is **illustrative**. None is derived from a gauge record
-or a rainfall observation — they are shaped to resemble a flash-flood rise and
-recession at a plausible magnitude for the catchment, and that is all they
-claim. The `disclosure` string on each scene travels with the result all the
-way to the UI, because a synthetic hydrograph over real terrain looks exactly
-as convincing as a real one and the difference has to be stated, not implied.
-
-Bounding boxes are approximate: they frame the reach, they are not surveyed
-catchment boundaries.
-"""
-
 from dataclasses import dataclass, field
 
 ILLUSTRATIVE = (
-    "Illustrative hydrograph — a plausible flash-flood shape for this "
+    "Illustrative hydrograph, a plausible flash-flood shape for this "
     "catchment, not a gauge record or a forecast. The terrain is real; the "
     "water is modelled."
 )
@@ -29,12 +9,10 @@ ILLUSTRATIVE = (
 
 @dataclass(frozen=True)
 class Scene:
-    """One showcase simulation, fully specified."""
-
     id: str
     name: str
     region: str
-    bbox: tuple                    # (min_lon, min_lat, max_lon, max_lat)
+    bbox: tuple
     summary: str
     peak_discharge_m3s: float
     rise_minutes: float
@@ -49,7 +27,6 @@ class Scene:
     tags: tuple = field(default_factory=tuple)
 
     def hydrograph(self) -> list:
-        """Piecewise-linear [(t_seconds, m³/s), ...] for this scene."""
         rise = self.rise_minutes * 60.0
         plateau = rise + self.peak_minutes * 60.0
         end = plateau + self.recession_minutes * 60.0
@@ -95,7 +72,7 @@ SCENES = {
             bbox=(-112.135, 36.060, -112.050, 36.130),
             summary=(
                 "A slot canyon draining to the Colorado. Extreme relief over a "
-                "short reach, so the wave is fast, deep and tightly confined — "
+                "short reach, so the wave is fast, deep and tightly confined, "
                 "the clearest demonstration that the solver routes water by "
                 "terrain rather than painting a flat plane."
             ),
@@ -104,7 +81,7 @@ SCENES = {
             peak_minutes=20.0,
             recession_minutes=90.0,
             duration_hours=5.0,
-            n_manning=0.045,          # bedrock and boulder channel
+            n_manning=0.045,
             tags=("canyon", "flash flood", "high relief"),
         ),
         Scene(
@@ -119,11 +96,11 @@ SCENES = {
                 "forward model, and the natural first place to couple the two."
             ),
             peak_discharge_m3s=160.0,
-            rise_minutes=15.0,        # post-fire catchments respond fast
+            rise_minutes=15.0,
             peak_minutes=15.0,
             recession_minutes=75.0,
             duration_hours=4.0,
-            n_manning=0.035,          # burned ground is smooth; runoff is quick
+            n_manning=0.035,
             tags=("post-fire", "flash flood", "burn scar"),
         ),
         Scene(
@@ -152,7 +129,7 @@ SCENES = {
             bbox=(-121.545, 39.495, -121.425, 39.580),
             summary=(
                 "A high-magnitude release into a confined river below a major "
-                "dam — the scenario satellites cannot answer, because it is "
+                "dam. The scenario satellites cannot answer, because it is "
                 "about water that has not arrived yet."
             ),
             peak_discharge_m3s=2200.0,
@@ -170,19 +147,19 @@ SCENES = {
             region="Bangladesh",
             bbox=(89.620, 24.380, 89.780, 24.520),
             summary=(
-                "A braided delta reach on very low relief — the hardest case "
+                "A braided delta reach on very low relief. The hardest case "
                 "for a terrain-driven solver and the one that matters most for "
                 "exposure, since a few centimetres of gradient decide which "
                 "side of the channel floods."
             ),
             peak_discharge_m3s=4500.0,
-            rise_minutes=180.0,       # monsoon flooding builds over hours
+            rise_minutes=180.0,
             peak_minutes=240.0,
             recession_minutes=480.0,
             duration_hours=18.0,
-            n_manning=0.06,           # vegetated, agricultural floodplain
+            n_manning=0.06,
             scale_m=60.0,
-            dt_max=15.0,              # low relief; the CFL step is generous
+            dt_max=15.0,
             tags=("delta", "monsoon", "low relief"),
         ),
     )
@@ -192,15 +169,11 @@ SCENE_IDS = tuple(SCENES)
 
 
 def get_scene(scene_id: str) -> Scene:
-    """Look up a showcase scene, failing with the list of what exists."""
     try:
         return SCENES[scene_id]
     except KeyError:
-        raise ValueError(
-            f"Unknown scene '{scene_id}'. Available: {list(SCENE_IDS)}"
-        ) from None
+        raise ValueError(f"Unknown scene '{scene_id}'. Available: {list(SCENE_IDS)}") from None
 
 
 def scenes_as_json() -> list:
-    """Serializable catalogue for GET /simulate/scenes."""
     return [scene.as_dict() for scene in SCENES.values()]

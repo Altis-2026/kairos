@@ -31,15 +31,10 @@ def track_ice_drift(bbox: list, start_date: str, end_date: str) -> dict:
     reference = early.mean().clip(geometry)
     target = late.mean().clip(geometry)
 
-    displacement = target.displacement(
-        referenceImage=reference, maxOffset=20000.0, patchWidth=8000.0
-    )
+    displacement = target.displacement(referenceImage=reference, maxOffset=20000.0, patchWidth=8000.0)
     gap_days = max(total_days / 2.0, 1.0)
     speed = (
-        displacement.select("dx")
-        .hypot(displacement.select("dy"))
-        .divide(1000.0 * gap_days)
-        .rename("drift")
+        displacement.select("dx").hypot(displacement.select("dy")).divide(1000.0 * gap_days).rename("drift")
     )
 
     ice = target.gt(-18)
