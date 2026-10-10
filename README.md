@@ -14,7 +14,7 @@ then simulate what could happen next and learn how to prepare.
 ![CI](https://github.com/Altis-2026/kairos/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/license-MIT-00BFA8)
 
-Built by **Prem Kamasani** and **Amogh Vinaykumar**, Flower Mound High School, Texas.
+Built by **Amogh Vinaykumar** and **Prem Kamasani**, Flower Mound High School, Texas.
 
 </div>
 
@@ -228,9 +228,7 @@ and autopilot modes. AI never produces a measurement, and the analyses,
 simulations, featured stories and map tools all work without it.
 
 **In development.** We used Claude (Anthropic) as an AI assistant while building
-Kairos, for brainstorming features and as a coding assistant that wrote and
-revised parts of the code under our direction. Commits it authored are labelled
-in the git history.
+Kairos, for brainstorming features and as a coding assistant that revised parts of the code under our direction. All of the main code and planning is done by both developers.
 
 ## Data and credit
 
