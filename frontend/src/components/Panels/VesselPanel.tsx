@@ -1,22 +1,8 @@
-/**
- * Dark-vessel screening — radar ship detections matched against AIS broadcasts.
- *
- * Ship detection alone finds bright returns on water. Fusing those with the
- * transponder record is what turns them into maritime domain awareness: the
- * interesting object is the radar return with no matching broadcast. The
- * caveats are shown with the result, not buried, because an unmatched return
- * is a screening lead and not evidence of anything.
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ExternalLink, Loader2, Play, Radio, Ship, X } from "lucide-react";
 import { useMapStore, bboxCenterZoom } from "../../stores/mapStore";
-import {
-  listVesselCases,
-  screenCase,
-  type ScreenResult,
-  type VesselCase,
-} from "../../api/vessels";
+import { listVesselCases, screenCase, type ScreenResult, type VesselCase } from "../../api/vessels";
 import { panelShell } from "../../lib/responsive";
 
 const MATCHED_LAYER = "vessels-broadcasting";
@@ -31,9 +17,7 @@ export default function VesselPanel({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     listVesselCases()
       .then((d) => setCases(d.cases))
-      .catch((e) =>
-        setError(e instanceof Error ? e.message : "Could not load the cases.")
-      );
+      .catch((e) => setError(e instanceof Error ? e.message : "Could not load the cases."));
   }, []);
 
   async function run(c: VesselCase) {
@@ -89,15 +73,14 @@ export default function VesselPanel({ onClose }: { onClose: () => void }) {
         <span className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-dim">
           <Ship size={13} className="text-teal" /> DARK VESSELS
         </span>
-        <button onClick={onClose} className="text-dim hover:text-ink" title="Close">
+        <button onClick={onClose} className="text-dim hover:text-ink" aria-label="Close" title="Close">
           <X size={15} />
         </button>
       </div>
 
       <p className="text-xs text-dim leading-relaxed">
-        Big ships are supposed to broadcast their position over AIS radio.
-        Radar sees every ship regardless. Line the two up and the gap is
-        interesting: a bright radar return with no transponder nearby.
+        Big ships are supposed to broadcast their position over AIS radio. Radar sees every ship regardless.
+        Line the two up and the gap is interesting: a bright radar return with no transponder nearby.
       </p>
 
       {!cases && !error && (
@@ -123,8 +106,7 @@ export default function VesselPanel({ onClose }: { onClose: () => void }) {
             >
               {running ? (
                 <>
-                  <Loader2 size={12} className="animate-spin" /> Matching radar
-                  to transponders…
+                  <Loader2 size={12} className="animate-spin" /> Matching radar to transponders…
                 </>
               ) : (
                 <>
@@ -135,8 +117,8 @@ export default function VesselPanel({ onClose }: { onClose: () => void }) {
           ) : (
             <p className="text-[10px] text-amber leading-snug rounded-lg bg-bg ring-1 ring-line p-2">
               AIS record not installed on this server. Run{" "}
-              <span className="font-mono">tools/get_ais_case.py</span> to
-              download the day from MarineCadastre.
+              <span className="font-mono">tools/get_ais_case.py</span> to download the day from
+              MarineCadastre.
             </p>
           )}
           <a
@@ -158,9 +140,7 @@ export default function VesselPanel({ onClose }: { onClose: () => void }) {
             </div>
             <div className="mt-1 font-display text-3xl text-[#FF3B5C]">
               {result.unmatched_count}
-              <span className="ml-1.5 text-base text-dim">
-                {result.headline_stat.unit}
-              </span>
+              <span className="ml-1.5 text-base text-dim">{result.headline_stat.unit}</span>
             </div>
             <div className="mt-2 space-y-1 font-mono text-[10px] text-dim">
               <div className="flex items-center gap-1.5">
@@ -184,8 +164,8 @@ export default function VesselPanel({ onClose }: { onClose: () => void }) {
             </div>
             <div>{result.ais_vessels_in_window} vessels broadcasting nearby</div>
             <div>
-              Match radius {result.match_radius_m.base} m plus ship drift,
-              typically {result.match_radius_m.typical} m
+              Match radius {result.match_radius_m.base} m plus ship drift, typically{" "}
+              {result.match_radius_m.typical} m
             </div>
           </div>
 

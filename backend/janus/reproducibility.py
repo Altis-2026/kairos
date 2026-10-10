@@ -1,24 +1,8 @@
-"""
-Reproducibility pack (docs/JANUS.md §4, v2).
-
-Assembles a project's complete method trail into a Markdown research pack a
-student can hand to a teacher or a reviewer: the question, the study design,
-every real analysis that was run (with its exact parameters, the imagery date
-used, and the headline result), any ground-truth validation, the annotated
-bibliography, and reproducible Kairos links so anyone can re-run each step.
-
-The point is defensibility. A reviewer's first question is "how did you get
-this number?" and this document answers it, step by step, with links that
-reproduce the exact map. Everything is drawn from stored tool events, so the
-pack cannot claim a run that did not happen.
-"""
-
 import os
 from datetime import date
 
 from janus import store
 
-# Where reproducible links point. Set to the deployed frontend origin.
 _APP_ORIGIN = os.getenv("FRONTEND_ORIGIN", "https://kairos.altis.earth")
 
 
@@ -26,14 +10,10 @@ def _case_link(analysis_type: str, bbox: list, start: str, end: str) -> str:
     if not (analysis_type and bbox and start and end):
         return ""
     bbox_str = ",".join(str(round(float(x), 4)) for x in bbox)
-    return (
-        f"{_APP_ORIGIN}/#task={analysis_type}&bbox={bbox_str}"
-        f"&start={start}&end={end}"
-    )
+    return f"{_APP_ORIGIN}/#task={analysis_type}&bbox={bbox_str}&start={start}&end={end}"
 
 
 def _collect_runs(project_id: int) -> tuple:
-    """Pull every analysis / validation run out of the stored tool events."""
     runs, validations = [], []
     for msg in store.get_messages(project_id):
         for ev in msg.get("tool_events") or []:
@@ -52,9 +32,7 @@ def _collect_runs(project_id: int) -> tuple:
                         "headline": f"{hs.get('label')}: {hs.get('value')} {hs.get('unit')}",
                     }
                 )
-            elif ev.get("tool") == "run_ground_truth_validation" and ev.get(
-                "validation"
-            ):
+            elif ev.get("tool") == "run_ground_truth_validation" and ev.get("validation"):
                 v = ev["validation"]
                 validations.append(
                     {
@@ -66,7 +44,6 @@ def _collect_runs(project_id: int) -> tuple:
 
 
 def build_pack(project_id: int) -> str:
-    """Return the full reproducibility pack as a Markdown string."""
     project = store.get_project(project_id)
     design = project.get("design") or {}
     biblio = store.get_bibliography(project_id)
@@ -75,14 +52,13 @@ def build_pack(project_id: int) -> str:
     lines = [
         f"# {project['title']}",
         "",
-        f"*Kairos + Janus research pack — generated {date.today().isoformat()}*",
+        f"*Kairos + Janus research pack, generated {date.today().isoformat()}*",
         "",
     ]
 
     if project.get("question"):
         lines += ["## Research question", "", project["question"], ""]
 
-    # --- Study design ---
     lines += ["## Study design", ""]
     if design.get("hypothesis"):
         lines.append(f"- **Hypothesis:** {design['hypothesis']}")
@@ -91,29 +67,22 @@ def build_pack(project_id: int) -> str:
     if design.get("bbox"):
         lines.append(f"- **Bounding box:** {design['bbox']}")
     if design.get("start_date") and design.get("end_date"):
-        lines.append(
-            f"- **Time window:** {design['start_date']} to {design['end_date']}"
-        )
+        lines.append(f"- **Time window:** {design['start_date']} to {design['end_date']}")
     if design.get("analysis_types"):
         lines.append(f"- **Methods:** {', '.join(design['analysis_types'])}")
     if design.get("confounders"):
-        lines.append(
-            "- **Confounders considered:** " + "; ".join(design["confounders"])
-        )
+        lines.append("- **Confounders considered:** " + "; ".join(design["confounders"]))
     if design.get("validation_plan"):
         lines.append(f"- **Validation plan:** {design['validation_plan']}")
     if len(lines) and lines[-1] == "":
         pass
     lines.append("")
 
-    # --- Analyses run ---
     lines += ["## Analyses run", ""]
     if not runs:
         lines += ["_No analyses were run in this project yet._", ""]
     for i, r in enumerate(runs, 1):
-        link = _case_link(
-            r["analysis_type"], r["bbox"], r["start_date"], r["end_date"]
-        )
+        link = _case_link(r["analysis_type"], r["bbox"], r["start_date"], r["end_date"])
         lines += [
             f"### {i}. {r['display_name']}",
             "",
@@ -127,7 +96,6 @@ def build_pack(project_id: int) -> str:
             lines.append(f"- **Reproduce this exact result:** [{link}]({link})")
         lines.append("")
 
-    # --- Validation ---
     if validations:
         lines += ["## Ground-truth validation", ""]
         for v in validations:
@@ -142,13 +110,12 @@ def build_pack(project_id: int) -> str:
                 "",
             ]
 
-    # --- Bibliography ---
     if biblio:
         lines += ["## Bibliography", ""]
         for b in biblio:
             cite = b["title"]
             if b.get("authors"):
-                cite = f"{b['authors']} — {cite}"
+                cite = f"{b['authors']}, {cite}"
             if b.get("year"):
                 cite += f" ({b['year']})"
             if b.get("venue"):
@@ -160,7 +127,6 @@ def build_pack(project_id: int) -> str:
                 lines.append(f"  - _{b['note']}_")
         lines.append("")
 
-    # --- Honest limitations footer ---
     lines += [
         "## Method notes and limitations",
         "",
@@ -181,7 +147,5 @@ def build_pack(project_id: int) -> str:
 
 
 def pack_filename(project: dict) -> str:
-    slug = "".join(
-        c.lower() if c.isalnum() else "-" for c in project["title"]
-    ).strip("-")[:50] or "project"
+    slug = "".join(c.lower() if c.isalnum() else "-" for c in project["title"]).strip("-")[:50] or "project"
     return f"kairos-research-pack-{slug}.md"

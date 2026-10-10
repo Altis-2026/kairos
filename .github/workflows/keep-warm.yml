@@ -1,12 +1,3 @@
-# Keeps the Cloud Run backend from scaling to zero — free alternative to
-# paying for `min-instances`. Pings /health every 10 minutes; as long as the
-# gap between pings stays under Cloud Run's idle-scale-down window, the
-# container never fully cold-starts, so users don't hit the "waking up" delay.
-#
-# Reuses the same GCP_SA_KEY / GCP_PROJECT_ID secrets deploy.yml already has
-# — no new secrets to configure. Runtime cost is a handful of seconds per
-# run, ~700 minutes/month total, well inside GitHub Actions' free tier.
-
 name: Keep Kairos backend warm
 
 on:

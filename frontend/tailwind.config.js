@@ -1,21 +1,15 @@
-/** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        // Kairos design spec — exact values from the project context doc
         bg: "#0B120E",
         surface: "#131A15",
         raised: "#1A231C",
         line: "#243027",
         amber: "#E8A318",
         teal: "#00BFA8",
-        // Added for the wildfire model. Deliberately not amber: amber is the
-        // "simulated, not observed" warning colour throughout the app, and
-        // reusing it for a fire's own accent would blur that signal exactly
-        // where it matters most. Matches the mid stop of the burn ramp in
-        // lib/fire.ts and the fire palette in the analysis registry.
+
         ember: "#F4743B",
         ink: "#E8EFE9",
         dim: "#8A9E8C",

@@ -1,15 +1,3 @@
-"""
-API key management + programmatic-access metering.
-
-  POST   /keys                mint a key (full key shown once)
-  GET    /keys?owner=         list key prefixes
-  DELETE /keys/{prefix}       revoke
-  GET    /keys/usage?owner=   30-day usage summary
-
-Requests to data endpoints may carry `X-API-Key`; a middleware in main.py
-resolves it and logs usage per owner. See docs/API.md for the full surface.
-"""
-
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
@@ -28,7 +16,7 @@ def create_key(req: KeyRequest):
     minted = apikeys.create_key(req.owner, req.label)
     return {
         **minted,
-        "note": "Store this key now — it is shown once and only a hash is kept.",
+        "note": "Store this key now. It is shown once and only a hash is kept.",
     }
 
 

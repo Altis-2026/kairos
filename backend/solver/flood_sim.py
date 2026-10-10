@@ -1,30 +1,3 @@
-"""
-Flood simulation as a Kairos analysis: AOI in, animated depth frames out.
-
-This is the orchestration layer — it owns none of the physics (`hydraulic_route`)
-and none of the fetching (`gee.raster_fetch`). Its job is to turn a bounding
-box and a handful of user parameters into a solve, and the solve into the same
-result envelope every other Kairos analysis returns, so the registry, the job
-queue, provenance stamping, and the frontend all handle it without special
-cases.
-
-What it is not
---------------
-Every result from here is **simulated**. The terrain is real and the physics
-are real, but the water is not observed — it comes from a hydrograph a person
-chose. That is a categorically different claim from `flood_extent`, which
-measures a flood that actually happened, and the two must never be confused by
-a user or by the AI layer. The result carries `mode: "simulated"` inside its
-provenance hash, a `disclosure` string, and a `confidence` value that is
-explicitly labelled as numerical integrity rather than forecast skill.
-
-Testability
------------
-`dem_provider` is injectable, so the whole pipeline — parameter resolution,
-inflow placement, solve, encode, result envelope — is exercised offline with
-synthetic terrain and no Earth Engine credentials.
-"""
-
 import numpy as np
 
 from solver import forcing, presets
@@ -36,16 +9,12 @@ from solver.payload import (
     payload_bytes,
 )
 
-#: Depth below which a cell is not called flooded, for area statistics. Also
-#: the threshold the 3D viewer uses to push a vertex under the terrain.
 WET_THRESHOLD_M = 0.05
 
-#: Wall-clock budget for one solve. The rq queue's own timeout is 600 s; this
-#: leaves room for the fetch and the encode either side of it.
 DEFAULT_MAX_SECONDS = 420.0
 
 DISCLOSURE = (
-    "SIMULATED — this is a forward hydraulic model, not a satellite "
+    "SIMULATED. This is a forward hydraulic model, not a satellite "
     "observation. Terrain is real (Copernicus GLO-30) and the physics are a "
     "local-inertial shallow-water solver, but the water comes from an assumed "
     "inflow hydrograph. It is not a forecast and it has not been calibrated "
@@ -68,21 +37,25 @@ DEFAULTS = {
     "open_edges": ["auto"],
     "fill_dem_pits": True,
     "inflow_cells": 12,
-    "max_transport_dim": DEFAULT_MAX_TRANSPORT_DIM,   # None = native resolution
+    "max_transport_dim": DEFAULT_MAX_TRANSPORT_DIM,
     "max_seconds": DEFAULT_MAX_SECONDS,
 }
 
 _POSITIVE = (
-    "peak_discharge_m3s", "duration_hours", "n_manning", "scale_m", "dt_max",
+    "peak_discharge_m3s",
+    "duration_hours",
+    "n_manning",
+    "scale_m",
+    "dt_max",
 )
 _NON_NEGATIVE = (
-    "rise_minutes", "peak_minutes", "recession_minutes", "rain_mm_per_hour",
+    "rise_minutes",
+    "peak_minutes",
+    "recession_minutes",
+    "rain_mm_per_hour",
     "infiltration_mm_per_hour",
 )
 
-#: Ceilings a caller may lower but not raise. `max_seconds` bounds how long one
-#: request can hold a worker; `max_transport_dim` bounds the response size.
-#: Both arrive over a public API, so neither can be a suggestion.
 _CEILINGS = {
     "max_seconds": DEFAULT_MAX_SECONDS,
     "max_transport_dim": MAX_TRANSPORT_DIM,
@@ -91,32 +64,16 @@ _CEILINGS = {
 
 
 def _as_number(key: str, value):
-    """
-    Coerce a parameter to float, failing as a user error rather than a crash.
-
-    These values arrive as JSON from the network: a string where a number
-    belongs must produce a 400 that names the field, not a TypeError deep in
-    the solver that surfaces as a 500.
-    """
     try:
         number = float(value)
     except (TypeError, ValueError):
-        raise ValueError(
-            f"{key} must be a number; got {value!r}."
-        ) from None
+        raise ValueError(f"{key} must be a number; got {value!r}.") from None
     if not np.isfinite(number):
         raise ValueError(f"{key} must be a finite number; got {value!r}.")
     return number
 
 
 def resolve_params(params: dict | None) -> dict:
-    """
-    Merge user parameters over the scene preset (if any) over the defaults.
-
-    Precedence is explicit-parameter > scene > default, so a user can pick a
-    showcase scene and still override its peak discharge without losing the
-    rest of the scene's tuning.
-    """
     supplied = dict(params or {})
     scene_id = supplied.pop("scene", None)
 
@@ -125,9 +82,15 @@ def resolve_params(params: dict | None) -> dict:
     if scene_id:
         scene = presets.get_scene(scene_id)
         for key in (
-            "peak_discharge_m3s", "rise_minutes", "peak_minutes",
-            "recession_minutes", "duration_hours", "n_manning", "scale_m",
-            "dt_max", "rain_mm_per_hour",
+            "peak_discharge_m3s",
+            "rise_minutes",
+            "peak_minutes",
+            "recession_minutes",
+            "duration_hours",
+            "n_manning",
+            "scale_m",
+            "dt_max",
+            "rain_mm_per_hour",
         ):
             resolved[key] = getattr(scene, key)
 
@@ -151,9 +114,7 @@ def resolve_params(params: dict | None) -> dict:
     try:
         frames = int(resolved["n_frames"])
     except (TypeError, ValueError):
-        raise ValueError(
-            f"n_frames must be a whole number; got {resolved['n_frames']!r}."
-        ) from None
+        raise ValueError(f"n_frames must be a whole number; got {resolved['n_frames']!r}.") from None
     if not (1 <= frames <= 240):
         raise ValueError(f"n_frames must be between 1 and 240; got {frames}.")
     resolved["n_frames"] = frames
@@ -164,11 +125,9 @@ def resolve_params(params: dict | None) -> dict:
             f"This is a demonstration solver, not an operational one."
         )
 
-    # Resource ceilings clamp rather than reject: a caller asking for a bigger
-    # payload or a longer solve gets the maximum, not an error.
     for key, ceiling in _CEILINGS.items():
         if key == "max_transport_dim" and resolved[key] is None:
-            continue    # None is the default and means "ship native resolution"
+            continue
         resolved[key] = min(_as_number(key, resolved[key]), ceiling)
         if resolved[key] <= 0:
             raise ValueError(f"{key} must be positive; got {resolved[key]}.")
@@ -177,15 +136,12 @@ def resolve_params(params: dict | None) -> dict:
 
 
 def build_hydrograph(p: dict) -> list:
-    """Piecewise-linear rise / plateau / recession from the shape parameters."""
     rise = p["rise_minutes"] * 60.0
     plateau = rise + p["peak_minutes"] * 60.0
     end = plateau + p["recession_minutes"] * 60.0
     peak = p["peak_discharge_m3s"]
     knots = [(0.0, 0.0), (rise, peak), (plateau, peak), (end, 0.0)]
 
-    # Collapse coincident breakpoints (a zero-length rise or plateau) so the
-    # hydrograph stays strictly increasing in time.
     cleaned = [knots[0]]
     for t, q in knots[1:]:
         if t > cleaned[-1][0]:
@@ -196,37 +152,15 @@ def build_hydrograph(p: dict) -> list:
 
 
 def upstream_edge(dem: np.ndarray, open_edges: tuple) -> str:
-    """
-    The edge water should enter through: the highest-lying closed edge.
-
-    Picking it from the terrain rather than asking the user to nominate one
-    means a scene needs no hand-placed inflow coordinate — the domain's own
-    relief says which side is upstream.
-    """
     from solver.grid import EDGES
 
-    candidates = {
-        name: float(np.mean(dem[sl]))
-        for name, sl in EDGES.items()
-        if name not in open_edges
-    }
-    if not candidates:  # every edge open — fall back to the full set
+    candidates = {name: float(np.mean(dem[sl])) for name, sl in EDGES.items() if name not in open_edges}
+    if not candidates:
         candidates = {name: float(np.mean(dem[sl])) for name, sl in EDGES.items()}
     return max(candidates, key=candidates.get)
 
 
-def inflow_mask_for(
-    dem: np.ndarray, open_edges: tuple, n_cells: int, inflow_point=None, bbox=None
-) -> tuple:
-    """
-    Where the hydrograph enters. Returns ``(mask, description)``.
-
-    With no explicit point, the injection sits on the lowest ground along the
-    upstream edge — i.e. in the channel where it crosses into the domain. An
-    explicit ``[lon, lat]`` is mapped through the bbox and then snapped to the
-    local topographic low, so a click that lands on a bank still puts water in
-    the channel rather than on a hillside.
-    """
+def inflow_mask_for(dem: np.ndarray, open_edges: tuple, n_cells: int, inflow_point=None, bbox=None) -> tuple:
     ny, nx = dem.shape
     radius = max(3, int(np.sqrt(n_cells)) + 2)
 
@@ -236,11 +170,9 @@ def inflow_mask_for(
         lon, lat = float(inflow_point[0]), float(inflow_point[1])
         min_lon, min_lat, max_lon, max_lat = bbox
         if not (min_lon <= lon <= max_lon and min_lat <= lat <= max_lat):
-            raise ValueError(
-                f"Inflow point ({lon}, {lat}) is outside the AOI {list(bbox)}."
-            )
+            raise ValueError(f"Inflow point ({lon}, {lat}) is outside the AOI {list(bbox)}.")
         fx = (lon - min_lon) / (max_lon - min_lon)
-        fy = (max_lat - lat) / (max_lat - min_lat)      # row 0 is north
+        fy = (max_lat - lat) / (max_lat - min_lat)
         row = min(max(int(round(fy * (ny - 1))), 0), ny - 1)
         col = min(max(int(round(fx * (nx - 1))), 0), nx - 1)
         mask = forcing.lowest_cells_mask(dem, row, col, n_cells, radius)
@@ -258,7 +190,6 @@ def inflow_mask_for(
 
 
 def _fetch_dem(bbox, scale_m):
-    """Default DEM provider. Imported here so Earth Engine stays optional."""
     from gee.raster_fetch import fetch_dem
 
     return fetch_dem(bbox, scale_m=scale_m)
@@ -271,13 +202,6 @@ def simulate_flood(
     params: dict | None = None,
     dem_provider=None,
 ) -> dict:
-    """
-    Run a flood simulation over an AOI and return a Kairos analysis result.
-
-    `start_date` is the date the simulated event is labelled with; it does not
-    select imagery, because nothing here is observed. The signature matches
-    every other registry function so the shared runner needs no special case.
-    """
     p = resolve_params(params)
     scene = p.pop("scene", None)
 
@@ -287,8 +211,11 @@ def simulate_flood(
     hydrograph = build_hydrograph(p)
     open_edges = tuple(p["open_edges"]) if p["open_edges"] else ()
     mask, inflow_note = inflow_mask_for(
-        tile.dem, open_edges, int(p["inflow_cells"]),
-        inflow_point=(params or {}).get("inflow_point"), bbox=list(bbox),
+        tile.dem,
+        open_edges,
+        int(p["inflow_cells"]),
+        inflow_point=(params or {}).get("inflow_point"),
+        bbox=list(bbox),
     )
 
     result = solve(
@@ -309,19 +236,13 @@ def simulate_flood(
     )
 
     if not result.depths:
-        raise ValueError(
-            "The simulation produced no frames. "
-            f"{result.truncation_reason or 'Unknown cause.'}"
-        )
+        raise ValueError(f"The simulation produced no frames. {result.truncation_reason or 'Unknown cause.'}")
 
-    # ---- derived statistics -------------------------------------------------
     cell_area = tile.dx * tile.dx
     wet_per_frame = [int((d > WET_THRESHOLD_M).sum()) for d in result.depths]
     peak_frame = int(np.argmax([float(d.max()) for d in result.depths]))
     peak_depth = float(result.depths[peak_frame].max())
     max_extent_km2 = max(wet_per_frame) * cell_area / 1e6
-    # Envelope of everything that was ever wet — the footprint an impact
-    # assessment would use, not the extent at any single instant.
     ever_wet = np.zeros(tile.dem.shape, dtype=bool)
     for d in result.depths:
         ever_wet |= d > WET_THRESHOLD_M
@@ -333,9 +254,7 @@ def simulate_flood(
 
     payload = encode_simulation(
         result,
-        max_transport_dim=(
-            None if p["max_transport_dim"] is None else int(p["max_transport_dim"])
-        ),
+        max_transport_dim=(None if p["max_transport_dim"] is None else int(p["max_transport_dim"])),
         extra_meta={
             "scene_id": scene.id if scene else None,
             "scene_name": scene.name if scene else None,
@@ -353,8 +272,7 @@ def simulate_flood(
         "scene_name": scene.name if scene else None,
         "hydrograph": [[float(t), float(q)] for t, q in hydrograph],
         "hydrograph_note": (
-            scene.disclosure if scene
-            else "Synthetic rise/peak/recession hydrograph chosen by the user."
+            scene.disclosure if scene else "Synthetic rise/peak/recession hydrograph chosen by the user."
         ),
         "inflow_placement": inflow_note,
         "inflow_cells": int(mask.sum()),
@@ -381,7 +299,7 @@ def simulate_flood(
             else "Raw DEM, unconditioned."
         ),
         "confidence_meaning": (
-            "Numerical integrity of the solve — mass closure and completion — "
+            "Numerical integrity of the solve, mass closure and completion, "
             "NOT forecast skill or agreement with any observation."
         ),
         "payload_bytes": payload_bytes(payload),
@@ -395,7 +313,7 @@ def simulate_flood(
     }
 
     return {
-        "tile_url": "",   # nothing server-rendered: the client draws the frames
+        "tile_url": "",
         "result_image": None,
         "data_date": start_date,
         "confidence": confidence,

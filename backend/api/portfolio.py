@@ -1,18 +1,3 @@
-"""
-Portfolio monitoring — a whole book of sites, one digest.
-
-An insurer's exposure list, an NGO's protected areas, a district's levees:
-organizations watch MANY places, not one AOI at a time. A portfolio is a
-named set of sites (name + bbox + the analysis that matters there); the
-digest endpoint sweeps them in one call and reports, per site, whether fresh
-imagery has arrived and when — the cheap, fast signal that tells an operator
-which sites deserve a full analysis right now.
-
-The digest deliberately checks scene availability rather than running full
-analyses (which would multiply GEE cost by the portfolio size); "Run" on a
-flagged site is one click / one API call away.
-"""
-
 import json
 import os
 import sqlite3
@@ -75,8 +60,7 @@ def create_portfolio(req: PortfolioRequest):
     _init()
     with _lock, _connect() as conn:
         cur = conn.execute(
-            "INSERT INTO portfolios (owner, name, sites, created_at) "
-            "VALUES (?, ?, ?, ?)",
+            "INSERT INTO portfolios (owner, name, sites, created_at) VALUES (?, ?, ?, ?)",
             (
                 req.owner,
                 req.name,
@@ -94,8 +78,7 @@ def list_portfolios(owner: str = Query(..., min_length=1, max_length=128)):
     _init()
     with _lock, _connect() as conn:
         rows = conn.execute(
-            "SELECT id, name, sites, created_at FROM portfolios "
-            "WHERE owner = ? ORDER BY id DESC",
+            "SELECT id, name, sites, created_at FROM portfolios WHERE owner = ? ORDER BY id DESC",
             (owner,),
         ).fetchall()
     return {
@@ -114,9 +97,7 @@ def list_portfolios(owner: str = Query(..., min_length=1, max_length=128)):
 def _get(portfolio_id: int, owner: str) -> dict:
     _init()
     with _lock, _connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM portfolios WHERE id = ?", (portfolio_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM portfolios WHERE id = ?", (portfolio_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="No such portfolio.")
     if row["owner"] != owner:
@@ -125,9 +106,7 @@ def _get(portfolio_id: int, owner: str) -> dict:
 
 
 @router.delete("/portfolios/{portfolio_id}")
-def delete_portfolio(
-    portfolio_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
+def delete_portfolio(portfolio_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     _get(portfolio_id, owner)
     with _lock, _connect() as conn:
         conn.execute("DELETE FROM portfolios WHERE id = ?", (portfolio_id,))
@@ -136,15 +115,7 @@ def delete_portfolio(
 
 
 @router.post("/portfolios/{portfolio_id}/digest")
-def digest(
-    portfolio_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
-    """
-    One sweep across every site: newest Sentinel-1 pass date and scene count
-    over the last 30 days. Sites whose newest pass is under 3 days old are
-    flagged 'fresh' — those are the ones worth running a full analysis on.
-    """
-    import ee
+def digest(portfolio_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     from gee import common
 
     p = _get(portfolio_id, owner)
@@ -163,9 +134,7 @@ def digest(
                 entry.update(scene_count=0, latest_pass=None, fresh=False)
             else:
                 latest = common.latest_image_date(coll)
-                age_days = (
-                    now.date() - datetime.strptime(latest, "%Y-%m-%d").date()
-                ).days
+                age_days = (now.date() - datetime.strptime(latest, "%Y-%m-%d").date()).days
                 entry.update(
                     scene_count=count,
                     latest_pass=latest,
@@ -183,6 +152,6 @@ def digest(
         "fresh_sites": fresh,
         "summary": (
             f"{len(fresh)} of {len(sites_out)} sites have imagery under 3 days "
-            "old — run full analyses there first."
+            "old. Run full analyses there first."
         ),
     }

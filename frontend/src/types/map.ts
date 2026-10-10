@@ -1,4 +1,4 @@
-export type BBox = [number, number, number, number]; // [minLon, minLat, maxLon, maxLat]
+export type BBox = [number, number, number, number];
 
 export interface RasterLayer {
   id: string;
@@ -7,12 +7,10 @@ export interface RasterLayer {
   opacity: number;
   visible: boolean;
   color: string;
-  // Layers belonging to a research control are driven by that control's UI
-  // (compare slider / timeline scrubber) and hidden from the normal LayerPanel.
+
   group?: "compare" | "timeline";
 }
 
-/** A pointer to the most recent analysis, so research tools can act on it. */
 export interface ResultRef {
   analysisType: string;
   displayName: string;
@@ -54,10 +52,6 @@ export interface PointLayer {
   visible: boolean;
 }
 
-/**
- * A georeferenced still image pinned to a bbox — used for research-grade
- * products Kairos serves rather than computes, like the InSAR interferograms.
- */
 export interface ImageLayer {
   id: string;
   name: string;
@@ -67,7 +61,7 @@ export interface ImageLayer {
   visible: boolean;
 }
 
-export type DrawMode = "rectangle" | "pin" | "quickpin" | null;
+export type DrawMode = "rectangle" | "polygon" | "pin" | "quickpin" | null;
 
 export type BaseStyle = "satellite" | "dark" | "terrain";
 

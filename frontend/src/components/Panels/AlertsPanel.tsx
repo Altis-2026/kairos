@@ -1,29 +1,11 @@
-/**
- * Alert mode — watched areas for the signed-in user.
- *
- * Each alert remembers the last Sentinel-1 acquisition it saw. "Check now" asks
- * the backend whether a newer pass has produced a fresh detection; if so the
- * result lands on the globe and the alert advances. This is the manual half of
- * alert mode — a scheduler can hit the same endpoint to make it automatic.
- */
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Bell, BellRing, Loader2, Radar, Trash2, X } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { useAlertsStore, type SavedAlert } from "../../stores/alertsStore";
-import {
-  alertsAvailable,
-  deleteAlert,
-  loadAlerts,
-  markAlertChecked,
-} from "../../lib/alerts";
+import { alertsAvailable, deleteAlert, loadAlerts, markAlertChecked } from "../../lib/alerts";
 import { checkAlert } from "../../api/alerts";
-import {
-  deleteWebhook,
-  getWebhook,
-  saveWebhook,
-  testWebhook,
-} from "../../api/research";
+import { deleteWebhook, getWebhook, saveWebhook, testWebhook } from "../../api/research";
 import { janusOwner } from "../../api/janus";
 import { applyResultToGlobe } from "../../lib/applyResult";
 import { panelShell } from "../../lib/responsive";
@@ -66,7 +48,7 @@ export default function AlertsPanel({ onClose }: { onClose: () => void }) {
           lastHeadlineValue: res.result.headline_stat.value,
           lastHeadlineUnit: res.result.headline_stat.unit,
         });
-        setFlashFor(a.id, `New pass ${res.result.data_date} — result on globe.`);
+        setFlashFor(a.id, `New pass ${res.result.data_date}, result on globe.`);
         onClose();
       } else if (res.data_date) {
         await markAlertChecked(a.id, {});
@@ -85,15 +67,13 @@ export default function AlertsPanel({ onClose }: { onClose: () => void }) {
     <motion.aside
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={`${panelShell(
-        "lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-80"
-      )} space-y-4`}
+      className={`${panelShell("lg:right-20 lg:left-auto lg:top-1/2 lg:-translate-y-1/2 lg:w-80")} space-y-4`}
     >
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-dim">
           <Bell size={12} /> ALERTS
         </span>
-        <button onClick={onClose} className="text-dim hover:text-ink" title="Close">
+        <button onClick={onClose} className="text-dim hover:text-ink" aria-label="Close" title="Close">
           <X size={15} />
         </button>
       </div>
@@ -101,14 +81,12 @@ export default function AlertsPanel({ onClose }: { onClose: () => void }) {
       {!alertsAvailable() ? (
         <p className="text-xs text-dim leading-relaxed">
           Alerts need Firebase configured. Add the{" "}
-          <span className="font-mono text-teal">VITE_FIREBASE_*</span> values to
-          enable watching areas.
+          <span className="font-mono text-teal">VITE_FIREBASE_*</span> values to enable watching areas.
         </p>
       ) : !user ? (
         <p className="text-xs text-dim leading-relaxed">
           Sign in to watch an area. Run an analysis, then use{" "}
-          <span className="text-teal">Watch this area</span> in the research panel
-          to start an alert.
+          <span className="text-teal">Watch this area</span> in the research panel to start an alert.
         </p>
       ) : loading ? (
         <div className="flex items-center gap-2 text-xs text-dim">
@@ -118,27 +96,19 @@ export default function AlertsPanel({ onClose }: { onClose: () => void }) {
         <p className="text-[11px] text-amber leading-relaxed">{error}</p>
       ) : alerts.length === 0 ? (
         <p className="text-xs text-dim leading-relaxed">
-          No alerts yet. Run an analysis, then choose{" "}
-          <span className="text-teal">Watch this area</span> to be able to re-check
-          it for new Sentinel-1 passes.
+          No alerts yet. Run an analysis, then choose <span className="text-teal">Watch this area</span> to be
+          able to re-check it for new Sentinel-1 passes.
         </p>
       ) : (
         <ul className="space-y-2 max-h-[26rem] overflow-y-auto">
           {alerts.map((a) => (
-            <li
-              key={a.id}
-              className="rounded-xl bg-bg/70 ring-1 ring-line p-3 space-y-2"
-            >
+            <li key={a.id} className="rounded-xl bg-bg/70 ring-1 ring-line p-3 space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-xs text-ink truncate">{a.label}</div>
-                  <div className="font-mono text-[10px] text-dim mt-0.5">
-                    {a.displayName}
-                  </div>
+                  <div className="font-mono text-[10px] text-dim mt-0.5">{a.displayName}</div>
                   <div className="font-mono text-[10px] text-dim/80 mt-0.5">
-                    {a.lastDataDate
-                      ? `last seen ${a.lastDataDate}`
-                      : "not checked yet"}
+                    {a.lastDataDate ? `last seen ${a.lastDataDate}` : "not checked yet"}
                     {a.lastHeadlineValue != null &&
                       ` · ${a.lastHeadlineValue.toLocaleString()} ${a.lastHeadlineUnit ?? ""}`}
                   </div>
@@ -146,6 +116,7 @@ export default function AlertsPanel({ onClose }: { onClose: () => void }) {
                 <button
                   onClick={() => deleteAlert(a.id)}
                   className="h-7 w-7 grid place-items-center rounded-lg ring-1 ring-line text-dim hover:text-ink transition shrink-0"
+                  aria-label="Delete alert"
                   title="Delete alert"
                 >
                   <Trash2 size={12} />
@@ -155,13 +126,10 @@ export default function AlertsPanel({ onClose }: { onClose: () => void }) {
                 onClick={() => check(a)}
                 disabled={checkingId === a.id}
                 className="w-full h-8 rounded-lg text-[11px] flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-teal hover:ring-teal/40 transition disabled:opacity-50"
+                aria-label="Check for a new Sentinel-1 pass now"
                 title="Check for a new Sentinel-1 pass now"
               >
-                {checkingId === a.id ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <Radar size={12} />
-                )}
+                {checkingId === a.id ? <Loader2 size={12} className="animate-spin" /> : <Radar size={12} />}
                 Check now
               </button>
               {flash[a.id] && (
@@ -180,11 +148,6 @@ export default function AlertsPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
-/**
- * Outbound webhook: push watch findings to Slack (incoming webhook) or any
- * JSON endpoint, so alerts reach the user's own systems instead of only
- * living in this panel.
- */
 function WebhookSection() {
   const [url, setUrl] = useState("");
   const [saved, setSaved] = useState(false);
@@ -216,12 +179,9 @@ function WebhookSection() {
 
   return (
     <div className="space-y-2 border-t border-line pt-3">
-      <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
-        Outbound webhook
-      </h3>
+      <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">Outbound webhook</h3>
       <p className="text-[10px] text-dim leading-snug">
-        Watch findings POST here — paste a Slack incoming-webhook URL or any
-        JSON endpoint.
+        Watch findings POST here, paste a Slack incoming-webhook URL or any JSON endpoint.
       </p>
       <input
         value={url}
@@ -251,7 +211,7 @@ function WebhookSection() {
           onClick={() =>
             run("test", async () => {
               await testWebhook(janusOwner());
-              setNote("Test event delivered — check the destination.");
+              setNote("Test event delivered. Check the destination.");
             })
           }
           disabled={!saved || busy !== null}

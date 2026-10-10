@@ -1,11 +1,3 @@
-"""
-Redis job queue setup (rq).
-
-Optional in development: if Redis is not running, the API transparently
-falls back to synchronous execution. Required in production for analyses
-that exceed Cloud Run request timeouts.
-"""
-
 import os
 
 from redis import Redis
@@ -15,7 +7,6 @@ _queue = None
 
 
 def get_queue():
-    """Return the rq Queue, or None when Redis is unreachable."""
     global _queue
     if _queue is not None:
         return _queue

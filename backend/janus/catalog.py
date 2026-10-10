@@ -1,14 +1,3 @@
-"""
-The dataset scout's knowledge base: a curated index of Earth observation
-datasets, every one of them free and already available on Google Earth Engine
-(so anything Janus recommends, Kairos can actually touch).
-
-Curated by hand rather than scraped: each entry carries what the catalog page
-won't tell a beginner — what the data is genuinely good for and where it will
-mislead you. The `limits` field is mandatory; a scout that only says nice
-things is a salesperson.
-"""
-
 DATASETS = [
     {
         "id": "COPERNICUS/S1_GRD",
@@ -174,11 +163,6 @@ DATASETS = [
 
 
 def search_datasets(query: str, limit: int = 5) -> list:
-    """
-    Rank the curated index against a free-text query. Deliberately simple
-    keyword scoring — the index is small and hand-written, so recall matters
-    more than clever ranking.
-    """
     terms = [t for t in query.lower().split() if len(t) > 2]
     scored = []
     for ds in DATASETS:
@@ -195,7 +179,6 @@ def search_datasets(query: str, limit: int = 5) -> list:
             scored.append((score, ds))
     scored.sort(key=lambda pair: -pair[0])
     results = [ds for _, ds in scored[:limit]]
-    # An empty result should still teach: return the two core sensors.
     if not results:
         results = DATASETS[:2]
     return [{k: v for k, v in ds.items() if k != "keywords"} for ds in results]

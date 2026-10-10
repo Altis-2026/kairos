@@ -1,29 +1,6 @@
-"""
-Janus mentor API.
-
-  GET    /janus/status                  is the mentor available (API key set)?
-  GET    /janus/entitlements?owner=     the owner's plan + unlocked features
-  GET    /janus/curricula               teaching tracks
-  POST   /janus/projects                create a project (+ mentor kickoff)
-  GET    /janus/projects?owner=         list my projects
-  GET    /janus/projects/{id}           project + messages + bibliography + insights
-  PATCH  /janus/projects/{id}           rename / edit question / stage
-  DELETE /janus/projects/{id}           delete a project
-  POST   /janus/projects/{id}/chat      one mentor turn (may run GEE tools)
-  POST   /janus/projects/{id}/watch     toggle proactive monitoring (+ instant check)
-  GET    /janus/projects/{id}/pack      download the reproducibility pack (Markdown)
-  POST   /janus/insights/{id}/dismiss   dismiss a proactive insight
-
-Synchronous handlers throughout: mentor turns can invoke blocking GEE calls,
-so FastAPI must run them in its threadpool (`def`, not `async def`).
-
-Ownership is an honesty check, not security: `owner` is the Firebase uid or
-an anonymous browser id. Real auth arrives with the paid tier.
-"""
-
 import os
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
@@ -39,6 +16,7 @@ from janus import (
 )
 from janus.curriculum import curricula_summary
 from janus.mentor import project_kickoff, run_turn
+from ratelimit import limit_ai
 
 router = APIRouter()
 
@@ -60,9 +38,7 @@ class UpdateProjectRequest(BaseModel):
 class ChatRequest(BaseModel):
     owner: str = Field(min_length=1, max_length=128)
     message: str = Field(min_length=1, max_length=4000)
-    mode: str = Field(
-        default="mentor", pattern="^(mentor|design|review|autopilot)$"
-    )
+    mode: str = Field(default="mentor", pattern="^(mentor|design|review|autopilot)$")
 
 
 class WatchRequest(BaseModel):
@@ -71,25 +47,13 @@ class WatchRequest(BaseModel):
 
 
 def _require_access(owner: str):
-    """
-    Closed research preview gate. Guards the two paths that spend real model
-    budget (creating a project and taking a mentor turn) so an owner who has
-    not redeemed an access code cannot draw down the shared preview budget.
-    """
     try:
         entitlements.require(owner, "mentor_chat")
-    except entitlements.FeatureLocked:
-        raise HTTPException(
-            status_code=403,
-            detail=(
-                "Janus is in closed research preview. Enter your access code "
-                "to unlock it, or request one if you do not have a code."
-            ),
-        )
+    except entitlements.FeatureLocked as e:
+        raise HTTPException(status_code=403, detail=str(e))
 
 
 def _owned_project(project_id: int, owner: str) -> dict:
-    """Owner OR invited member may work on a project (shared projects)."""
     try:
         project = store.get_project(project_id)
     except ValueError as e:
@@ -100,15 +64,12 @@ def _owned_project(project_id: int, owner: str) -> dict:
 
 
 def _strictly_owned(project_id: int, owner: str) -> dict:
-    """Destructive/administrative actions stay owner-only."""
     try:
         project = store.get_project(project_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     if project["owner"] != owner:
-        raise HTTPException(
-            status_code=403, detail="Only the project owner can do that."
-        )
+        raise HTTPException(status_code=403, detail="Only the project owner can do that.")
     return project
 
 
@@ -130,31 +91,12 @@ def get_entitlements(owner: str = Query(..., min_length=1, max_length=128)):
     return ent
 
 
-class RedeemRequest(BaseModel):
-    owner: str = Field(min_length=1, max_length=128)
-    code: str = Field(min_length=1, max_length=64)
-
-
-@router.post("/janus/redeem")
-def redeem_access_code(request: RedeemRequest):
-    """
-    Redeem a research-preview access code. Returns the owner's refreshed
-    entitlements on success so the caller can unlock its UI from one response.
-    """
-    if not entitlements.redeem(request.owner, request.code):
-        raise HTTPException(
-            status_code=403,
-            detail="That access code is not valid. Check it and try again.",
-        )
-    return {"unlocked": True, "entitlements": entitlements.entitlements(request.owner)}
-
-
 @router.get("/janus/curricula")
 def get_curricula():
     return {"curricula": curricula_summary()}
 
 
-@router.post("/janus/projects")
+@router.post("/janus/projects", dependencies=[Depends(limit_ai)])
 def create_project(request: CreateProjectRequest):
     _require_access(request.owner)
     if request.curriculum_id is not None:
@@ -162,15 +104,11 @@ def create_project(request: CreateProjectRequest):
         if request.curriculum_id not in valid:
             raise HTTPException(status_code=400, detail="Unknown curriculum.")
 
-    # Enforce the plan's project cap (early access has none).
     cap = entitlements.project_cap(request.owner)
     if cap is not None and len(store.list_projects(request.owner)) >= cap:
         raise HTTPException(
-            status_code=402,
-            detail=(
-                f"Your plan allows {cap} active projects. Upgrade for more, "
-                "or delete one to make room."
-            ),
+            status_code=403,
+            detail=f"You can keep {cap} active projects. Delete one to make room.",
         )
 
     project = store.create_project(
@@ -179,10 +117,7 @@ def create_project(request: CreateProjectRequest):
         question=request.question,
         curriculum_id=request.curriculum_id,
     )
-    # The mentor speaks first — instantly, no model call (see mentor.py).
-    kickoff = store.add_message(
-        project["id"], "assistant", project_kickoff(project), mode="mentor"
-    )
+    kickoff = store.add_message(project["id"], "assistant", project_kickoff(project), mode="mentor")
     return {
         "project": project,
         "messages": [kickoff],
@@ -194,24 +129,19 @@ def create_project(request: CreateProjectRequest):
 
 @router.get("/janus/projects")
 def list_projects(owner: str = Query(..., min_length=1, max_length=128)):
-    # The companion chat is reached through its own card, not the project list.
     return {
-        "projects": [
-            p
-            for p in store.list_projects(owner)
-            if not (p.get("design") or {}).get("companion")
-        ]
+        "projects": [p for p in store.list_projects(owner) if not (p.get("design") or {}).get("companion")]
     }
 
 
 _COMPANION_KICKOFF = (
-    "### Hey — I'm Janus\n"
+    "### Hey, I'm Janus\n"
     "This chat is always here, no project needed. Ask me anything:\n"
-    "- how Kairos works (\"how do I run a flood analysis?\", \"what's the "
-    "lightning-bolt tool?\")\n"
-    "- any question about the Earth, satellites, or radar — or genuinely "
+    '- how Kairos works ("how do I run a flood analysis?", "what\'s the '
+    'lightning-bolt tool?")\n'
+    "- any question about the Earth, satellites, or radar, or genuinely "
     "anything you're curious about\n"
-    "- or just tell me what you want DONE (\"check the Sundarbans for "
+    '- or just tell me what you want DONE ("check the Sundarbans for '
     "flooding this month\") and I'll run it for real.\n\n"
     "There's a mic button below if you'd rather talk, and the speaker "
     "toggle makes me talk back. When a conversation grows into real "
@@ -224,14 +154,8 @@ class CompanionRequest(BaseModel):
     owner: str = Field(min_length=1, max_length=128)
 
 
-@router.post("/janus/companion")
+@router.post("/janus/companion", dependencies=[Depends(limit_ai)])
 def open_companion(request: CompanionRequest):
-    """
-    The always-on Janus chat: no project setup, just talk. Backed by a
-    persistent per-owner companion project under the hood so memory, tools,
-    voice and history all work exactly like everywhere else. Created on
-    first use; never counts against the plan's project cap.
-    """
     for p in store.list_projects(request.owner):
         if (p.get("design") or {}).get("companion"):
             return {
@@ -242,13 +166,9 @@ def open_companion(request: CompanionRequest):
                 "hypotheses": store.get_hypotheses(p["id"]),
             }
 
-    project = store.create_project(
-        owner=request.owner, title="Ask Janus", question=""
-    )
+    project = store.create_project(owner=request.owner, title="Ask Janus", question="")
     project = store.update_project(project["id"], design={"companion": True})
-    kickoff = store.add_message(
-        project["id"], "assistant", _COMPANION_KICKOFF, mode="mentor"
-    )
+    kickoff = store.add_message(project["id"], "assistant", _COMPANION_KICKOFF, mode="mentor")
     return {
         "project": project,
         "messages": [kickoff],
@@ -259,9 +179,7 @@ def open_companion(request: CompanionRequest):
 
 
 @router.get("/janus/projects/{project_id}")
-def get_project(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
+def get_project(project_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     project = _owned_project(project_id, owner)
     return {
         "project": project,
@@ -285,15 +203,10 @@ def update_project(project_id: int, request: UpdateProjectRequest):
 
 
 @router.delete("/janus/projects/{project_id}")
-def delete_project(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
+def delete_project(project_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     _strictly_owned(project_id, owner)
     store.delete_project(project_id)
     return {"deleted": True}
-
-
-# --- shared projects ----------------------------------------------------------
 
 
 class MemberRequest(BaseModel):
@@ -303,7 +216,6 @@ class MemberRequest(BaseModel):
 
 @router.post("/janus/projects/{project_id}/members")
 def add_member(project_id: int, req: MemberRequest):
-    """Share the project with another account (PI adds a student, etc.)."""
     _strictly_owned(project_id, req.owner)
     if req.member == req.owner:
         raise HTTPException(status_code=400, detail="You already own this project.")
@@ -312,9 +224,7 @@ def add_member(project_id: int, req: MemberRequest):
 
 
 @router.get("/janus/projects/{project_id}/members")
-def project_members(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
+def project_members(project_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     _owned_project(project_id, owner)
     return {"members": store.list_members(project_id)}
 
@@ -332,11 +242,10 @@ def remove_member(
 
 @router.get("/janus/shared")
 def shared_projects(owner: str = Query(..., min_length=1, max_length=128)):
-    """Projects other people have shared with this account."""
     return {"projects": store.shared_with(owner)}
 
 
-@router.post("/janus/projects/{project_id}/chat")
+@router.post("/janus/projects/{project_id}/chat", dependencies=[Depends(limit_ai)])
 def chat(project_id: int, request: ChatRequest):
     _owned_project(project_id, request.owner)
     _require_access(request.owner)
@@ -352,7 +261,7 @@ def chat(project_id: int, request: ChatRequest):
         try:
             entitlements.require(request.owner, "autopilot")
         except entitlements.FeatureLocked as e:
-            raise HTTPException(status_code=402, detail=str(e))
+            raise HTTPException(status_code=403, detail=str(e))
     try:
         return run_turn(project_id, request.message, mode=request.mode)
     except HTTPException:
@@ -363,16 +272,11 @@ def chat(project_id: int, request: ChatRequest):
 
 @router.post("/janus/projects/{project_id}/watch")
 def toggle_watch(project_id: int, request: WatchRequest):
-    """
-    Turn proactive monitoring on/off for a project. Turning it on runs one
-    instant check so the student gets immediate value rather than waiting for
-    the next scheduled cycle.
-    """
     _owned_project(project_id, request.owner)
     try:
         entitlements.require(request.owner, "proactive_monitoring")
     except entitlements.FeatureLocked as e:
-        raise HTTPException(status_code=402, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e))
 
     project = store.update_project(project_id, watched=1 if request.watch else 0)
     result = {"project": project, "new_insight": False}
@@ -382,21 +286,17 @@ def toggle_watch(project_id: int, request: WatchRequest):
             result["new_insight"] = check["new_insight"]
             result["insights"] = store.get_insights(project_id)
         except Exception as e:
-            # Monitoring is best-effort; never fail the toggle on a GEE hiccup.
             result["check_error"] = str(e)
     return result
 
 
 @router.get("/janus/projects/{project_id}/pack", response_class=PlainTextResponse)
-def download_pack(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
-    """The reproducibility pack as a downloadable Markdown document."""
+def download_pack(project_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     project = _owned_project(project_id, owner)
     try:
         entitlements.require(owner, "reproducibility_pack")
     except entitlements.FeatureLocked as e:
-        raise HTTPException(status_code=402, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e))
 
     markdown = reproducibility.build_pack(project_id)
     filename = reproducibility.pack_filename(project)
@@ -408,15 +308,12 @@ def download_pack(
 
 
 @router.get("/janus/projects/{project_id}/notebook", response_class=PlainTextResponse)
-def download_notebook(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
-    """A runnable Python Earth Engine script reproducing the project's analyses."""
+def download_notebook(project_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     project = _owned_project(project_id, owner)
     try:
         entitlements.require(owner, "reproducibility_pack")
     except entitlements.FeatureLocked as e:
-        raise HTTPException(status_code=402, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e))
 
     code = notebook.build_notebook(project_id)
     filename = notebook.notebook_filename(project)
@@ -428,10 +325,7 @@ def download_notebook(
 
 
 @router.get("/janus/projects/{project_id}/figures")
-def list_figures(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
-    """Which publication figures have data to render for this project."""
+def list_figures(project_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     _owned_project(project_id, owner)
     return {"figures": figures.available_figures(project_id)}
 
@@ -443,12 +337,11 @@ def download_figure(
     owner: str = Query(..., min_length=1, max_length=128),
     download: bool = Query(default=False),
 ):
-    """A single publication figure as an SVG (vector, paper-ready)."""
     project = _owned_project(project_id, owner)
     try:
         entitlements.require(owner, "reproducibility_pack")
     except entitlements.FeatureLocked as e:
-        raise HTTPException(status_code=402, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e))
     if kind not in figures.FIGURE_KINDS:
         raise HTTPException(status_code=404, detail=f"Unknown figure: {kind}")
     try:
@@ -457,9 +350,7 @@ def download_figure(
         raise HTTPException(status_code=404, detail=str(e))
     headers = {}
     if download:
-        headers["Content-Disposition"] = (
-            f'attachment; filename="{figures.figure_filename(project, kind)}"'
-        )
+        headers["Content-Disposition"] = f'attachment; filename="{figures.figure_filename(project, kind)}"'
     return Response(content=svg, media_type="image/svg+xml", headers=headers)
 
 
@@ -477,12 +368,11 @@ def download_latex(
     owner: str = Query(..., min_length=1, max_length=128),
     journal: str = Query(default="article", pattern="^(article|ieee)$"),
 ):
-    """An Overleaf-ready LaTeX manuscript (generic article or IEEEtran)."""
     project = _owned_project(project_id, owner)
     try:
         entitlements.require(owner, "reproducibility_pack")
     except entitlements.FeatureLocked as e:
-        raise HTTPException(status_code=402, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e))
     return _attachment(
         exports.build_latex(project_id, journal=journal),
         exports.latex_filename(project),
@@ -491,15 +381,12 @@ def download_latex(
 
 
 @router.get("/janus/projects/{project_id}/brief", response_class=PlainTextResponse)
-def download_policy_brief(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
-    """A one-page plain-language policy/decision brief (opens in Google Docs)."""
+def download_policy_brief(project_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     project = _owned_project(project_id, owner)
     try:
         entitlements.require(owner, "reproducibility_pack")
     except entitlements.FeatureLocked as e:
-        raise HTTPException(status_code=402, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e))
     return _attachment(
         exports.build_policy_brief_html(project_id),
         exports.policy_brief_filename(project),
@@ -508,10 +395,7 @@ def download_policy_brief(
 
 
 @router.get("/janus/projects/{project_id}/bibtex", response_class=PlainTextResponse)
-def download_bibtex(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
-    """The project bibliography as a BibTeX .bib (Zotero / Mendeley / LaTeX)."""
+def download_bibtex(project_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     project = _owned_project(project_id, owner)
     return _attachment(
         exports.build_bibtex(project_id),
@@ -521,10 +405,7 @@ def download_bibtex(
 
 
 @router.get("/janus/projects/{project_id}/ris", response_class=PlainTextResponse)
-def download_ris(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
-    """The project bibliography as RIS (Zotero / Mendeley / EndNote import)."""
+def download_ris(project_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     project = _owned_project(project_id, owner)
     return _attachment(
         exports.build_ris(project_id),
@@ -534,15 +415,12 @@ def download_ris(
 
 
 @router.get("/janus/projects/{project_id}/gdoc", response_class=PlainTextResponse)
-def download_gdoc(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
-    """A Google Docs-importable HTML document for the project."""
+def download_gdoc(project_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     project = _owned_project(project_id, owner)
     try:
         entitlements.require(owner, "reproducibility_pack")
     except entitlements.FeatureLocked as e:
-        raise HTTPException(status_code=402, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e))
     return _attachment(
         exports.build_gdoc_html(project_id),
         exports.gdoc_filename(project),
@@ -551,19 +429,12 @@ def download_gdoc(
 
 
 @router.get("/janus/projects/{project_id}/review")
-def peer_review(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
-    """
-    Generate a formal mock peer-review report of the whole project. Slow when
-    the AI provider is configured (one deep-model call); instant deterministic
-    checklist otherwise.
-    """
+def peer_review(project_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     _owned_project(project_id, owner)
     try:
         entitlements.require(owner, "reproducibility_pack")
     except entitlements.FeatureLocked as e:
-        raise HTTPException(status_code=402, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e))
     try:
         return {"markdown": review_report.build_review(project_id)}
     except Exception as e:
@@ -576,7 +447,6 @@ def citations(
     owner: str = Query(..., min_length=1, max_length=128),
     style: str = Query(default="apa", pattern="^(apa|agu|ieee)$"),
 ):
-    """The project's bibliography formatted in a chosen citation style."""
     _owned_project(project_id, owner)
     from janus.citations import format_bibliography
 
@@ -589,9 +459,6 @@ def dismiss_insight(insight_id: int):
     return {"dismissed": True}
 
 
-# --- bring-your-own-data (v1) ------------------------------------------------
-
-
 class DatasetUpload(BaseModel):
     owner: str = Field(min_length=1, max_length=128)
     name: str = Field(min_length=1, max_length=120)
@@ -601,17 +468,11 @@ class DatasetUpload(BaseModel):
 
 @router.post("/janus/projects/{project_id}/datasets")
 def upload_dataset(project_id: int, req: DatasetUpload):
-    """
-    Attach the student's own data to a project: GeoJSON (points/polygons) or
-    a CSV with lon/lat columns. Used as AOIs and as private ground truth.
-    """
     from janus import datasets
 
     _owned_project(project_id, req.owner)
     if not req.geojson and not req.csv:
-        raise HTTPException(
-            status_code=400, detail="Provide either 'geojson' or 'csv'."
-        )
+        raise HTTPException(status_code=400, detail="Provide either 'geojson' or 'csv'.")
     try:
         gj = req.geojson or datasets.csv_to_geojson(req.csv)
         saved = datasets.add_dataset(project_id, req.name, gj)
@@ -621,9 +482,7 @@ def upload_dataset(project_id: int, req: DatasetUpload):
 
 
 @router.get("/janus/projects/{project_id}/datasets")
-def project_datasets(
-    project_id: int, owner: str = Query(..., min_length=1, max_length=128)
-):
+def project_datasets(project_id: int, owner: str = Query(..., min_length=1, max_length=128)):
     from janus import datasets
 
     _owned_project(project_id, owner)

@@ -1,14 +1,3 @@
-/**
- * Janus — the research mentor panel.
- *
- * A persistent research project picks up exactly where it left off: the
- * question, the study design, every run, every saved paper. The mentor's
- * tool calls surface as chips inside the conversation, and any analysis it
- * runs can be dropped straight onto the globe.
- *
- * Visual language: standard Kairos panel, but Janus wears amber (the accent
- * color) rather than teal, so mentor moments read differently from data.
- */
 import { useEffect, useRef, useState } from "react";
 import { useClickOutside } from "../../hooks/useClickOutside";
 import { motion } from "framer-motion";
@@ -61,13 +50,7 @@ import {
   type ProjectDataset,
 } from "../../api/janus";
 import { timeAgo } from "../../api/feed";
-import {
-  isSpeechSupported,
-  isTTSSupported,
-  speak,
-  startDictation,
-  stopSpeaking,
-} from "../../lib/voice";
+import { isSpeechSupported, isTTSSupported, speak, startDictation, stopSpeaking } from "../../lib/voice";
 import { panelShellFlex } from "../../lib/responsive";
 import type {
   ConfounderReport,
@@ -79,16 +62,11 @@ import type {
   StudyDesign,
   ToolEvent,
 } from "../../api/janus";
+import Markdown from "../Markdown";
 
 const VOICE_OUT_KEY = "kairos_janus_voice_out";
 
-const STAGES: JanusProject["stage"][] = [
-  "exploring",
-  "designing",
-  "analyzing",
-  "validating",
-  "writing",
-];
+const STAGES: JanusProject["stage"][] = ["exploring", "designing", "analyzing", "validating", "writing"];
 
 const MODES: { id: JanusMode; label: string; hint: string }[] = [
   { id: "mentor", label: "Mentor", hint: "Teach me and think with me" },
@@ -101,60 +79,6 @@ const MODES: { id: JanusMode; label: string; hint: string }[] = [
   },
 ];
 
-/** Markdown-lite: ### headers, "- " bullets, blank-line paragraphs. */
-function renderMentorText(text: string) {
-  const blocks: React.ReactNode[] = [];
-  let para: string[] = [];
-  let bullets: string[] = [];
-  const flush = (key: string) => {
-    if (bullets.length) {
-      blocks.push(
-        <ul key={`u${key}`} className="space-y-1 pl-1">
-          {bullets.map((b, i) => (
-            <li key={i} className="flex gap-2 text-xs leading-relaxed">
-              <span className="text-amber shrink-0 mt-[3px]">·</span>
-              <span>{b}</span>
-            </li>
-          ))}
-        </ul>
-      );
-      bullets = [];
-    }
-    if (para.length) {
-      blocks.push(
-        <p key={`p${key}`} className="text-xs leading-relaxed">
-          {para.join(" ")}
-        </p>
-      );
-      para = [];
-    }
-  };
-  text.split("\n").forEach((raw, i) => {
-    const line = raw.trim().replace(/\*\*/g, "");
-    if (line.startsWith("###")) {
-      flush(`${i}`);
-      blocks.push(
-        <h4
-          key={`h${i}`}
-          className="font-mono text-[9px] tracking-[0.18em] text-amber uppercase mt-2.5 first:mt-0"
-        >
-          {line.replace(/^#+\s*/, "")}
-        </h4>
-      );
-    } else if (line.startsWith("- ")) {
-      if (para.length) flush(`${i}`);
-      bullets.push(line.slice(2));
-    } else if (!line) {
-      flush(`${i}`);
-    } else {
-      if (bullets.length) flush(`${i}`);
-      para.push(line);
-    }
-  });
-  flush("end");
-  return blocks;
-}
-
 function StagePips({ stage }: { stage: JanusProject["stage"] }) {
   const idx = STAGES.indexOf(stage);
   return (
@@ -163,17 +87,11 @@ function StagePips({ stage }: { stage: JanusProject["stage"] }) {
         <span
           key={s}
           className={`h-1 rounded-full transition-all ${
-            i < idx
-              ? "w-2 bg-amber/50"
-              : i === idx
-              ? "w-4 bg-amber"
-              : "w-2 bg-line"
+            i < idx ? "w-2 bg-amber/50" : i === idx ? "w-4 bg-amber" : "w-2 bg-line"
           }`}
         />
       ))}
-      <span className="ml-1.5 font-mono text-[9px] tracking-wider text-dim uppercase">
-        {stage}
-      </span>
+      <span className="ml-1.5 font-mono text-[9px] tracking-wider text-dim uppercase">{stage}</span>
     </div>
   );
 }
@@ -186,10 +104,8 @@ function DesignCard({ design }: { design: StudyDesign }) {
   if (design.bbox) rows.push(["AOI", design.bbox.map((n) => n.toFixed(2)).join(", ")]);
   if (design.start_date && design.end_date)
     rows.push(["Window", `${design.start_date} to ${design.end_date}`]);
-  if (design.analysis_types?.length)
-    rows.push(["Methods", design.analysis_types.join(", ")]);
-  if (design.confounders?.length)
-    rows.push(["Confounders", design.confounders.join("; ")]);
+  if (design.analysis_types?.length) rows.push(["Methods", design.analysis_types.join(", ")]);
+  if (design.confounders?.length) rows.push(["Confounders", design.confounders.join("; ")]);
   if (design.validation_plan) rows.push(["Validation", design.validation_plan]);
   if (rows.length === 0) return null;
 
@@ -203,10 +119,7 @@ function DesignCard({ design }: { design: StudyDesign }) {
           <ClipboardList size={11} />
           Study design · {rows.length} element{rows.length > 1 ? "s" : ""}
         </span>
-        <ChevronDown
-          size={12}
-          className={`text-dim transition-transform ${open ? "rotate-180" : ""}`}
-        />
+        <ChevronDown size={12} className={`text-dim transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div className="px-3 pb-2.5 space-y-1.5">
@@ -243,10 +156,7 @@ function ResearchLog({ hypotheses }: { hypotheses: Hypothesis[] }) {
           Research log · {hypotheses.length} hypothes
           {hypotheses.length > 1 ? "es" : "is"}
         </span>
-        <ChevronDown
-          size={12}
-          className={`text-dim transition-transform ${open ? "rotate-180" : ""}`}
-        />
+        <ChevronDown size={12} className={`text-dim transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div className="px-3 pb-2.5 space-y-2">
@@ -262,9 +172,7 @@ function ResearchLog({ hypotheses }: { hypotheses: Hypothesis[] }) {
                 </span>
                 <span className="flex-1 text-ink/90">{h.statement}</span>
               </div>
-              {h.evidence && (
-                <div className="mt-0.5 pl-1 text-dim">{h.evidence}</div>
-              )}
+              {h.evidence && <div className="mt-0.5 pl-1 text-dim">{h.evidence}</div>}
             </div>
           ))}
         </div>
@@ -307,7 +215,7 @@ function PeerReviewModal({
               Janus is reviewing the whole project…
             </div>
           ) : (
-            <div className="space-y-1.5">{renderMentorText(markdown || "")}</div>
+            <Markdown text={markdown || ""} size="text-xs" />
           )}
         </div>
       </div>
@@ -329,8 +237,8 @@ function EventChip({ event }: { event: ToolEvent }) {
     event.status === "error"
       ? "text-[#FF3B5C] ring-[#FF3B5C]/30"
       : event.status === "empty"
-      ? "text-dim ring-line"
-      : "text-teal ring-teal/30";
+        ? "text-dim ring-line"
+        : "text-teal ring-teal/30";
 
   return (
     <div className="space-y-1.5">
@@ -341,6 +249,7 @@ function EventChip({ event }: { event: ToolEvent }) {
         {event.result && (
           <button
             onClick={() => applyResultToGlobe(event.result!)}
+            aria-label="Show this result on the globe"
             title="Show this result on the globe"
             className="flex shrink-0 items-center gap-1 rounded-md bg-teal/15 px-1.5 py-0.5 text-teal hover:bg-teal/25 transition"
           >
@@ -392,9 +301,7 @@ function EventChip({ event }: { event: ToolEvent }) {
       )}
       {showConcept && event.concept && (
         <div className="rounded-lg bg-bg/60 ring-1 ring-line px-2.5 py-2 space-y-1.5">
-          <div className="text-[11px] leading-relaxed text-ink/90">
-            {event.concept.explanation}
-          </div>
+          <div className="text-[11px] leading-relaxed text-ink/90">{event.concept.explanation}</div>
           <div className="flex flex-wrap gap-1.5 pt-0.5">
             {event.concept.resources.map((r, i) => (
               <a
@@ -416,9 +323,7 @@ function EventChip({ event }: { event: ToolEvent }) {
           {event.papers.map((p, i) => (
             <div key={i} className="rounded-lg bg-bg/60 ring-1 ring-line px-2.5 py-2">
               <div className="flex items-start gap-1.5">
-                <span className="flex-1 text-[11px] leading-snug text-ink/90">
-                  {p.title}
-                </span>
+                <span className="flex-1 text-[11px] leading-snug text-ink/90">{p.title}</span>
                 {p.doi && (
                   <a
                     href={p.doi}
@@ -460,7 +365,7 @@ function MessageBubble({ m }: { m: JanusMessage }) {
           <EventChip key={i} event={ev} />
         ))}
         <div className="rounded-xl bg-bg/80 ring-1 ring-line px-3 py-2.5 space-y-1.5 text-ink/95">
-          {renderMentorText(m.content)}
+          <Markdown text={m.content} size="text-xs" />
         </div>
       </div>
     </div>
@@ -481,13 +386,12 @@ function InsightBanner({
       <div className="flex items-start gap-2">
         <RadioTower size={13} className="mt-0.5 shrink-0 text-amber animate-pulse-soft" />
         <div className="flex-1 text-[11px] leading-relaxed text-ink/90">
-          <span className="font-mono text-[9px] tracking-[0.18em] text-amber uppercase">
-            Janus noticed
-          </span>
+          <span className="font-mono text-[9px] tracking-[0.18em] text-amber uppercase">Janus noticed</span>
           <p className="mt-0.5">{insight.content}</p>
         </div>
         <button
           onClick={() => onDismiss(insight.id)}
+          aria-label="Dismiss"
           title="Dismiss"
           className="shrink-0 text-dim hover:text-ink transition"
         >
@@ -518,9 +422,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     openingId,
     sending,
     watchBusy,
-    redeeming,
     error,
-    redeem,
     loadHome,
     open,
     openCompanion,
@@ -538,7 +440,6 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
 
   const [draft, setDraft] = useState("");
   const [mode, setMode] = useState<JanusMode>("mentor");
-  const [accessCode, setAccessCode] = useState("");
   const [newQuestion, setNewQuestion] = useState("");
   const [showBiblio, setShowBiblio] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -546,12 +447,12 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewText, setReviewText] = useState<string | null>(null);
-  // Researcher-tool exports + publication figures.
+
   const [busyExport, setBusyExport] = useState<string | null>(null);
   const [figuresOpen, setFiguresOpen] = useState(false);
   const [figuresList, setFiguresList] = useState<string[] | null>(null);
   const [figuresLoading, setFiguresLoading] = useState(false);
-  // Bring-your-own-data: uploaded field datasets on this project.
+
   const [dataOpen, setDataOpen] = useState(false);
   const [datasets, setDatasets] = useState<ProjectDataset[] | null>(null);
   const [dataBusy, setDataBusy] = useState(false);
@@ -574,15 +475,12 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     if (!bundle) void loadHome();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [bundle?.messages.length, sending]);
 
-  // Read new mentor replies aloud when voice output is on. Guarded by message
-  // id so re-renders don't re-speak, and so we never speak the loaded history.
   useEffect(() => {
     if (!voiceOut || !bundle || sending) return;
     const msgs = bundle.messages;
@@ -593,7 +491,6 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     speak(last.content);
   }, [bundle?.messages, voiceOut, sending, bundle]);
 
-  // Stop any audio / mic when the panel unmounts.
   useEffect(() => {
     return () => {
       stopSpeaking();
@@ -601,13 +498,9 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
-  // Figures depend on the project and its runs. When either changes, drop the
-  // cached list so it regenerates from current data; refetch immediately if the
-  // section is open. The preview <img> is cache-busted by run count below.
   const projectId = bundle?.project.id;
   const runCount = bundle?.messages.length;
-  // The companion chat hides the research chrome (design card, deliverables,
-  // figures) — it's for talking, not writing papers. My data stays.
+
   const isCompanion = !!bundle?.project.design?.companion;
   useEffect(() => {
     setFiguresList(null);
@@ -620,7 +513,6 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
         .catch(() => setFiguresList([]))
         .finally(() => setFiguresLoading(false));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, runCount]);
 
   function submit() {
@@ -636,9 +528,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     if (!next) stopSpeaking();
     try {
       localStorage.setItem(VOICE_OUT_KEY, next ? "1" : "0");
-    } catch {
-      /* private mode */
-    }
+    } catch {}
   }
 
   function toggleMic() {
@@ -699,19 +589,13 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
       const res = await fetchPeerReview(bundle.project.id);
       setReviewText(res.markdown);
     } catch (e) {
-      setReviewText(
-        `### Review failed\n${e instanceof Error ? e.message : "Try again."}`
-      );
+      setReviewText(`### Review failed\n${e instanceof Error ? e.message : "Try again."}`);
     } finally {
       setReviewLoading(false);
     }
   }
 
-  // Researcher-tool exports share one busy flag (only one download at a time).
-  async function runExport(
-    kind: string,
-    fn: (id: number, title: string) => Promise<void>
-  ) {
+  async function runExport(kind: string, fn: (id: number, title: string) => Promise<void>) {
     if (!bundle || busyExport) return;
     setBusyExport(kind);
     try {
@@ -756,22 +640,18 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
 
   async function onDataFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the same file
+    e.target.value = "";
     if (!file || !bundle || dataBusy) return;
     setDataBusy(true);
     setDataError(null);
     try {
       const text = await file.text();
       const name = file.name.replace(/\.(geojson|json|csv)$/i, "");
-      const payload = /\.csv$/i.test(file.name)
-        ? { csv: text }
-        : { geojson: JSON.parse(text) };
+      const payload = /\.csv$/i.test(file.name) ? { csv: text } : { geojson: JSON.parse(text) };
       const res = await uploadDataset(bundle.project.id, name, payload);
       setDatasets((d) => [res.dataset, ...(d ?? [])]);
     } catch (err) {
-      setDataError(
-        err instanceof Error ? err.message : "Upload failed — check the file."
-      );
+      setDataError(err instanceof Error ? err.message : "Upload failed. Check the file.");
     } finally {
       setDataBusy(false);
     }
@@ -782,22 +662,16 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
     try {
       await deleteDataset(bundle.project.id, id);
       setDatasets((d) => (d ?? []).filter((x) => x.id !== id));
-    } catch {
-      /* leave the row; next open refreshes */
-    }
+    } catch {}
   }
 
   function actOnInsight(insight: Insight) {
     const action = insight.action;
     if (!action) return;
     dismiss(insight.id);
-    // Keep the mentor in the loop: ask it to re-run and interpret, rather than
-    // silently dropping a raster on the globe. It has the params in context.
+
     const label = action.label || "the suggested analysis";
-    void send(
-      `Yes, please ${label.toLowerCase()} and tell me what changed since last time.`,
-      "mentor"
-    );
+    void send(`Yes, please ${label.toLowerCase()} and tell me what changed since last time.`, "mentor");
   }
 
   function startFromQuestion() {
@@ -826,6 +700,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
         <button
           onClick={onClose}
           className="text-dim hover:text-ink transition-colors"
+          aria-label="Close"
           title="Close"
         >
           <X size={15} />
@@ -847,60 +722,18 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
 
       {available === false && (
         <p className="text-xs leading-relaxed text-dim">
-          Janus needs the AI provider configured on the backend
-          (OPENROUTER_API_KEY). Everything else in Kairos still works.
+          Janus needs the AI provider configured on the backend (OPENROUTER_API_KEY). Everything else in
+          Kairos still works.
         </p>
       )}
 
-      {/* ---------- Closed research preview: access code required ---------- */}
-      {available !== false && entitlements?.locked && (
-        <div className="min-h-0 flex-1 overflow-y-auto space-y-3 pr-0.5">
-          <p className="text-xs leading-relaxed text-dim">
-            Janus is an AI research mentor: it teaches the craft of
-            Earth-observation research, designs studies with you, runs real
-            analyses mid-conversation, and pushes back on weak reasoning.
-          </p>
-          <p className="text-xs leading-relaxed text-dim">
-            It is currently in a closed research preview. If you have an access
-            code, enter it below. The rest of Kairos works without one.
-          </p>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const code = accessCode.trim();
-              if (code && !redeeming) void redeem(code);
-            }}
-            className="space-y-2"
-          >
-            <input
-              value={accessCode}
-              onChange={(e) => setAccessCode(e.target.value)}
-              placeholder="Access code"
-              autoComplete="off"
-              spellCheck={false}
-              className="w-full rounded-lg bg-bg ring-1 ring-white/10 px-3 py-2 text-sm text-ink placeholder:text-dim/60 focus:outline-none focus:ring-amber/50"
-            />
-            <button
-              type="submit"
-              disabled={!accessCode.trim() || redeeming}
-              className="w-full rounded-lg bg-amber px-3 py-2 text-sm font-medium text-bg hover:bg-amber/90 transition disabled:opacity-50"
-            >
-              {redeeming ? "Checking..." : "Unlock Janus"}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* ---------- Home: projects + new project ---------- */}
-      {available !== false && !entitlements?.locked && !bundle && (
+      {available !== false && !bundle && (
         <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pr-0.5">
           <p className="text-xs leading-relaxed text-dim">
-            A mentor that works with you like a PhD scientist: it teaches the
-            craft, designs studies with you, runs real analyses mid-sentence,
-            and pushes back on weak reasoning.
+            A mentor that works with you like a PhD scientist: it teaches the craft, designs studies with you,
+            runs real analyses mid-sentence, and pushes back on weak reasoning.
           </p>
 
-          {/* The always-on chat: no project needed, just talk (or speak). */}
           <button
             onClick={() => void openCompanion()}
             disabled={openingId !== null}
@@ -912,25 +745,15 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
               ) : (
                 <Sparkles size={15} className="text-amber shrink-0" />
               )}
-              <span className="text-sm text-ink font-medium">
-                Ask Janus anything
-              </span>
+              <span className="text-sm text-ink font-medium">Ask Janus anything</span>
               <Mic size={12} className="ml-auto text-amber/70 shrink-0" />
             </div>
             <p className="mt-1 text-[11px] leading-snug text-dim">
-              No project needed. How Kairos works, any question at all, or
-              &ldquo;check the Sundarbans for flooding&rdquo; &mdash; it runs
-              things for real. Voice in, voice out.
+              No project needed. How Kairos works, any question at all, or &ldquo;check the Sundarbans for
+              flooding&rdquo; &mdash; it runs things for real. Voice in, voice out.
             </p>
           </button>
 
-          {/* Optional-chained even though the type says this is always
-              present: the backend once shipped an entitlements payload
-              missing this key, and reading it unconditionally crashed the
-              whole app with no error boundary anywhere to catch it — every
-              control on the page stopped responding, not just Janus. The
-              backend is fixed, but a render this central to opening the
-              panel should never depend on that staying true forever. */}
           {entitlements && (entitlements.skills?.length ?? 0) > 0 && (
             <div className="rounded-xl bg-bg/70 ring-1 ring-line px-3 py-2.5">
               <div className="flex items-center gap-1.5 font-mono text-[9px] tracking-[0.18em] text-amber uppercase">
@@ -946,8 +769,8 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                       s.level === "confident"
                         ? "text-teal ring-teal/40 bg-teal/10"
                         : s.level === "practiced"
-                        ? "text-amber ring-amber/30"
-                        : "text-dim ring-line"
+                          ? "text-amber ring-amber/30"
+                          : "text-dim ring-line"
                     }`}
                   >
                     {s.skill}
@@ -955,8 +778,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
               <p className="mt-2 text-[10px] leading-snug text-dim">
-                Janus remembers this across every project and teaches to your
-                gaps.
+                Janus remembers this across every project and teaches to your gaps.
               </p>
             </div>
           )}
@@ -969,9 +791,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
 
           {projects.length > 0 && (
             <div className="space-y-2">
-              <div className="font-mono text-[9px] tracking-[0.18em] text-dim uppercase">
-                Your projects
-              </div>
+              <div className="font-mono text-[9px] tracking-[0.18em] text-dim uppercase">Your projects</div>
               {projects.map((p) => (
                 <div
                   key={p.id}
@@ -985,9 +805,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                     <div className="truncate text-xs text-ink">{p.title}</div>
                     <div className="mt-1 flex items-center gap-2">
                       <StagePips stage={p.stage} />
-                      <span className="font-mono text-[9px] text-dim">
-                        {timeAgo(p.updated_at)}
-                      </span>
+                      <span className="font-mono text-[9px] text-dim">{timeAgo(p.updated_at)}</span>
                     </div>
                   </button>
                   {openingId === p.id ? (
@@ -995,6 +813,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                   ) : (
                     <button
                       onClick={() => remove(p.id)}
+                      aria-label="Delete project"
                       title="Delete project"
                       className="opacity-0 group-hover:opacity-100 text-dim hover:text-[#FF3B5C] transition"
                     >
@@ -1022,11 +841,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
               disabled={!newQuestion.trim() || openingId !== null}
               className="w-full h-9 flex items-center justify-center gap-1.5 rounded-xl bg-amber text-bg text-xs font-medium hover:brightness-110 transition disabled:opacity-50"
             >
-              {openingId === -1 ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <Plus size={13} />
-              )}
+              {openingId === -1 ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
               Start research project
             </button>
           </div>
@@ -1050,9 +865,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                       {c.sessions.length} sessions
                     </span>
                   </div>
-                  <div className="mt-1 text-[11px] leading-snug text-dim">
-                    {c.outcome}
-                  </div>
+                  <div className="mt-1 text-[11px] leading-snug text-dim">{c.outcome}</div>
                 </button>
               ))}
             </div>
@@ -1060,52 +873,48 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {/* ---------- Conversation ---------- */}
       {available !== false && bundle && (
         <>
           <div className="flex items-center gap-2">
             <button
               onClick={backToList}
+              aria-label="All projects"
               title="All projects"
               className="text-dim hover:text-ink transition"
             >
               <ChevronLeft size={15} />
             </button>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-xs text-ink">
-                {bundle.project.title}
-              </div>
+              <div className="truncate text-xs text-ink">{bundle.project.title}</div>
               <StagePips stage={bundle.project.stage} />
             </div>
             <button
               onClick={() => setWatch(!watched)}
               disabled={watchBusy}
+              aria-label={
+                watched
+                  ? "Monitoring on: Janus checks for new Sentinel-1 passes"
+                  : "Watch this study area for new satellite passes"
+              }
               title={
                 watched
                   ? "Monitoring on: Janus checks for new Sentinel-1 passes"
                   : "Watch this study area for new satellite passes"
               }
               className={`flex items-center gap-1 rounded-lg px-2 py-1 font-mono text-[10px] ring-1 transition disabled:opacity-50 ${
-                watched
-                  ? "text-amber ring-amber/40 bg-amber/10"
-                  : "text-dim ring-line hover:text-ink"
+                watched ? "text-amber ring-amber/40 bg-amber/10" : "text-dim ring-line hover:text-ink"
               }`}
             >
-              {watchBusy ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <RadioTower size={11} />
-              )}
+              {watchBusy ? <Loader2 size={11} className="animate-spin" /> : <RadioTower size={11} />}
               {watched ? "Watching" : "Watch"}
             </button>
             {bundle.bibliography.length > 0 && (
               <button
                 onClick={() => setShowBiblio(!showBiblio)}
+                aria-label="Bibliography"
                 title="Bibliography"
                 className={`flex items-center gap-1 rounded-lg px-2 py-1 font-mono text-[10px] ring-1 transition ${
-                  showBiblio
-                    ? "text-amber ring-amber/40 bg-amber/10"
-                    : "text-dim ring-line hover:text-ink"
+                  showBiblio ? "text-amber ring-amber/40 bg-amber/10" : "text-dim ring-line hover:text-ink"
                 }`}
               >
                 <BookMarked size={11} />
@@ -1117,204 +926,180 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
           {bundle.insights.length > 0 && (
             <div className="space-y-2">
               {bundle.insights.map((ins) => (
-                <InsightBanner
-                  key={ins.id}
-                  insight={ins}
-                  onAct={actOnInsight}
-                  onDismiss={dismiss}
-                />
+                <InsightBanner key={ins.id} insight={ins} onAct={actOnInsight} onDismiss={dismiss} />
               ))}
             </div>
           )}
 
           {!isCompanion && (
             <>
-          <DesignCard design={bundle.project.design} />
+              <DesignCard design={bundle.project.design} />
 
-          <ResearchLog hypotheses={bundle.hypotheses} />
+              <ResearchLog hypotheses={bundle.hypotheses} />
 
-          {/* Deliverables: the artifacts a researcher takes away. */}
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={exportPack}
-              disabled={exporting}
-              title="Reproducibility pack: a Markdown methods report"
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
-            >
-              {exporting ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <Download size={11} />
-              )}
-              PACK
-            </button>
-            <button
-              onClick={exportNotebook}
-              disabled={exportingNb}
-              title="Runnable Python Earth Engine script that reproduces every analysis"
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
-            >
-              {exportingNb ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <ScrollText size={11} />
-              )}
-              CODE
-            </button>
-            <button
-              onClick={runPeerReview}
-              disabled={reviewLoading}
-              title="Generate a formal peer-review report of the whole project"
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-amber/30 text-amber hover:bg-amber/10 transition disabled:opacity-50"
-            >
-              {reviewLoading ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <ShieldCheck size={11} />
-              )}
-              REVIEW
-            </button>
-          </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={exportPack}
+                  disabled={exporting}
+                  aria-label="Reproducibility pack: a Markdown methods report"
+                  title="Reproducibility pack: a Markdown methods report"
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+                >
+                  {exporting ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
+                  PACK
+                </button>
+                <button
+                  onClick={exportNotebook}
+                  disabled={exportingNb}
+                  aria-label="Runnable Python Earth Engine script that reproduces every analysis"
+                  title="Runnable Python Earth Engine script that reproduces every analysis"
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+                >
+                  {exportingNb ? <Loader2 size={11} className="animate-spin" /> : <ScrollText size={11} />}
+                  CODE
+                </button>
+                <button
+                  onClick={runPeerReview}
+                  disabled={reviewLoading}
+                  aria-label="Generate a formal peer-review report of the whole project"
+                  title="Generate a formal peer-review report of the whole project"
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-amber/30 text-amber hover:bg-amber/10 transition disabled:opacity-50"
+                >
+                  {reviewLoading ? <Loader2 size={11} className="animate-spin" /> : <ShieldCheck size={11} />}
+                  REVIEW
+                </button>
+              </div>
 
-          {/* Finish in the tools researchers actually use. */}
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => runExport("latex", downloadLatex)}
-              disabled={busyExport !== null}
-              title="Overleaf-ready LaTeX manuscript (.tex) with figures and bibliography"
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
-            >
-              {busyExport === "latex" ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <FileText size={11} />
-              )}
-              LaTeX
-            </button>
-            <button
-              onClick={() => runExport("doc", downloadGoogleDoc)}
-              disabled={busyExport !== null}
-              title="A formatted document you can open or paste straight into Google Docs"
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
-            >
-              {busyExport === "doc" ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <FileText size={11} />
-              )}
-              DOCS
-            </button>
-            <button
-              onClick={() => runExport("bibtex", downloadBibtex)}
-              disabled={busyExport !== null}
-              title="Bibliography as BibTeX (.bib) — Zotero, Mendeley, LaTeX"
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
-            >
-              {busyExport === "bibtex" ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <Quote size={11} />
-              )}
-              .BIB
-            </button>
-            <button
-              onClick={() => runExport("ris", downloadRis)}
-              disabled={busyExport !== null}
-              title="Bibliography as RIS (.ris) — Zotero, Mendeley, EndNote import"
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
-            >
-              {busyExport === "ris" ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <Quote size={11} />
-              )}
-              .RIS
-            </button>
-            <button
-              onClick={() => runExport("brief", downloadPolicyBrief)}
-              disabled={busyExport !== null}
-              title="One-page plain-language brief for decision makers (NGO, government, press)"
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-amber/30 text-amber hover:bg-amber/10 transition disabled:opacity-50"
-            >
-              {busyExport === "brief" ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <FileText size={11} />
-              )}
-              BRIEF
-            </button>
-          </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => runExport("latex", downloadLatex)}
+                  disabled={busyExport !== null}
+                  aria-label="Overleaf-ready LaTeX manuscript (.tex) with figures and bibliography"
+                  title="Overleaf-ready LaTeX manuscript (.tex) with figures and bibliography"
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+                >
+                  {busyExport === "latex" ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    <FileText size={11} />
+                  )}
+                  LaTeX
+                </button>
+                <button
+                  onClick={() => runExport("doc", downloadGoogleDoc)}
+                  disabled={busyExport !== null}
+                  aria-label="A formatted document you can open or paste straight into Google Docs"
+                  title="A formatted document you can open or paste straight into Google Docs"
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+                >
+                  {busyExport === "doc" ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    <FileText size={11} />
+                  )}
+                  DOCS
+                </button>
+                <button
+                  onClick={() => runExport("bibtex", downloadBibtex)}
+                  disabled={busyExport !== null}
+                  aria-label="Bibliography as BibTeX (.bib), Zotero, Mendeley, LaTeX"
+                  title="Bibliography as BibTeX (.bib), Zotero, Mendeley, LaTeX"
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+                >
+                  {busyExport === "bibtex" ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    <Quote size={11} />
+                  )}
+                  .BIB
+                </button>
+                <button
+                  onClick={() => runExport("ris", downloadRis)}
+                  disabled={busyExport !== null}
+                  aria-label="Bibliography as RIS (.ris), Zotero, Mendeley, EndNote import"
+                  title="Bibliography as RIS (.ris), Zotero, Mendeley, EndNote import"
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition disabled:opacity-50"
+                >
+                  {busyExport === "ris" ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    <Quote size={11} />
+                  )}
+                  .RIS
+                </button>
+                <button
+                  onClick={() => runExport("brief", downloadPolicyBrief)}
+                  disabled={busyExport !== null}
+                  aria-label="One-page plain-language brief for decision makers (NGO, government, press)"
+                  title="One-page plain-language brief for decision makers (NGO, government, press)"
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-amber/30 text-amber hover:bg-amber/10 transition disabled:opacity-50"
+                >
+                  {busyExport === "brief" ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    <FileText size={11} />
+                  )}
+                  BRIEF
+                </button>
+              </div>
 
-          {/* Publication figures — real charts/maps from the analysis results. */}
-          <div>
-            <button
-              onClick={toggleFigures}
-              title="Publication-quality figures generated from this project's results"
-              className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition"
-            >
-              <span className="flex items-center gap-1.5">
-                <ImageIcon size={11} />
-                PUBLICATION FIGURES
-              </span>
-              <ChevronDown
-                size={12}
-                className={`transition-transform ${figuresOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-            {figuresOpen && (
-              <div className="mt-2 space-y-2">
-                {figuresLoading && (
-                  <div className="flex items-center gap-2 text-[11px] text-dim">
-                    <Loader2 size={12} className="animate-spin" /> Generating…
+              <div>
+                <button
+                  onClick={toggleFigures}
+                  aria-label="Publication-quality figures generated from this project's results"
+                  title="Publication-quality figures generated from this project's results"
+                  className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <ImageIcon size={11} />
+                    PUBLICATION FIGURES
+                  </span>
+                  <ChevronDown
+                    size={12}
+                    className={`transition-transform ${figuresOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {figuresOpen && (
+                  <div className="mt-2 space-y-2">
+                    {figuresLoading && (
+                      <div className="flex items-center gap-2 text-[11px] text-dim">
+                        <Loader2 size={12} className="animate-spin" /> Generating…
+                      </div>
+                    )}
+                    {!figuresLoading && figuresList !== null && figuresList.length === 0 && (
+                      <p className="text-[11px] text-dim leading-snug">
+                        Figures appear once you've run an analysis or defined a study area. Ask Janus to run
+                        one, then reopen this.
+                      </p>
+                    )}
+                    {!figuresLoading &&
+                      (figuresList || []).map((kind) => (
+                        <div key={kind} className="rounded-xl bg-white ring-1 ring-line overflow-hidden">
+                          <img
+                            src={`${figureUrl(bundle.project.id, kind)}&v=${runCount}`}
+                            alt={`${kind} figure`}
+                            className="w-full block"
+                          />
+                          <button
+                            onClick={() => downloadFigure(bundle.project.id, kind, bundle.project.title)}
+                            className="flex w-full items-center justify-center gap-1 py-1.5 font-mono text-[9px] tracking-wider text-dim hover:text-ink bg-surface transition"
+                          >
+                            <Download size={10} />
+                            {kind.replace(/_/g, " ").toUpperCase()} · SVG
+                          </button>
+                        </div>
+                      ))}
                   </div>
                 )}
-                {!figuresLoading &&
-                  figuresList !== null &&
-                  figuresList.length === 0 && (
-                    <p className="text-[11px] text-dim leading-snug">
-                      Figures appear once you've run an analysis or defined a
-                      study area. Ask Janus to run one, then reopen this.
-                    </p>
-                  )}
-                {!figuresLoading &&
-                  (figuresList || []).map((kind) => (
-                    <div
-                      key={kind}
-                      className="rounded-xl bg-white ring-1 ring-line overflow-hidden"
-                    >
-                      <img
-                        src={`${figureUrl(bundle.project.id, kind)}&v=${runCount}`}
-                        alt={`${kind} figure`}
-                        className="w-full block"
-                      />
-                      <button
-                        onClick={() =>
-                          downloadFigure(
-                            bundle.project.id,
-                            kind,
-                            bundle.project.title
-                          )
-                        }
-                        className="flex w-full items-center justify-center gap-1 py-1.5 font-mono text-[9px] tracking-wider text-dim hover:text-ink bg-surface transition"
-                      >
-                        <Download size={10} />
-                        {kind.replace(/_/g, " ").toUpperCase()} · SVG
-                      </button>
-                    </div>
-                  ))}
               </div>
-            )}
-          </div>
-
             </>
           )}
 
-          {/* Bring-your-own-data: field polygons / CSV points as private
-              ground truth Janus can validate against. */}
           <div>
             <button
               onClick={() => void toggleData()}
-              title="Upload your own GeoJSON or CSV — use it as ground truth"
+              aria-label="Upload your own GeoJSON or CSV. Use it as ground truth"
+              title="Upload your own GeoJSON or CSV. Use it as ground truth"
               className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 font-mono text-[9px] tracking-wider ring-1 ring-line text-dim hover:text-ink transition"
             >
               <span className="flex items-center gap-1.5">
@@ -1322,19 +1107,12 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                 MY DATA
                 {datasets && datasets.length > 0 ? ` · ${datasets.length}` : ""}
               </span>
-              <ChevronDown
-                size={12}
-                className={`transition-transform ${dataOpen ? "rotate-180" : ""}`}
-              />
+              <ChevronDown size={12} className={`transition-transform ${dataOpen ? "rotate-180" : ""}`} />
             </button>
             {dataOpen && (
               <div className="mt-2 space-y-2">
                 <label className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dashed border-line px-2 py-2 font-mono text-[9px] tracking-wider text-dim hover:text-ink hover:border-amber/40 transition">
-                  {dataBusy ? (
-                    <Loader2 size={11} className="animate-spin" />
-                  ) : (
-                    <Plus size={11} />
-                  )}
+                  {dataBusy ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
                   UPLOAD .GEOJSON / .CSV
                   <input
                     type="file"
@@ -1344,15 +1122,12 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                     disabled={dataBusy}
                   />
                 </label>
-                {dataError && (
-                  <p className="text-[10px] text-amber leading-snug">{dataError}</p>
-                )}
+                {dataError && <p className="text-[10px] text-amber leading-snug">{dataError}</p>}
                 {datasets !== null && datasets.length === 0 && !dataError && (
                   <p className="text-[11px] text-dim leading-snug">
-                    Field plots, flood outlines, survey points — upload them
-                    and Janus can score any analysis against YOUR data
-                    (&ldquo;validate the flood run against my polygons&rdquo;).
-                    CSV needs lon/lat columns.
+                    Field plots, flood outlines, survey points. Upload them and Janus can score any analysis
+                    against YOUR data (&ldquo;validate the flood run against my polygons&rdquo;). CSV needs
+                    lon/lat columns.
                   </p>
                 )}
                 {(datasets || []).map((d) => (
@@ -1369,6 +1144,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                     </div>
                     <button
                       onClick={() => void removeDataset(d.id)}
+                      aria-label="Remove dataset"
                       title="Remove dataset"
                       className="text-dim hover:text-ink shrink-0"
                     >
@@ -1415,8 +1191,8 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
               <div className="flex justify-start">
                 <div className="relative overflow-hidden scanline rounded-xl bg-bg/80 ring-1 ring-amber/30 px-3 py-2 font-mono text-[10px] text-amber">
                   {mode === "autopilot"
-                    ? "Autopilot running the full investigation — this can take a minute…"
-                    : "Janus is working — it may run analyses or search literature…"}
+                    ? "Autopilot running the full investigation. This can take a minute…"
+                    : "Janus is working. It may run analyses or search literature…"}
                 </div>
               </div>
             )}
@@ -1438,6 +1214,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                 <button
                   key={m.id}
                   onClick={() => setMode(m.id)}
+                  aria-label={m.hint}
                   title={m.hint}
                   className={`flex-1 h-7 rounded-lg font-mono text-[10px] tracking-wider ring-1 transition ${
                     mode === m.id
@@ -1451,15 +1228,10 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
               {voiceOutAvailable && (
                 <button
                   onClick={toggleVoiceOut}
-                  title={
-                    voiceOut
-                      ? "Voice replies on: Janus reads answers aloud"
-                      : "Voice replies off"
-                  }
+                  aria-label={voiceOut ? "Voice replies on: Janus reads answers aloud" : "Voice replies off"}
+                  title={voiceOut ? "Voice replies on: Janus reads answers aloud" : "Voice replies off"}
                   className={`h-7 w-7 shrink-0 grid place-items-center rounded-lg ring-1 transition ${
-                    voiceOut
-                      ? "bg-amber/15 text-amber ring-amber/40"
-                      : "text-dim ring-line hover:text-ink"
+                    voiceOut ? "bg-amber/15 text-amber ring-amber/40" : "text-dim ring-line hover:text-ink"
                   }`}
                 >
                   {voiceOut ? <Volume2 size={13} /> : <VolumeX size={13} />}
@@ -1471,6 +1243,7 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                 <button
                   onClick={toggleMic}
                   disabled={sending}
+                  aria-label={listening ? "Stop dictation" : "Speak your message"}
                   title={listening ? "Stop dictation" : "Speak your message"}
                   className={`h-9 w-9 shrink-0 grid place-items-center rounded-xl ring-1 transition disabled:opacity-50 ${
                     listening
@@ -1494,12 +1267,12 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
                   listening
                     ? "Listening…"
                     : mode === "design"
-                    ? "Describe what you want to study…"
-                    : mode === "review"
-                    ? "Paste a claim or draft for review…"
-                    : mode === "autopilot"
-                    ? "Describe a goal — e.g. “check if there was flooding near Dhaka last month and whether it's real”…"
-                    : "Ask, answer, or think out loud…"
+                      ? "Describe what you want to study…"
+                      : mode === "review"
+                        ? "Paste a claim or draft for review…"
+                        : mode === "autopilot"
+                          ? "Describe a goal, e.g. “check if there was flooding near Dhaka last month and whether it's real”…"
+                          : "Ask, answer, or think out loud…"
                 }
                 rows={2}
                 className="min-w-0 flex-1 resize-none rounded-xl bg-bg px-3 py-2.5 text-xs text-ink ring-1 ring-line placeholder:text-dim focus:ring-amber/60 outline-none"
@@ -1507,21 +1280,17 @@ export default function JanusPanel({ onClose }: { onClose: () => void }) {
               <button
                 onClick={submit}
                 disabled={!draft.trim() || sending}
+                aria-label="Send (Enter)"
                 title="Send (Enter)"
                 className="h-9 w-9 shrink-0 grid place-items-center rounded-xl bg-amber text-bg hover:brightness-110 transition disabled:opacity-50"
               >
-                {sending ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <ArrowUp size={14} />
-                )}
+                {sending ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={14} />}
               </button>
             </div>
             {bundle.project.curriculum_id && (
               <div className="flex items-center gap-1.5 font-mono text-[9px] text-dim">
                 <BookOpen size={10} className="text-amber" />
-                Course project: Janus teaches the next session each time you're
-                ready.
+                Course project: Janus teaches the next session each time you're ready.
               </div>
             )}
           </div>

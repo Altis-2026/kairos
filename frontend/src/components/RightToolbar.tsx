@@ -1,20 +1,14 @@
-/**
- * Right-side controls: analytics, globe view, layers, zoom, locate.
- *
- * Below `lg` (1024px) there is nowhere to float a 12-button vertical rail
- * without it running off the top or bottom of the screen, so it collapses to
- * a single "Tools" launcher that opens a full-width bottom sheet grid instead.
- * Both renderings are driven by the same action list, so behavior never
- * drifts between the two.
- */
 import {
   BarChart3,
   Bell,
+  Bot,
   FileSpreadsheet,
   FlaskConical,
   Globe2,
   Grid3x3,
   History,
+  Home,
+  Landmark,
   Layers,
   LocateFixed,
   Map as MapIcon,
@@ -27,35 +21,52 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentType, type LazyExoticComponent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMapStore } from "../stores/mapStore";
 import { useIsCompact } from "../hooks/useIsCompact";
-import LayerPanel from "./Panels/LayerPanel";
-import AnalyticsPanel from "./Panels/AnalyticsPanel";
-import ResearchPanel from "./Panels/ResearchPanel";
-import HistoryPanel from "./Panels/HistoryPanel";
-import BatchPanel from "./Panels/BatchPanel";
-import AlertsPanel from "./Panels/AlertsPanel";
-import JanusPanel from "./Janus/JanusPanel";
-import InsarPanel from "./Panels/InsarPanel";
-import VesselPanel from "./Panels/VesselPanel";
-import SimulationPanel from "./Panels/SimulationPanel";
 import PanelErrorBoundary from "./ErrorBoundary";
 
-type PanelKey =
-  | "layers"
-  | "analytics"
-  | "research"
-  | "history"
-  | "batch"
-  | "alerts"
-  | "janus"
-  | "insar"
-  | "vessels"
-  | "simulation";
+type PanelProps = { onClose: () => void };
 
-interface ToolAction {
+const PANELS = {
+  myplace: { label: "My Place", component: lazy(() => import("./Panels/MyPlacePanel")) },
+  district: { label: "My District", component: lazy(() => import("./Panels/DistrictPanel")) },
+  simulation: { label: "Simulate", component: lazy(() => import("./Panels/SimulationPanel")) },
+  janus: { label: "Janus mentor", component: lazy(() => import("./Janus/JanusPanel")) },
+  agent: { label: "Agent mode", component: lazy(() => import("./Panels/AgentPanel")) },
+  layers: { label: "Layers", component: lazy(() => import("./Panels/LayerPanel")) },
+  research: { label: "Research tools", component: lazy(() => import("./Panels/ResearchPanel")) },
+  analytics: { label: "Analytics", component: lazy(() => import("./Panels/AnalyticsPanel")) },
+  history: { label: "My analyses", component: lazy(() => import("./Panels/HistoryPanel")) },
+  batch: { label: "Batch analysis", component: lazy(() => import("./Panels/BatchPanel")) },
+  alerts: { label: "Alerts", component: lazy(() => import("./Panels/AlertsPanel")) },
+  vessels: { label: "Dark vessels", component: lazy(() => import("./Panels/VesselPanel")) },
+  insar: { label: "InSAR deep dive", component: lazy(() => import("./Panels/InsarPanel")) },
+} satisfies Record<string, { label: string; component: LazyExoticComponent<ComponentType<PanelProps>> }>;
+
+type PanelKey = keyof typeof PANELS;
+
+const ICONS: Record<PanelKey, LucideIcon> = {
+  myplace: Home,
+  district: Landmark,
+  simulation: Waves,
+  janus: Telescope,
+  agent: Bot,
+  layers: Layers,
+  research: FlaskConical,
+  analytics: BarChart3,
+  history: History,
+  batch: FileSpreadsheet,
+  alerts: Bell,
+  vessels: Ship,
+  insar: Radar,
+};
+
+const PRIMARY: PanelKey[] = ["myplace", "district", "simulation", "janus", "agent", "layers"];
+const LAB: PanelKey[] = ["research", "analytics", "history", "batch", "alerts", "vessels", "insar"];
+
+interface Action {
   key: string;
   label: string;
   icon: LucideIcon;
@@ -64,39 +75,90 @@ interface ToolAction {
   onClick: () => void;
 }
 
-function ToolButton({
-  title,
-  tour,
-  active,
-  amber,
-  onClick,
-  children,
-}: {
-  title: string;
-  /** Stable hook for the guided tour; see components/Tutorial. */
-  tour?: string;
-  active?: boolean;
-  amber?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+function RailButton({ action, tour }: { action: Action; tour?: string }) {
+  const { label, icon: Icon, active, amber, onClick } = action;
   return (
     <button
-      title={title}
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
       data-tour={tour}
       onClick={onClick}
-      className={`h-10 w-10 grid place-items-center transition-colors ${
+      className={`h-10 w-10 grid place-items-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber/70 ${
         active ? (amber ? "text-amber" : "text-teal") : "text-dim hover:text-ink"
       }`}
     >
-      {children}
+      <Icon size={17} />
     </button>
+  );
+}
+
+function GridButton({ action }: { action: Action }) {
+  const { label, icon: Icon, active, amber, onClick } = action;
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center gap-1.5 rounded-xl ring-1 py-3 px-1.5 text-center transition-colors ${
+        active
+          ? amber
+            ? "text-amber ring-amber/40 bg-amber/10"
+            : "text-teal ring-teal/40 bg-teal/10"
+          : "text-dim ring-line hover:text-ink hover:ring-teal/40"
+      }`}
+    >
+      <Icon size={19} />
+      <span className="text-[10px] leading-tight">{label}</span>
+    </button>
+  );
+}
+
+function Sheet({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 z-40 bg-bg/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        role="dialog"
+        aria-label={title}
+        initial={{ y: 40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 40, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 320, damping: 32 }}
+        onClick={(e) => e.stopPropagation()}
+        className="absolute inset-x-3 bottom-3 lg:inset-x-auto lg:bottom-auto lg:right-20 lg:top-1/2 lg:-translate-y-1/2 lg:w-[22rem] max-h-[70vh] overflow-y-auto rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <span className="font-mono text-[10px] tracking-[0.22em] text-dim uppercase">{title}</span>
+          <button onClick={onClose} className="text-dim hover:text-ink transition-colors" aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        {children}
+      </motion.div>
+    </motion.div>
   );
 }
 
 export default function RightToolbar() {
   const [openPanel, setOpenPanel] = useState<PanelKey | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheet, setSheet] = useState<"tools" | "lab" | null>(null);
   const isCompact = useIsCompact();
   const requestFlyTo = useMapStore((s) => s.requestFlyTo);
   const projection = useMapStore((s) => s.projection);
@@ -104,290 +166,141 @@ export default function RightToolbar() {
   const panelRequest = useMapStore((s) => s.panelRequest);
   const clearPanelRequest = useMapStore((s) => s.clearPanelRequest);
 
-  // The tutorial's "Try it" buttons ask us to open a specific panel.
   useEffect(() => {
     if (!panelRequest) return;
-    const known: PanelKey[] = [
-      "layers",
-      "analytics",
-      "research",
-      "history",
-      "batch",
-      "alerts",
-      "janus",
-      "insar",
-      "vessels",
-      // Was missing: a requestPanel("simulation") fell through this list and
-      // silently did nothing, so the guide's "Try it" for the forward models
-      // opened no panel at all.
-      "simulation",
-    ];
-    if ((known as string[]).includes(panelRequest)) {
-      setOpenPanel(panelRequest as PanelKey);
-    }
+    if (panelRequest in PANELS) setOpenPanel(panelRequest as PanelKey);
     clearPanelRequest();
   }, [panelRequest, clearPanelRequest]);
 
   const zoomBy = (delta: number) => {
-    // Globe listens to flyTo; for zoom buttons we nudge using current viewport
     const vb = useMapStore.getState().viewportBbox;
-    const center: [number, number] = vb
-      ? [(vb[0] + vb[2]) / 2, (vb[1] + vb[3]) / 2]
-      : [25, 18];
+    const center: [number, number] = vb ? [(vb[0] + vb[2]) / 2, (vb[1] + vb[3]) / 2] : [25, 18];
     const span = vb ? Math.max(vb[2] - vb[0], vb[3] - vb[1]) : 90;
-    const approxZoom = Math.log2(360 / Math.max(span, 0.01));
-    requestFlyTo(center, Math.min(15, Math.max(1.5, approxZoom + delta)));
+    const zoom = Math.log2(360 / Math.max(span, 0.01));
+    requestFlyTo(center, Math.min(15, Math.max(1.5, zoom + delta)));
   };
 
-  function openPanelAndCloseSheet(key: PanelKey) {
-    setOpenPanel(openPanel === key ? null : key);
-    setSheetOpen(false);
-  }
-  function runAndCloseSheet(fn: () => void) {
-    fn();
-    setSheetOpen(false);
-  }
+  const panelAction = (key: PanelKey, amber = false): Action => ({
+    key,
+    label: PANELS[key].label,
+    icon: ICONS[key],
+    active: openPanel === key,
+    amber,
+    onClick: () => {
+      setOpenPanel((current) => (current === key ? null : key));
+      setSheet(null);
+    },
+  });
 
-  const actions: ToolAction[] = [
-    {
-      key: "janus",
-      label: "Janus mentor",
-      icon: Telescope,
-      active: openPanel === "janus",
-      amber: true,
-      onClick: () => openPanelAndCloseSheet("janus"),
-    },
-    {
-      key: "analytics",
-      label: "Analytics",
-      icon: BarChart3,
-      active: openPanel === "analytics",
-      onClick: () => openPanelAndCloseSheet("analytics"),
-    },
+  const run = (fn: () => void) => () => {
+    fn();
+    setSheet(null);
+  };
+
+  const primary = PRIMARY.map((k) => panelAction(k, k === "simulation" || k === "janus"));
+  const lab = LAB.map((k) => panelAction(k));
+  const labOpen = LAB.includes(openPanel as PanelKey);
+  const labAction: Action = {
+    key: "lab",
+    label: "Lab: advanced tools",
+    icon: Grid3x3,
+    active: labOpen || sheet === "lab",
+    onClick: () => setSheet((s) => (s === "lab" ? null : "lab")),
+  };
+  const mapControls: Action[] = [
     {
       key: "reset-view",
       label: "Reset globe view",
       icon: Globe2,
-      onClick: () => runAndCloseSheet(() => requestFlyTo([25, 18], 2.1)),
+      onClick: run(() => requestFlyTo([25, 18], 2.1)),
     },
     {
       key: "projection",
-      label: projection === "globe" ? "Switch to 2D flat map" : "Switch to 3D globe",
+      label: projection === "globe" ? "Switch to flat map" : "Switch to 3D globe",
       icon: projection === "globe" ? MapIcon : Globe2,
       active: projection === "mercator",
-      onClick: () => runAndCloseSheet(toggleProjection),
+      onClick: run(toggleProjection),
     },
-    {
-      key: "layers",
-      label: "Layers",
-      icon: Layers,
-      active: openPanel === "layers",
-      onClick: () => openPanelAndCloseSheet("layers"),
-    },
-    {
-      key: "research",
-      label: "Research tools",
-      icon: FlaskConical,
-      active: openPanel === "research",
-      onClick: () => openPanelAndCloseSheet("research"),
-    },
-    {
-      key: "history",
-      label: "My analyses",
-      icon: History,
-      active: openPanel === "history",
-      onClick: () => openPanelAndCloseSheet("history"),
-    },
-    {
-      key: "batch",
-      label: "Batch mode (CSV)",
-      icon: FileSpreadsheet,
-      active: openPanel === "batch",
-      onClick: () => openPanelAndCloseSheet("batch"),
-    },
-    {
-      key: "alerts",
-      label: "Alerts",
-      icon: Bell,
-      active: openPanel === "alerts",
-      onClick: () => openPanelAndCloseSheet("alerts"),
-    },
-    {
-      key: "vessels",
-      label: "Dark vessels",
-      icon: Ship,
-      active: openPanel === "vessels",
-      onClick: () => openPanelAndCloseSheet("vessels"),
-    },
-    {
-      key: "simulation",
-      label: "Forward simulation",
-      icon: Waves,
-      active: openPanel === "simulation",
-      amber: true,
-      onClick: () => openPanelAndCloseSheet("simulation"),
-    },
-    {
-      key: "insar",
-      label: "InSAR deep dive",
-      icon: Radar,
-      active: openPanel === "insar",
-      onClick: () => openPanelAndCloseSheet("insar"),
-    },
-    {
-      key: "zoom-in",
-      label: "Zoom in",
-      icon: Plus,
-      onClick: () => runAndCloseSheet(() => zoomBy(1)),
-    },
-    {
-      key: "zoom-out",
-      label: "Zoom out",
-      icon: Minus,
-      onClick: () => runAndCloseSheet(() => zoomBy(-1)),
-    },
+    { key: "zoom-in", label: "Zoom in", icon: Plus, onClick: run(() => zoomBy(1)) },
+    { key: "zoom-out", label: "Zoom out", icon: Minus, onClick: run(() => zoomBy(-1)) },
     {
       key: "locate",
       label: "My location",
       icon: LocateFixed,
-      onClick: () =>
-        runAndCloseSheet(() => {
-          navigator.geolocation?.getCurrentPosition((pos) =>
-            requestFlyTo([pos.coords.longitude, pos.coords.latitude], 9)
-          );
-        }),
+      onClick: run(() =>
+        navigator.geolocation?.getCurrentPosition((pos) =>
+          requestFlyTo([pos.coords.longitude, pos.coords.latitude], 9)
+        )
+      ),
     },
   ];
+
+  const Active = openPanel ? PANELS[openPanel].component : null;
 
   return (
     <>
       {isCompact ? (
         <button
           title="Tools"
-          onClick={() => setSheetOpen(true)}
-          className="absolute right-5 top-1/2 -translate-y-1/2 z-30 h-12 w-12 grid place-items-center rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel text-dim hover:text-ink transition-colors"
+          aria-label="Open tools"
+          onClick={() => setSheet("tools")}
+          className="absolute right-3 top-20 z-30 h-12 w-12 grid place-items-center rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel text-dim hover:text-ink transition-colors"
         >
           <Grid3x3 size={19} />
         </button>
       ) : (
-        <div className="absolute right-5 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel divide-y divide-line">
-          {actions.map((a) => (
-            <ToolButton
-              key={a.key}
-              title={a.label}
-              tour={`tool-${a.key}`}
-              active={a.active}
-              amber={a.amber}
-              onClick={a.onClick}
-            >
-              <a.icon size={17} />
-            </ToolButton>
-          ))}
-        </div>
+        <nav
+          aria-label="Tools"
+          className="absolute right-5 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-2"
+        >
+          <div className="flex flex-col rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel divide-y divide-line overflow-hidden">
+            {primary.map((a) => (
+              <RailButton key={a.key} action={a} tour={`tool-${a.key}`} />
+            ))}
+            <RailButton action={labAction} tour="tool-lab" />
+          </div>
+          <div className="flex flex-col rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-panel divide-y divide-line overflow-hidden">
+            {mapControls.map((a) => (
+              <RailButton key={a.key} action={a} />
+            ))}
+          </div>
+        </nav>
       )}
 
       <AnimatePresence>
-        {isCompact && sheetOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-40 bg-bg/60 backdrop-blur-sm"
-            onClick={() => setSheetOpen(false)}
-          >
-            <motion.div
-              initial={{ y: 60, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 60, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 320, damping: 32 }}
-              onClick={(e) => e.stopPropagation()}
-              className="absolute inset-x-3 bottom-3 max-h-[70vh] overflow-y-auto rounded-2xl bg-surface/95 backdrop-blur ring-1 ring-line shadow-panel p-4"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="font-mono text-[10px] tracking-[0.22em] text-dim">
-                  TOOLS
-                </span>
-                <button
-                  onClick={() => setSheetOpen(false)}
-                  className="text-dim hover:text-ink transition-colors"
-                  title="Close"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="grid grid-cols-4 gap-2.5">
-                {actions.map((a) => (
-                  <button
-                    key={a.key}
-                    onClick={a.onClick}
-                    className={`flex flex-col items-center gap-1.5 rounded-xl ring-1 py-3 px-1.5 text-center transition-colors ${
-                      a.active
-                        ? a.amber
-                          ? "text-amber ring-amber/40 bg-amber/10"
-                          : "text-teal ring-teal/40 bg-teal/10"
-                        : "text-dim ring-line hover:text-ink"
-                    }`}
-                  >
-                    <a.icon size={19} />
-                    <span className="text-[9px] leading-tight">{a.label}</span>
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
+        {sheet === "tools" && (
+          <Sheet title="Tools" onClose={() => setSheet(null)}>
+            <div className="grid grid-cols-4 gap-2.5">
+              {[...primary, ...lab, ...mapControls].map((a) => (
+                <GridButton key={a.key} action={a} />
+              ))}
+            </div>
+          </Sheet>
+        )}
+        {sheet === "lab" && (
+          <Sheet title="Lab" onClose={() => setSheet(null)}>
+            <p className="text-xs text-dim mb-3 leading-relaxed">
+              Research-grade tools: raw backscatter, time series, accuracy benchmarks, batch runs, alerts,
+              ship screening and interferometry.
+            </p>
+            <div className="grid grid-cols-3 gap-2.5">
+              {lab.map((a) => (
+                <GridButton key={a.key} action={a} />
+              ))}
+            </div>
+          </Sheet>
         )}
       </AnimatePresence>
 
-      {/* Each panel is wrapped individually: a crash in one must never
-          take the rest of the app down with it — see ErrorBoundary.tsx. */}
-      {openPanel === "simulation" && (
-        <PanelErrorBoundary label="Forward simulation" onDismiss={() => setOpenPanel(null)}>
-          <SimulationPanel onClose={() => setOpenPanel(null)} />
-        </PanelErrorBoundary>
-      )}
-      {openPanel === "layers" && (
-        <PanelErrorBoundary label="Layers" onDismiss={() => setOpenPanel(null)}>
-          <LayerPanel onClose={() => setOpenPanel(null)} />
-        </PanelErrorBoundary>
-      )}
-      {openPanel === "research" && (
-        <PanelErrorBoundary label="Research tools" onDismiss={() => setOpenPanel(null)}>
-          <ResearchPanel onClose={() => setOpenPanel(null)} />
-        </PanelErrorBoundary>
-      )}
-      {openPanel === "history" && (
-        <PanelErrorBoundary label="My analyses" onDismiss={() => setOpenPanel(null)}>
-          <HistoryPanel onClose={() => setOpenPanel(null)} />
-        </PanelErrorBoundary>
-      )}
-      {openPanel === "batch" && (
-        <PanelErrorBoundary label="Batch mode" onDismiss={() => setOpenPanel(null)}>
-          <BatchPanel onClose={() => setOpenPanel(null)} />
-        </PanelErrorBoundary>
-      )}
-      {openPanel === "alerts" && (
-        <PanelErrorBoundary label="Alerts" onDismiss={() => setOpenPanel(null)}>
-          <AlertsPanel onClose={() => setOpenPanel(null)} />
-        </PanelErrorBoundary>
-      )}
-      {openPanel === "analytics" && (
-        <PanelErrorBoundary label="Analytics" onDismiss={() => setOpenPanel(null)}>
-          <AnalyticsPanel onClose={() => setOpenPanel(null)} />
-        </PanelErrorBoundary>
-      )}
-      {openPanel === "janus" && (
-        <PanelErrorBoundary label="Janus" onDismiss={() => setOpenPanel(null)}>
-          <JanusPanel onClose={() => setOpenPanel(null)} />
-        </PanelErrorBoundary>
-      )}
-      {openPanel === "vessels" && (
-        <PanelErrorBoundary label="Dark vessels" onDismiss={() => setOpenPanel(null)}>
-          <VesselPanel onClose={() => setOpenPanel(null)} />
-        </PanelErrorBoundary>
-      )}
-      {openPanel === "insar" && (
-        <PanelErrorBoundary label="InSAR" onDismiss={() => setOpenPanel(null)}>
-          <InsarPanel onClose={() => setOpenPanel(null)} />
+      {openPanel && Active && (
+        <PanelErrorBoundary
+          key={openPanel}
+          label={PANELS[openPanel].label}
+          onDismiss={() => setOpenPanel(null)}
+        >
+          <Suspense fallback={null}>
+            <Active onClose={() => setOpenPanel(null)} />
+          </Suspense>
         </PanelErrorBoundary>
       )}
     </>

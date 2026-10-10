@@ -1,7 +1,6 @@
-"""Pydantic request models for every Kairos API endpoint."""
-
 from datetime import datetime
 from typing import List, Optional
+
 from pydantic import BaseModel, field_validator, model_validator
 
 
@@ -15,9 +14,7 @@ def _validate_date(value: str, field: str) -> str:
 
 def _validate_bbox_values(v):
     if len(v) != 4:
-        raise ValueError(
-            "bbox must have exactly 4 values: [min_lon, min_lat, max_lon, max_lat]"
-        )
+        raise ValueError("bbox must have exactly 4 values: [min_lon, min_lat, max_lon, max_lat]")
     min_lon, min_lat, max_lon, max_lat = v
     if min_lon >= max_lon:
         raise ValueError("min_lon must be less than max_lon")
@@ -31,22 +28,34 @@ def _validate_bbox_values(v):
 
 
 class AnalyzeRequest(BaseModel):
-    """POST /analyze (also reused for /research/backscatter and /research/compare)"""
-
     analysis_type: str
-    bbox: List[float]          # [min_lon, min_lat, max_lon, max_lat]
-    start_date: str            # YYYY-MM-DD
-    end_date: str              # YYYY-MM-DD
-    # Extra configuration for analysis types that declare `accepts_params` in
-    # the registry (currently the forward-model simulations). Passing this for
-    # an analysis that does not take parameters is an error rather than a
-    # silent no-op — see api/analyze.py.
+    bbox: List[float]
+    start_date: str
+    end_date: str
     params: Optional[dict] = None
+    polygon: Optional[List[List[float]]] = None
 
     @field_validator("bbox")
     @classmethod
     def validate_bbox(cls, v):
         return _validate_bbox_values(v)
+
+    @field_validator("polygon")
+    @classmethod
+    def validate_polygon(cls, v):
+        if v is None:
+            return v
+        if len(v) < 3:
+            raise ValueError("polygon needs at least 3 vertices")
+        if len(v) > 2000:
+            raise ValueError("polygon must have 2000 vertices or fewer")
+        for point in v:
+            if len(point) != 2:
+                raise ValueError("each polygon vertex must be [lon, lat]")
+            lon, lat = point
+            if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+                raise ValueError("polygon vertex out of range")
+        return v
 
     @field_validator("start_date")
     @classmethod
@@ -66,8 +75,6 @@ class AnalyzeRequest(BaseModel):
 
 
 class OpticalRequest(BaseModel):
-    """POST /research/optical — Sentinel-2 true-color for a window."""
-
     bbox: List[float]
     start_date: str
     end_date: str
@@ -95,8 +102,6 @@ class OpticalRequest(BaseModel):
 
 
 class ReportRequest(BaseModel):
-    """POST /export/report — build a methodology report from a finished result."""
-
     analysis_type: str
     display_name: str
     bbox: List[float]
@@ -126,13 +131,11 @@ class ReportRequest(BaseModel):
 
 
 class TimeSeriesRequest(BaseModel):
-    """POST /research/timeseries — run an analysis across stepped time windows."""
-
     analysis_type: str
     bbox: List[float]
-    end_date: str              # most recent frame ends here; frames step backward
-    steps: int = 6             # number of frames
-    interval_days: int = 12    # Sentinel-1 revisit cadence; also each frame's window
+    end_date: str
+    steps: int = 6
+    interval_days: int = 12
 
     @field_validator("bbox")
     @classmethod
@@ -160,16 +163,11 @@ class TimeSeriesRequest(BaseModel):
 
 
 class AlertCheckRequest(BaseModel):
-    """
-    POST /alerts/check — has a new Sentinel-1 pass produced a fresh detection
-    for a watched area since we last looked? Drives "alert mode".
-    """
-
     analysis_type: str
     bbox: List[float]
-    since_date: Optional[str] = None   # latest data_date already seen/notified
-    end_date: Optional[str] = None     # window end; defaults to today (UTC)
-    lookback_days: int = 24            # ~2 Sentinel-1 revisit cycles
+    since_date: Optional[str] = None
+    end_date: Optional[str] = None
+    lookback_days: int = 24
 
     @field_validator("bbox")
     @classmethod
@@ -195,12 +193,10 @@ class AlertCheckRequest(BaseModel):
 
 
 class EventsRequest(BaseModel):
-    """POST /events/historical — past natural disasters near an area (NASA EONET)."""
-
     bbox: List[float]
-    days: int = 3650           # how far back to look (default ~10 years)
-    category: Optional[str] = None  # EONET category id (e.g. 'floods', 'wildfires')
-    status: str = "all"        # 'open' (active), 'closed', or 'all'
+    days: int = 3650
+    category: Optional[str] = None
+    status: str = "all"
 
     @field_validator("bbox")
     @classmethod
@@ -210,7 +206,7 @@ class EventsRequest(BaseModel):
     @field_validator("days")
     @classmethod
     def validate_days(cls, v):
-        if not (1 <= v <= 7300):  # cap at ~20 years
+        if not (1 <= v <= 7300):
             raise ValueError("days must be between 1 and 7300")
         return v
 
@@ -223,8 +219,6 @@ class EventsRequest(BaseModel):
 
 
 class ImpactRequest(BaseModel):
-    """POST /impact/population — people & buildings within a detection footprint."""
-
     analysis_type: str
     bbox: List[float]
     start_date: str
@@ -253,8 +247,6 @@ class ImpactRequest(BaseModel):
 
 
 class PopulationRequest(BaseModel):
-    """POST /research/population — a population-density context tile for a bbox."""
-
     bbox: List[float]
 
     @field_validator("bbox")
@@ -264,12 +256,6 @@ class PopulationRequest(BaseModel):
 
 
 class InterpretRequest(BaseModel):
-    """
-    POST /interpret and /interpret/context — turn a finished result into a
-    plain-language explanation (and optionally live regional context).
-    Carries the headline figures so the AI is grounded in real numbers.
-    """
-
     analysis_type: str
     bbox: List[float]
     start_date: str
@@ -300,9 +286,7 @@ class InterpretRequest(BaseModel):
 
 
 class ConversationTurn(BaseModel):
-    """One prior message in the chat thread, sent so the parser has context."""
-
-    role: str            # "user" or "kairos"
+    role: str
     content: str
 
     @field_validator("role")
@@ -314,19 +298,21 @@ class ConversationTurn(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    """POST /query — natural language input"""
-
     query: str
-    # Optional viewport context so "this area" resolves to what the user sees
     viewport_bbox: Optional[List[float]] = None
-    # Prior turns of the conversation so follow-ups ("now show fires there",
-    # "what about last year") resolve against earlier context. Most recent last.
     history: Optional[List[ConversationTurn]] = None
-    # Return the parsed parameters WITHOUT running the analysis. Used by the
-    # parser evaluation harness (scripts/paper_data/), where running a full
-    # GEE analysis per test query would cost an hour and real quota to measure
-    # something that happens entirely before the analysis starts.
     parse_only: bool = False
+    language: Optional[str] = None
+
+    @field_validator("language")
+    @classmethod
+    def validate_language(cls, v):
+        if v is None:
+            return v
+        v = v.strip()
+        if len(v) > 20:
+            raise ValueError("language must be a short BCP-47 tag")
+        return v or None
 
     @field_validator("query")
     @classmethod
@@ -340,20 +326,17 @@ class QueryRequest(BaseModel):
     @field_validator("history")
     @classmethod
     def cap_history(cls, v):
-        # Only the recent tail matters for follow-up resolution; keep it bounded.
         if v and len(v) > 12:
             return v[-12:]
         return v
 
 
 class SignalRequest(BaseModel):
-    """POST /research/signal — per-scene signal time series over an AOI."""
-
     bbox: List[float]
     start_date: str
     end_date: str
-    variable: str = "VV"        # VV | VH | NDVI | NDWI | NDSI
-    source: Optional[str] = None  # optical only: S2 (default) | HLS
+    variable: str = "VV"
+    source: Optional[str] = None
 
     @field_validator("bbox")
     @classmethod
@@ -378,8 +361,6 @@ class SignalRequest(BaseModel):
 
 
 class ComparisonSide(BaseModel):
-    """One side of an A/B analysis comparison."""
-
     label: str = ""
     bbox: List[float]
     start_date: str
@@ -392,16 +373,12 @@ class ComparisonSide(BaseModel):
 
 
 class CompareAnalysesRequest(BaseModel):
-    """POST /research/compare_analyses — same analysis, two sites or periods."""
-
     analysis_type: str
     a: ComparisonSide
     b: ComparisonSide
 
 
 class MyPlaceRequest(BaseModel):
-    """POST /myplace/locate — free-tier address lookup."""
-
     address: str
 
     @field_validator("address")
@@ -416,8 +393,6 @@ class MyPlaceRequest(BaseModel):
 
 
 class ForesightRequest(BaseModel):
-    """POST /foresight — hazard exposure outlook for one area."""
-
     hazard: str
     bbox: List[float]
 
@@ -436,8 +411,6 @@ class ForesightRequest(BaseModel):
 
 
 class ForesightAskRequest(BaseModel):
-    """POST /foresight/ask — a follow-up question about a computed outlook."""
-
     question: str
     hazard: str
     place_name: Optional[str] = None
@@ -470,25 +443,12 @@ class ForesightAskRequest(BaseModel):
 
 
 class SimulateRequest(BaseModel):
-    """
-    POST /simulate — run a forward simulation over an AOI.
-
-    Either `bbox` or `scene` must be given: a showcase scene carries its own
-    AOI and forcing, an explicit bbox is simulated with whatever `params`
-    supplies over the defaults.
-
-    `kind` selects the physics. The two forward models answer different
-    questions over the same terrain, and share this endpoint because
-    everything around the physics — queueing, provenance, the simulated-vs-
-    observed labelling, the payload envelope — is identical for both.
-    """
-
-    kind: str = "flood"                   # "flood" or "fire"
+    kind: str = "flood"
     bbox: Optional[List[float]] = None
     scene: Optional[str] = None
-    start_date: Optional[str] = None      # the date the event is labelled with
+    start_date: Optional[str] = None
     params: Optional[dict] = None
-    run_async: bool = True                # queue it; False forces inline
+    run_async: bool = True
 
     @field_validator("bbox")
     @classmethod
@@ -511,7 +471,114 @@ class SimulateRequest(BaseModel):
     def require_an_area(self):
         if not self.bbox and not self.scene:
             raise ValueError(
-                "Provide either a bbox to simulate or a showcase scene id "
-                "(GET /simulate/scenes lists them)."
+                "Provide either a bbox to simulate or a showcase scene id (GET /simulate/scenes lists them)."
             )
         return self
+
+
+class BriefingFinding(BaseModel):
+    analysis_type: str
+    display_name: str
+    headline_label: str
+    headline_value: float
+    headline_unit: str
+    data_date: str
+    start_date: str
+    end_date: str
+    confidence: float
+    summary: Optional[str] = None
+
+
+class BriefingRequest(BaseModel):
+    area_name: str
+    area_label: Optional[str] = None
+    area_km2: Optional[float] = None
+    prepared_for: Optional[str] = None
+    findings: List[BriefingFinding]
+
+    @field_validator("findings")
+    @classmethod
+    def cap_findings(cls, v):
+        if not v:
+            raise ValueError("a briefing needs at least one finding")
+        if len(v) > 8:
+            return v[:8]
+        return v
+
+    @field_validator("area_name")
+    @classmethod
+    def require_area(cls, v):
+        if not v or not v.strip():
+            raise ValueError("area_name must not be empty")
+        return v.strip()
+
+
+class AgentPlanRequest(BaseModel):
+    goal: str
+    viewport_bbox: Optional[List[float]] = None
+    history: Optional[List[ConversationTurn]] = None
+
+    @field_validator("goal")
+    @classmethod
+    def validate_goal(cls, v):
+        if not v or not v.strip():
+            raise ValueError("goal must not be empty")
+        if len(v) > 2000:
+            raise ValueError("goal must be under 2000 characters")
+        return v.strip()
+
+
+class AgentOutcome(BaseModel):
+    analysis_type: str
+    display_name: Optional[str] = None
+    location_name: Optional[str] = None
+    status: str
+    headline_label: Optional[str] = None
+    headline_value: Optional[float] = None
+    headline_unit: Optional[str] = None
+    data_date: Optional[str] = None
+    detail: Optional[str] = None
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v):
+        if v not in ("ok", "no_data", "failed"):
+            raise ValueError("status must be 'ok', 'no_data' or 'failed'")
+        return v
+
+
+class AgentReportRequest(BaseModel):
+    goal: str
+    plan_summary: Optional[str] = None
+    outcomes: List[AgentOutcome]
+
+    @field_validator("outcomes")
+    @classmethod
+    def cap_outcomes(cls, v):
+        if not v:
+            raise ValueError("a report needs at least one outcome")
+        if len(v) > 6:
+            return v[:6]
+        return v
+
+
+class ConfounderRequest(BaseModel):
+    analysis_type: str
+    bbox: List[float]
+    start_date: str
+    end_date: str
+
+    @field_validator("bbox")
+    @classmethod
+    def validate_bbox(cls, v):
+        return _validate_bbox_values(v)
+
+    @field_validator("start_date")
+    @classmethod
+    def validate_start(cls, v):
+        return _validate_date(v, "start_date")
+
+    @field_validator("end_date")
+    @classmethod
+    def validate_end(cls, v):
+        return _validate_date(v, "end_date")
