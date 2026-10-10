@@ -116,7 +116,7 @@ export default function About() {
             Earth Engine, or from our own flood and wildfire physics models. AI never produces a measurement.
           </p>
           <p>
-            A language model (Claude, through OpenRouter) turns typed or spoken questions into analysis
+            A language model (through OpenRouter) turns typed or spoken questions into analysis
             settings and writes the plain-language explanations of finished results. The Janus research mentor
             uses the same models to plan studies and call Kairos's tools. The analysis wizard, featured
             stories, simulations and every map tool work without it. Our README has the full disclosure of how
