@@ -168,7 +168,10 @@ export default function RightToolbar() {
 
   useEffect(() => {
     if (!panelRequest) return;
-    if (panelRequest in PANELS) setOpenPanel(panelRequest as PanelKey);
+    if (panelRequest === "close") {
+      setOpenPanel(null);
+      setSheet(null);
+    } else if (panelRequest in PANELS) setOpenPanel(panelRequest as PanelKey);
     clearPanelRequest();
   }, [panelRequest, clearPanelRequest]);
 
