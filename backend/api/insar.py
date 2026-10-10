@@ -6,9 +6,7 @@ from fastapi.responses import FileResponse
 
 router = APIRouter()
 
-DATA_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "data", "insar")
-)
+DATA_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "data", "insar"))
 
 SITES = [
     {
@@ -66,8 +64,6 @@ def _shape_site(site: dict) -> dict:
         "source_url": site["source_url"],
         "dates": meta.get("dates"),
         "frame": meta.get("frame"),
-        # The interferogram is the layer that actually demonstrates phase
-        # measurement; coherence is a supporting layer shown only when present.
         "available": layers.get("interferogram") is not None,
         "layers": layers,
     }

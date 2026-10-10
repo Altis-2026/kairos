@@ -1,8 +1,3 @@
-/**
- * The sidebar is a finite state machine. The state is always exactly one of
- * the six steps. Transitions are explicit functions — there is no way to
- * reach an ambiguous state.
- */
 import { create } from "zustand";
 import type { AnalysisResult, AnalysisType } from "../types/analysis";
 
@@ -71,8 +66,7 @@ export const useSidebarStore = create<SidebarState>((set) => ({
   openSidebar: () => set({ open: true }),
   closeSidebar: () => set({ open: false }),
   toggleSidebar: () => set((s) => ({ open: !s.open })),
-  selectTask: (task) =>
-    set({ selectedTask: task, step: "DEFINE_AOI", error: null }),
+  selectTask: (task) => set({ selectedTask: task, step: "DEFINE_AOI", error: null }),
   confirmAoi: () => set({ step: "CONFIGURE" }),
   confirmConfig: () => set({ step: "PREVIEW_SCENES" }),
   startRun: () => set({ step: "RUNNING", error: null, result: null }),

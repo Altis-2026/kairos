@@ -1,4 +1,3 @@
-/** The 6-step progress rail. Encodes real sequence — order carries meaning. */
 import { useSidebarStore, STEP_ORDER, type SidebarStep } from "../../stores/sidebarStore";
 
 const LABELS: Record<SidebarStep, string> = {
@@ -21,7 +20,7 @@ export default function StepIndicator() {
       {STEP_ORDER.map((s, i) => {
         const done = i < currentIdx;
         const active = i === currentIdx;
-        // Completed steps are revisitable (except while running)
+
         const clickable = done && step !== "RUNNING" && (i > 0 ? !!selectedTask : true);
         return (
           <li key={s} className="flex items-center gap-1">
@@ -32,15 +31,13 @@ export default function StepIndicator() {
                 active
                   ? "bg-raised text-teal ring-1 ring-teal/40"
                   : done
-                  ? "text-ink hover:text-teal"
-                  : "text-dim/60"
+                    ? "text-ink hover:text-teal"
+                    : "text-dim/60"
               } ${clickable ? "cursor-pointer" : "cursor-default"}`}
             >
               {LABELS[s]}
             </button>
-            {i < STEP_ORDER.length - 1 && (
-              <span className={`h-px w-2 ${done ? "bg-teal/50" : "bg-line"}`} />
-            )}
+            {i < STEP_ORDER.length - 1 && <span className={`h-px w-2 ${done ? "bg-teal/50" : "bg-line"}`} />}
           </li>
         );
       })}

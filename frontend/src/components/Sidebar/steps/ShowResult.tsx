@@ -1,4 +1,3 @@
-/** Step 6 — the result: headline, confidence, exports, next actions. */
 import { useState } from "react";
 import {
   Check,
@@ -9,35 +8,40 @@ import {
   GitCompareArrows,
   Loader2,
   RotateCcw,
+  ShieldQuestion,
 } from "lucide-react";
 import { useSidebarStore } from "../../../stores/sidebarStore";
-import {
-  downloadGeoTIFF,
-  downloadReport,
-  type ExportSource,
-} from "../../../lib/exporters";
+import { usePrefsStore } from "../../../stores/prefsStore";
+import { downloadGeoTIFF, downloadReport, type ExportSource } from "../../../lib/exporters";
 import { buildShareUrl } from "../../../lib/share";
 import { buildEmbedSnippet } from "../../../lib/embed";
+import { plainConfidence, plainSentence } from "../../../lib/plain";
+import { checkConfounders, type ConfounderReport } from "../../../api/trust";
 import ResultInsight from "../../Insight/ResultInsight";
+
+const CONCERN_COLORS: Record<string, string> = {
+  high: "text-amber",
+  some: "text-ink",
+  low: "text-teal",
+};
 
 export default function ShowResult() {
   const { result, reset, compareNewDates, selectedTask } = useSidebarStore();
+  const simpleMode = usePrefsStore((s) => s.simpleMode);
+  const toggleSimpleMode = usePrefsStore((s) => s.toggleSimpleMode);
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [exportErr, setExportErr] = useState<string | null>(null);
+  const [confounders, setConfounders] = useState<ConfounderReport | null>(null);
+  const [confounderBusy, setConfounderBusy] = useState(false);
+  const [confounderErr, setConfounderErr] = useState<string | null>(null);
 
   if (!result) {
-    return (
-      <p className="text-xs text-dim">
-        No result to show — run an analysis first.
-      </p>
-    );
+    return <p className="text-xs text-dim">No result to show. Run an analysis first.</p>;
   }
 
-  const vesselPoints = result.stats?.vessel_points as
-    | GeoJSON.FeatureCollection
-    | undefined;
+  const vesselPoints = result.stats?.vessel_points as GeoJSON.FeatureCollection | undefined;
 
   const exportSrc: ExportSource = {
     analysis_type: result.analysis_type,
@@ -110,30 +114,99 @@ export default function ShowResult() {
       });
   }
 
+  async function runConfounders() {
+    if (confounderBusy || !result) return;
+    setConfounderBusy(true);
+    setConfounderErr(null);
+    try {
+      setConfounders(
+        await checkConfounders(result.analysis_type, result.bbox, result.start_date, result.end_date)
+      );
+    } catch (e) {
+      setConfounderErr(e instanceof Error ? e.message : "The confounder check failed.");
+    } finally {
+      setConfounderBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl bg-bg/70 ring-1 ring-teal/30 p-4">
-        <div className="font-mono text-[10px] tracking-[0.18em] text-dim uppercase">
-          {result.headline_stat.label}
+        <div className="flex items-start justify-between gap-2">
+          <div className="font-mono text-[10px] tracking-[0.18em] text-dim uppercase">
+            {result.headline_stat.label}
+          </div>
+          <button
+            onClick={toggleSimpleMode}
+            aria-label="Switch between plain and technical readouts"
+            title="Switch between plain and technical readouts"
+            className="font-mono text-[9px] tracking-wide text-dim hover:text-teal transition-colors shrink-0"
+          >
+            {simpleMode ? "EXPERT VIEW" : "SIMPLE VIEW"}
+          </button>
         </div>
         <div className="mt-1 font-display text-4xl text-teal">
           {result.headline_stat.value.toLocaleString()}
-          <span className="ml-1.5 text-lg text-dim">
-            {result.headline_stat.unit}
-          </span>
+          <span className="ml-1.5 text-lg text-dim">{result.headline_stat.unit}</span>
         </div>
-        <div className="mt-2 font-mono text-[10px] text-dim">
-          Sentinel-1 · {result.data_date} · confidence{" "}
-          {Math.round(result.confidence * 100)}%
-        </div>
+        {simpleMode ? (
+          <>
+            <p className="mt-2 text-[12px] text-ink leading-relaxed">
+              {plainSentence(result.analysis_type, result.headline_stat.value, result.data_date)}
+            </p>
+            <p className="mt-1 text-[11px] text-dim leading-snug">
+              {plainConfidence(result.confidence)} Measured on {result.data_date}.
+            </p>
+          </>
+        ) : (
+          <div className="mt-2 font-mono text-[10px] text-dim">
+            Sentinel-1 · {result.data_date} · confidence {Math.round(result.confidence * 100)}%
+          </div>
+        )}
       </div>
 
-      {result.headline_stat.value === 0 && (
+      {result.headline_stat.value === 0 && !simpleMode && (
         <p className="text-[11px] text-dim leading-relaxed">
-          No change detected in this window. That can be the real answer — or
-          try different dates or a larger area.
+          No change detected in this window. That can be the real answer, or try different dates or a larger
+          area.
         </p>
       )}
+
+      <div className="space-y-2">
+        <button
+          onClick={runConfounders}
+          disabled={confounderBusy}
+          aria-label="Pull the real rainfall, wind and land-cover records to test innocent explanations"
+          title="Pull the real rainfall, wind and land-cover records to test innocent explanations"
+          className="w-full h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors disabled:opacity-50"
+        >
+          {confounderBusy ? <Loader2 size={13} className="animate-spin" /> : <ShieldQuestion size={13} />}
+          {confounderBusy ? "Checking rainfall, wind and land cover..." : "Test other explanations"}
+        </button>
+        {confounderErr && <p className="text-[10px] text-amber leading-snug">{confounderErr}</p>}
+        {confounders && (
+          <div className="rounded-xl bg-bg/70 ring-1 ring-line p-3 space-y-2">
+            <div className="font-mono text-[10px] tracking-[0.18em] uppercase">
+              <span className="text-dim">Alternative explanations: </span>
+              <span className={CONCERN_COLORS[confounders.overall_concern]}>
+                {confounders.overall_concern === "high"
+                  ? "plausible"
+                  : confounders.overall_concern === "some"
+                    ? "partial"
+                    : "unlikely"}
+              </span>
+            </div>
+            {confounders.findings.map((f, i) => (
+              <p key={i} className={`text-[11px] leading-snug ${CONCERN_COLORS[f.concern]}`}>
+                {f.finding}
+              </p>
+            ))}
+            <p className="text-[9px] text-dim/70 leading-snug">
+              Live data: CHIRPS rainfall, ERA5 wind, ESA WorldCover land cover for this exact area and window.
+            </p>
+          </div>
+        )}
+      </div>
 
       <ResultInsight
         input={{
@@ -152,40 +225,33 @@ export default function ShowResult() {
       />
 
       <div className="space-y-2">
-        <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
-          Export
-        </h3>
+        <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">Export</h3>
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => runExport("geotiff", () => downloadGeoTIFF(exportSrc))}
             disabled={busy === "geotiff"}
+            aria-label="Download the result raster as a GeoTIFF"
             title="Download the result raster as a GeoTIFF"
             className="h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors disabled:opacity-50"
           >
-            {busy === "geotiff" ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : (
-              <Download size={13} />
-            )}
+            {busy === "geotiff" ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
             GeoTIFF
           </button>
           <button
             onClick={() => runExport("report", () => downloadReport(exportSrc))}
             disabled={busy === "report"}
+            aria-label="Download a methodology report (markdown)"
             title="Download a methodology report (markdown)"
             className="h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors disabled:opacity-50"
           >
-            {busy === "report" ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : (
-              <FileText size={13} />
-            )}
+            {busy === "report" ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
             Report
           </button>
         </div>
         {vesselPoints && (
           <button
             onClick={downloadGeoJSON}
+            aria-label="Download detections as GeoJSON"
             title="Download detections as GeoJSON"
             className="w-full h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors"
           >
@@ -202,32 +268,24 @@ export default function ShowResult() {
           </button>
           <button
             onClick={copyEmbedCode}
+            aria-label="Copy an <iframe> snippet to embed this live result"
             title="Copy an <iframe> snippet to embed this live result"
             className="h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors"
           >
-            {embedCopied ? (
-              <Check size={13} className="text-teal" />
-            ) : (
-              <Code2 size={13} />
-            )}
+            {embedCopied ? <Check size={13} className="text-teal" /> : <Code2 size={13} />}
             {embedCopied ? "Copied" : "Embed code"}
           </button>
         </div>
-        {exportErr && (
-          <p className="text-[10px] text-amber leading-snug">{exportErr}</p>
-        )}
+        {exportErr && <p className="text-[10px] text-amber leading-snug">{exportErr}</p>}
       </div>
 
       <div className="space-y-2">
-        <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
-          Next
-        </h3>
+        <h3 className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">Next</h3>
         <button
           onClick={compareNewDates}
           className="w-full h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 ring-1 ring-line text-dim hover:text-ink transition-colors"
         >
-          <GitCompareArrows size={13} /> Compare different dates ·{" "}
-          {selectedTask?.display_name}
+          <GitCompareArrows size={13} /> Compare different dates · {selectedTask?.display_name}
         </button>
         <button
           onClick={reset}

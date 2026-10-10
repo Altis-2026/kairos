@@ -50,7 +50,6 @@ def parse_args():
 
 
 def to_epoch_ms(stamp: str) -> int:
-    # MarineCadastre uses "2023-01-15T00:00:02" in UTC.
     dt = datetime.strptime(stamp[:19], "%Y-%m-%dT%H:%M:%S").replace(
         tzinfo=timezone.utc
     )

@@ -9,10 +9,6 @@ from gee import common
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "ais")
 
-# Radar detections are matched to the AIS position nearest in time. Because a
-# ship keeps moving between its last broadcast and the radar pass, the match
-# radius grows with that time gap at 10 m/s, roughly 19 knots, which is faster
-# than most commercial traffic.
 BASE_RADIUS_M = 300
 DRIFT_SPEED_MS = 10.0
 MAX_RADIUS_M = 2000
@@ -39,9 +35,7 @@ def get_case(case_id: str) -> dict:
     for case in CASES:
         if case["id"] == case_id:
             return case
-    raise ValueError(
-        f"Unknown case '{case_id}'. Available: {[c['id'] for c in CASES]}"
-    )
+    raise ValueError(f"Unknown case '{case_id}'. Available: {[c['id'] for c in CASES]}")
 
 
 def ais_path(case_id: str) -> str:
@@ -73,21 +67,17 @@ def _haversine_m(lon1, lat1, lon2, lat2) -> float:
 
 
 def _radar_detections(case: dict, window_days: int = 2) -> dict:
-    """Run the production ship detector and keep the acquisition timestamp."""
     geometry = common.bbox_geometry(case["bbox"])
     target = ee.Date(case["target_date"])
     period = (
         common.s1_collection(geometry, polarization="VV")
-        .filterDate(
-            target.advance(-window_days, "day"), target.advance(window_days, "day")
-        )
+        .filterDate(target.advance(-window_days, "day"), target.advance(window_days, "day"))
         .sort("system:time_start", False)
     )
     count = period.size().getInfo()
     if count == 0:
         raise ValueError(
-            f"No Sentinel-1 acquisition within {window_days} days of "
-            f"{case['target_date']} over this area."
+            f"No Sentinel-1 acquisition within {window_days} days of {case['target_date']} over this area."
         )
 
     latest = ee.Image(period.first())
@@ -125,14 +115,11 @@ def _radar_detections(case: dict, window_days: int = 2) -> dict:
     return {
         "points": points,
         "epoch_ms": int(epoch_ms),
-        "tile_url": common.tile_url(
-            detections, {"palette": [common.AMBER], "min": 0, "max": 1}
-        ),
+        "tile_url": common.tile_url(detections, {"palette": [common.AMBER], "min": 0, "max": 1}),
     }
 
 
 def _nearest_in_time(records: list, epoch_ms: int) -> dict:
-    """One position per vessel: the broadcast closest to the radar pass."""
     best = {}
     for r in records:
         key = r.get("mmsi")
@@ -170,9 +157,7 @@ def screen_case(case_id: str) -> dict:
         best_vessel = None
         for vessel in broadcasts.values():
             gap_s = vessel["gap_ms"] / 1000.0
-            radius = min(
-                MAX_RADIUS_M, BASE_RADIUS_M + gap_s * DRIFT_SPEED_MS
-            )
+            radius = min(MAX_RADIUS_M, BASE_RADIUS_M + gap_s * DRIFT_SPEED_MS)
             dist = _haversine_m(lon, lat, vessel["lon"], vessel["lat"])
             if dist <= radius and (best_dist is None or dist < best_dist):
                 best_dist = dist
@@ -209,9 +194,6 @@ def screen_case(case_id: str) -> dict:
         "matched_count": len(matched_points),
         "unmatched_count": unmatched,
         "ais_vessels_in_window": len(broadcasts),
-        # Distinct transponders accounted for by at least one radar return.
-        # Differs from matched_count when two returns fall inside one vessel's
-        # match radius, and it is the numerator recall needs.
         "matched_vessel_count": len(matched_mmsi),
         "match_radius_m": {
             "base": BASE_RADIUS_M,
@@ -233,8 +215,7 @@ def screen_case(case_id: str) -> dict:
             "Fixed structures put permanent bright returns on the radar. This "
             "area has hundreds of oil and gas platforms, and each one reads as "
             "an unmatched detection.",
-            "Radar also picks up breaking waves and clutter, which inflates "
-            "the unmatched count.",
+            "Radar also picks up breaking waves and clutter, which inflates the unmatched count.",
             "AIS positions are broadcasts, not continuous tracks. Each "
             "detection is matched to the broadcast nearest in time, with the "
             "radius widened for how far the ship could have travelled.",

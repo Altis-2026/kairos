@@ -1,16 +1,3 @@
-"""
-POST /events/historical — past natural disasters near an area.
-
-Pulls from NASA's EONET (Earth Observatory Natural Event Tracker), a free public
-feed of wildfires, floods, storms, volcanoes and more going back several years.
-Rendered as context markers on the globe so an analyst can see, e.g., "this
-coastline has flooded repeatedly" alongside a fresh detection.
-
-Always degrades gracefully: if EONET is unreachable (network policy, outage),
-the endpoint returns an empty list with `available: false` and a note rather
-than failing — the rest of Kairos never depends on it.
-"""
-
 import httpx
 from fastapi import APIRouter
 
@@ -20,8 +7,6 @@ router = APIRouter()
 
 EONET_URL = "https://eonet.gsfc.nasa.gov/api/v3/events"
 
-# A small curated icon/colour hint per EONET category so the frontend can style
-# markers consistently with the rest of Kairos.
 _CATEGORY_COLOR = {
     "wildfires": "#E8541E",
     "floods": "#3BA7FF",
@@ -35,7 +20,6 @@ _CATEGORY_COLOR = {
 
 
 def _representative_point(geometry: list):
-    """Pick one [lon, lat] to mark from an EONET geometry list (latest entry)."""
     if not geometry:
         return None, None
     latest = geometry[-1]
@@ -46,7 +30,6 @@ def _representative_point(geometry: list):
     try:
         if gtype == "point":
             return float(coords[0]), float(coords[1])
-        # Polygon: coordinates[0] is the outer ring — use its centroid.
         ring = coords[0]
         lons = [float(p[0]) for p in ring]
         lats = [float(p[1]) for p in ring]
@@ -87,9 +70,7 @@ def _transform(events: list) -> list:
 
 @router.post("/events/historical")
 def historical_events(req: EventsRequest):
-    """Historical natural events (markers) inside the bbox, newest first."""
     min_lon, min_lat, max_lon, max_lat = req.bbox
-    # EONET bbox order is upper-left lon,lat then lower-right lon,lat.
     eonet_bbox = f"{min_lon},{max_lat},{max_lon},{min_lat}"
     params = {
         "bbox": eonet_bbox,
@@ -118,7 +99,6 @@ def historical_events(req: EventsRequest):
         }
 
     events = _transform(payload.get("events", []))
-    # Newest first.
     events.sort(key=lambda e: e["date"], reverse=True)
     return {
         "available": True,

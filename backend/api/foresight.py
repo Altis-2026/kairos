@@ -1,21 +1,15 @@
-"""
-POST /foresight       — hazard exposure outlook for one place
-POST /foresight/ask   — plain-language follow-up about that outlook
-"""
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 import foresight_answers
 from models.requests import ForesightAskRequest, ForesightRequest
+from ratelimit import limit_ai, limit_compute
 
 router = APIRouter()
 
-# Outlooks reduce decades of imagery over the AOI, so a continent-sized box
-# would time out rather than fail cleanly. Cap it at roughly county scale.
 MAX_SPAN_DEG = 3.0
 
 
-@router.post("/foresight")
+@router.post("/foresight", dependencies=[Depends(limit_compute)])
 def run_foresight(request: ForesightRequest):
     from gee.risk import RISK_FUNCTIONS
 
@@ -38,7 +32,7 @@ def run_foresight(request: ForesightRequest):
         raise HTTPException(status_code=500, detail=f"Risk outlook failed: {e}")
 
 
-@router.post("/foresight/ask")
+@router.post("/foresight/ask", dependencies=[Depends(limit_ai)])
 def ask_foresight(request: ForesightAskRequest):
     ctx = request.model_dump()
     try:
@@ -46,6 +40,4 @@ def ask_foresight(request: ForesightAskRequest):
 
         return {"answer": answer_foresight_question(ctx), "source": "ai"}
     except Exception:
-        # The outlook's own numbers are enough to answer the common questions,
-        # so a missing key or an exhausted quota degrades instead of failing.
         return {"answer": foresight_answers.fallback_answer(ctx), "source": "data"}

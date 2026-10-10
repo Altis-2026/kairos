@@ -1,8 +1,5 @@
-/**
- * Global map state. The Globe component is a pure renderer of this store:
- * it never owns state itself, so any component can drive the map.
- */
 import { create } from "zustand";
+import { polygonBBox } from "../lib/geo";
 import type {
   BaseStyle,
   BBox,
@@ -19,7 +16,7 @@ import type {
 interface FlyToTarget {
   center: [number, number];
   zoom: number;
-  ts: number; // changes on every request so Globe's effect re-fires
+  ts: number;
 }
 
 interface MapState {
@@ -28,6 +25,7 @@ interface MapState {
   pointLayers: PointLayer[];
   imageLayers: ImageLayer[];
   aoi: BBox | null;
+  aoiPolygon: [number, number][] | null;
   drawMode: DrawMode;
   flyTo: FlyToTarget | null;
   baseStyle: BaseStyle;
@@ -35,12 +33,9 @@ interface MapState {
   quickAnalysisOpen: boolean;
   viewportBbox: BBox | null;
 
-  // Interactive tutorial overlay + a one-shot request to open a toolbar panel
-  // (used by the tutorial's "Try it" buttons, which live outside the toolbar).
   tutorialOpen: boolean;
   panelRequest: string | null;
 
-  // Research tools operate on the most recent analysis result.
   lastResult: ResultRef | null;
   compare: CompareControl | null;
   timeline: TimelineControl | null;
@@ -58,6 +53,7 @@ interface MapState {
   setLayerVisible: (id: string, visible: boolean) => void;
   clearLayers: () => void;
   setAoi: (bbox: BBox | null) => void;
+  setAoiPolygon: (ring: [number, number][]) => void;
   setDrawMode: (mode: DrawMode) => void;
   requestFlyTo: (center: [number, number], zoom: number) => void;
   setBaseStyle: (s: BaseStyle) => void;
@@ -79,6 +75,7 @@ export const useMapStore = create<MapState>((set) => ({
   pointLayers: [],
   imageLayers: [],
   aoi: null,
+  aoiPolygon: null,
   drawMode: null,
   flyTo: null,
   baseStyle: "satellite",
@@ -112,39 +109,29 @@ export const useMapStore = create<MapState>((set) => ({
       pointLayers: s.pointLayers.filter((l) => l.id !== id),
       imageLayers: s.imageLayers.filter((l) => l.id !== id),
     })),
-  clearGroup: (group) =>
-    set((s) => ({ layers: s.layers.filter((l) => l.group !== group) })),
+  clearGroup: (group) => set((s) => ({ layers: s.layers.filter((l) => l.group !== group) })),
   setLayerOpacity: (id, opacity) =>
     set((s) => ({
       layers: s.layers.map((l) => (l.id === id ? { ...l, opacity } : l)),
+      imageLayers: s.imageLayers.map((l) => (l.id === id ? { ...l, opacity } : l)),
     })),
   toggleLayerVisible: (id) =>
     set((s) => ({
-      layers: s.layers.map((l) =>
-        l.id === id ? { ...l, visible: !l.visible } : l
-      ),
-      pointLayers: s.pointLayers.map((l) =>
-        l.id === id ? { ...l, visible: !l.visible } : l
-      ),
-      imageLayers: s.imageLayers.map((l) =>
-        l.id === id ? { ...l, visible: !l.visible } : l
-      ),
+      layers: s.layers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l)),
+      pointLayers: s.pointLayers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l)),
+      imageLayers: s.imageLayers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l)),
     })),
   setLayerVisible: (id, visible) =>
     set((s) => ({
       layers: s.layers.map((l) => (l.id === id ? { ...l, visible } : l)),
-      pointLayers: s.pointLayers.map((l) =>
-        l.id === id ? { ...l, visible } : l
-      ),
-      imageLayers: s.imageLayers.map((l) =>
-        l.id === id ? { ...l, visible } : l
-      ),
+      pointLayers: s.pointLayers.map((l) => (l.id === id ? { ...l, visible } : l)),
+      imageLayers: s.imageLayers.map((l) => (l.id === id ? { ...l, visible } : l)),
     })),
   clearLayers: () => set({ layers: [], pointLayers: [], imageLayers: [] }),
-  setAoi: (aoi) => set({ aoi }),
+  setAoi: (aoi) => set({ aoi, aoiPolygon: null }),
+  setAoiPolygon: (ring) => set({ aoiPolygon: ring, aoi: polygonBBox(ring) }),
   setDrawMode: (drawMode) => set({ drawMode }),
-  requestFlyTo: (center, zoom) =>
-    set({ flyTo: { center, zoom, ts: Date.now() } }),
+  requestFlyTo: (center, zoom) => set({ flyTo: { center, zoom, ts: Date.now() } }),
   setBaseStyle: (baseStyle) => set({ baseStyle }),
   setProjection: (projection) => set({ projection }),
   toggleProjection: () =>
@@ -155,8 +142,7 @@ export const useMapStore = create<MapState>((set) => ({
   setTutorialOpen: (tutorialOpen) => set({ tutorialOpen }),
   requestPanel: (panelRequest) => set({ panelRequest }),
   clearPanelRequest: () => set({ panelRequest: null }),
-  // A new result invalidates the research overlays tied to the old one
-  // (compare/timeline frames + the backscatter/optical reference tiles).
+
   setLastResult: (lastResult) =>
     set((s) => ({
       lastResult,
@@ -176,13 +162,9 @@ export const useMapStore = create<MapState>((set) => ({
   setTimelineIndex: (timelineIndex) => set({ timelineIndex }),
 }));
 
-/** Center + sensible zoom for a bbox — used after analyses complete. */
 export function bboxCenterZoom(bbox: BBox): { center: [number, number]; zoom: number } {
   const [minLon, minLat, maxLon, maxLat] = bbox;
-  const center: [number, number] = [
-    (minLon + maxLon) / 2,
-    (minLat + maxLat) / 2,
-  ];
+  const center: [number, number] = [(minLon + maxLon) / 2, (minLat + maxLat) / 2];
   const span = Math.max(maxLon - minLon, maxLat - minLat);
   const zoom = span > 8 ? 4.5 : span > 4 ? 5.5 : span > 2 ? 6.5 : span > 1 ? 7.5 : 8.5;
   return { center, zoom };

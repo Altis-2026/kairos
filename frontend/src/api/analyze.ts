@@ -7,6 +7,7 @@ export interface AnalyzeParams {
   bbox: BBox;
   start_date: string;
   end_date: string;
+  polygon?: [number, number][] | null;
 }
 
 export function runAnalyze(params: AnalyzeParams): Promise<AnalysisResult> {

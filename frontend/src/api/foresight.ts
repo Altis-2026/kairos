@@ -49,11 +49,7 @@ export interface AskAnswer {
   source: "ai" | "data";
 }
 
-export function askForesight(
-  question: string,
-  outlook: RiskOutlook,
-  placeName: string
-): Promise<AskAnswer> {
+export function askForesight(question: string, outlook: RiskOutlook, placeName: string): Promise<AskAnswer> {
   return apiFetch<AskAnswer>("/foresight/ask", {
     method: "POST",
     body: JSON.stringify({
