@@ -1,21 +1,3 @@
-"""
-Janus's SAR knowledge base — grounding, not fine-tuning.
-
-A model can't be retrained inside this codebase, and parametric memory of
-SAR physics is exactly the kind of thing that drifts subtly wrong. So instead
-Janus is grounded: every concept below is a hand-written, technically
-reviewed primer that cites the real public program that is authoritative for
-it (NASA ARSET, the Alaska Satellite Facility, ESA/Copernicus, UN-SPIDER,
-NASA/ISRO NISAR, NASA Earthdata, USGS). The mentor retrieves these via the
-explain_concept tool and is instructed to answer core SAR physics FROM this
-base rather than freehand, the same discipline search_literature enforces
-for citations.
-
-Every `resources` URL below is a real, stable top-level program page (not a
-deep link liable to rot) so the mentor can point a student at primary
-material instead of a fabricated citation.
-"""
-
 CONCEPTS = {
     "backscatter": {
         "title": "Radar backscatter",
@@ -32,8 +14,14 @@ CONCEPTS = {
             "directions, including back to the sensor, reading bright."
         ),
         "resources": [
-            {"name": "NASA ARSET: SAR fundamentals training", "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset"},
-            {"name": "ASF: What is SAR?", "url": "https://asf.alaska.edu/information/sar-information/what-is-sar/"},
+            {
+                "name": "NASA ARSET: SAR fundamentals training",
+                "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset",
+            },
+            {
+                "name": "ASF: What is SAR?",
+                "url": "https://asf.alaska.edu/information/sar-information/what-is-sar/",
+            },
         ],
     },
     "polarization": {
@@ -54,7 +42,10 @@ CONCEPTS = {
         ),
         "resources": [
             {"name": "ESA/Copernicus Sentinel Online", "url": "https://sentinels.copernicus.eu/"},
-            {"name": "NASA ARSET: SAR fundamentals training", "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset"},
+            {
+                "name": "NASA ARSET: SAR fundamentals training",
+                "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset",
+            },
         ],
     },
     "scattering-mechanisms": {
@@ -75,7 +66,10 @@ CONCEPTS = {
             "VV."
         ),
         "resources": [
-            {"name": "NASA ARSET: SAR fundamentals training", "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset"},
+            {
+                "name": "NASA ARSET: SAR fundamentals training",
+                "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset",
+            },
             {"name": "UN-SPIDER Knowledge Portal", "url": "https://www.un-spider.org/"},
         ],
     },
@@ -97,7 +91,10 @@ CONCEPTS = {
             "beginner's mistake; speckle is exactly why."
         ),
         "resources": [
-            {"name": "ASF: What is SAR?", "url": "https://asf.alaska.edu/information/sar-information/what-is-sar/"},
+            {
+                "name": "ASF: What is SAR?",
+                "url": "https://asf.alaska.edu/information/sar-information/what-is-sar/",
+            },
             {"name": "UN-SPIDER Knowledge Portal", "url": "https://www.un-spider.org/"},
         ],
     },
@@ -120,7 +117,10 @@ CONCEPTS = {
         ),
         "resources": [
             {"name": "NASA/ISRO NISAR mission", "url": "https://nisar.jpl.nasa.gov/"},
-            {"name": "ASF: What is SAR?", "url": "https://asf.alaska.edu/information/sar-information/what-is-sar/"},
+            {
+                "name": "ASF: What is SAR?",
+                "url": "https://asf.alaska.edu/information/sar-information/what-is-sar/",
+            },
         ],
     },
     "revisit-and-modes": {
@@ -162,7 +162,10 @@ CONCEPTS = {
         ),
         "resources": [
             {"name": "UN-SPIDER Knowledge Portal", "url": "https://www.un-spider.org/"},
-            {"name": "NASA ARSET: SAR fundamentals training", "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset"},
+            {
+                "name": "NASA ARSET: SAR fundamentals training",
+                "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset",
+            },
         ],
     },
     "optical-vs-radar": {
@@ -190,28 +193,34 @@ CONCEPTS = {
         "explanation": (
             "SAR measures distance, not angle, so terrain distorts the image "
             "in ways optical users don't expect. Foreshortening: slopes "
-            "facing the sensor are compressed and read unnaturally bright — "
+            "facing the sensor are compressed and read unnaturally bright, "
             "a mountainside can shrink to a bright sliver. Layover: when a "
             "slope is steeper than the radar's incidence angle, the mountain "
             "TOP is closer to the satellite than its base, so the peak is "
-            "imaged on the wrong side — the mountain folds over itself. "
+            "imaged on the wrong side. The mountain folds over itself. "
             "Shadow: behind steep terrain the radar simply cannot see, and "
-            "those pixels contain no data at all (not 'dark ground' — "
+            "those pixels contain no data at all (not 'dark ground', "
             "nothing). Any detection inside layover or shadow zones is "
             "unreliable, which is why mountainous AOIs deserve extra "
             "scepticism and why ascending vs descending orbit passes see "
             "different sides of the same ridge."
         ),
         "resources": [
-            {"name": "ASF: SAR image distortions", "url": "https://asf.alaska.edu/information/sar-information/what-is-sar/"},
-            {"name": "NASA ARSET: SAR fundamentals training", "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset"},
+            {
+                "name": "ASF: SAR image distortions",
+                "url": "https://asf.alaska.edu/information/sar-information/what-is-sar/",
+            },
+            {
+                "name": "NASA ARSET: SAR fundamentals training",
+                "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset",
+            },
         ],
     },
     "incidence-angle": {
         "title": "Incidence angle",
         "explanation": (
             "The angle between the radar beam and the vertical at the ground "
-            "— roughly 30-46 degrees across a Sentinel-1 IW swath. The same "
+            "- roughly 30-46 degrees across a Sentinel-1 IW swath. The same "
             "field can read several dB brighter at the near edge of the "
             "swath than the far edge, purely from geometry. This matters "
             "whenever you compare scenes: two passes with different "
@@ -222,7 +231,10 @@ CONCEPTS = {
             "relative orbit is the rigorous fix when precision matters."
         ),
         "resources": [
-            {"name": "ESA Sentinel-1 acquisition modes", "url": "https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-1-sar/acquisition-modes"},
+            {
+                "name": "ESA Sentinel-1 acquisition modes",
+                "url": "https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-1-sar/acquisition-modes",
+            },
         ],
     },
     "coherence-vs-amplitude": {
@@ -230,19 +242,22 @@ CONCEPTS = {
         "explanation": (
             "Amplitude is how much energy comes back; coherence is whether "
             "the PHASE relationship between two passes stays stable. "
-            "Coherence-based change detection is exquisitely sensitive — a "
+            "Coherence-based change detection is exquisitely sensitive, a "
             "field being ploughed or a building collapsing destroys phase "
             "stability before the amplitude changes much. But coherence "
             "requires SLC (single-look complex) products that keep the phase, "
             "and interferometric processing. The free Sentinel-1 archive in "
-            "Earth Engine is GRD — amplitude only, phase discarded — so "
+            "Earth Engine is GRD, amplitude only, phase discarded. So "
             "Kairos's detections are amplitude-based, and honest about it. "
             "True coherence/InSAR (millimetre deformation, earthquake "
-            "damage proxies) needs SLC processing infrastructure — it is on "
+            "damage proxies) needs SLC processing infrastructure. It is on "
             "the Kairos roadmap as exactly that."
         ),
         "resources": [
-            {"name": "ASF: InSAR introduction", "url": "https://asf.alaska.edu/information/sar-information/what-is-insar/"},
+            {
+                "name": "ASF: InSAR introduction",
+                "url": "https://asf.alaska.edu/information/sar-information/what-is-insar/",
+            },
             {"name": "ESA InSAR principles", "url": "https://www.esa.int/Applications/Observing_the_Earth/"},
         ],
     },
@@ -252,7 +267,7 @@ CONCEPTS = {
             "Penetration scales with wavelength. C-band (~5.5 cm, Sentinel-1) "
             "interacts with leaves and the upper canopy; L-band (~24 cm, "
             "ALOS PALSAR, NISAR) passes through foliage to trunks and ground, "
-            "and in hyper-arid sand can reach metres below the surface — "
+            "and in hyper-arid sand can reach metres below the surface, "
             "SIR-A famously imaged buried paleochannels under the Sahara in "
             "1982, and L-band archaeology has mapped features invisible on "
             "the ground since. The catch: penetration in soil requires "
@@ -272,8 +287,8 @@ CONCEPTS = {
         "explanation": (
             "A 10 m Sentinel-1 pixel covers 100 m². A detection smaller than "
             "a few pixels is indistinguishable from speckle, which is why "
-            "honest SAR mapping states a minimum mapping unit — the smallest "
-            "feature the method can reliably claim — typically several times "
+            "honest SAR mapping states a minimum mapping unit. The smallest "
+            "feature the method can reliably claim, typically several times "
             "the pixel area after speckle filtering. Mixed pixels (half "
             "water, half field) return intermediate values that threshold "
             "methods assign arbitrarily, so area estimates carry an inherent "
@@ -283,7 +298,10 @@ CONCEPTS = {
             "nearest 0.01 km² from 10 m pixels is the classic mistake."
         ),
         "resources": [
-            {"name": "NASA ARSET: SAR for land applications", "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset"},
+            {
+                "name": "NASA ARSET: SAR for land applications",
+                "url": "https://appliedsciences.nasa.gov/what-we-do/capacity-building/arset",
+            },
         ],
     },
 }

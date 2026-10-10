@@ -1,13 +1,3 @@
-"""
-Citation formatting for the project bibliography.
-
-Turns the saved references into a formatted, paste-ready reference list in a
-chosen style. Deterministic string formatting from the fields already stored
-(authors, year, title, venue, url) — no model call, so it is fast and cannot
-drift. Styles cover the ones Earth-observation students actually submit in:
-APA 7, AGU (the American Geophysical Union house style), and IEEE.
-"""
-
 from janus import store
 
 STYLES = ("apa", "agu", "ieee")
@@ -30,7 +20,6 @@ def _apa(ref: dict) -> str:
 
 
 def _agu(ref: dict) -> str:
-    # AGU: Authors (Year), Title, Venue, doi.
     authors = _authors_list(ref.get("authors") or "")
     who = ", ".join(authors) if authors else "Unknown author"
     year = f"({ref['year']})," if ref.get("year") else "(n.d.),"
@@ -41,7 +30,6 @@ def _agu(ref: dict) -> str:
 
 
 def _ieee(ref: dict, n: int) -> str:
-    # IEEE: [n] A. Author, "Title," Venue, year.
     authors = _authors_list(ref.get("authors") or "")
     who = ", ".join(authors) if authors else "Unknown author"
     title = f'"{ref["title"]},"'
@@ -52,7 +40,6 @@ def _ieee(ref: dict, n: int) -> str:
 
 
 def format_bibliography(project_id: int, style: str = "apa") -> dict:
-    """Return the project's references formatted in the requested style."""
     style = style.lower()
     if style not in STYLES:
         style = "apa"

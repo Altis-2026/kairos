@@ -1,23 +1,3 @@
-"""
-Wildfire Burn Scar Mapping.
-
-Method (per the Kairos spec):
-Fire removes vegetation and exposes bare rough soil, which INCREASES
-VH backscatter relative to the pre-fire state. We compare the post-fire
-period to a pre-fire baseline and flag pixels with a significant VH rise.
-Works through smoke that blinds optical satellites.
-
-Rigour upgrades layered on the core method:
-- Speckle suppression: 50 m focal median despeckle on both multi-looked
-  composites before differencing.
-- Uncertainty: re-run at +2/+2.5/+3 dB, report the area spread, and dock
-  confidence for threshold-fragile results.
-- Optical fusion: when cloud-free Sentinel-2 exists both pre- and post-fire,
-  the SAR scar is checked against dNBR and agreement adjusts confidence.
-
-Data source: Sentinel-1 GRD, IW mode, VH polarization.
-"""
-
 from gee import common, fusion
 
 _THRESHOLDS = [2.0, 2.5, 3.0]
@@ -28,9 +8,7 @@ def detect_burn_scar(bbox: list, start_date: str, end_date: str) -> dict:
     s1 = common.s1_collection(geometry, polarization="VH")
 
     post = s1.filterDate(start_date, end_date)
-    post_count = common.require_images(
-        post, f"this area between {start_date} and {end_date}"
-    )
+    post_count = common.require_images(post, f"this area between {start_date} and {end_date}")
 
     pre_start, pre_end = common.baseline_window(start_date, days=60)
     pre = s1.filterDate(pre_start, pre_end)
@@ -38,10 +16,8 @@ def detect_burn_scar(bbox: list, start_date: str, end_date: str) -> dict:
 
     diff = common.despeckle(post.mean()).subtract(common.despeckle(pre.mean()))
 
-    # Burned areas: VH backscatter rise of more than 2.5 dB
     burn_mask = diff.gt(2.5)
 
-    # Exclude water (low backscatter, irrelevant for fire)
     permanent = common.permanent_water_mask(50)
     burn = burn_mask.where(permanent, 0).selfMask().clip(geometry)
 
@@ -64,9 +40,7 @@ def detect_burn_scar(bbox: list, start_date: str, end_date: str) -> dict:
 
     optical = {}
     try:
-        optical = fusion.confirm_burn(
-            burn, geometry, start_date, end_date, pre_start, pre_end
-        )
+        optical = fusion.confirm_burn(burn, geometry, start_date, end_date, pre_start, pre_end)
         confidence += fusion.confidence_adjustment(
             optical.get("optical_agreement_pct"),
             optical.get("optical_coverage_pct", 0),

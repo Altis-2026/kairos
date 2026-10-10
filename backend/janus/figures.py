@@ -1,20 +1,3 @@
-"""
-Publication figures from a project's real analysis results (docs/JANUS.md v5).
-
-Turns the stored analysis runs into crisp, paper-ready figures instead of just
-tile URLs: a results chart of every headline metric, a study-area map (the AOI
-geometry drawn to scale with a global locator), and a ground-truth validation
-chart. Everything is emitted as standalone SVG — vector, so it stays sharp at
-any size, imports cleanly into Google Docs and HTML, and drops into LaTeX /
-Overleaf via `\\usepackage{svg}` + `\\includesvg`. Pure string building, no
-plotting dependency, so it behaves identically in local dev and on Cloud Run.
-
-Every figure is drawn only from stored tool events, so a figure can never show
-a run that did not happen. Figures use a white background and the Kairos accent
-palette (teal for data, amber for the study area) so they sit correctly on a
-printed page rather than the dark app.
-"""
-
 from __future__ import annotations
 
 import html
@@ -24,7 +7,6 @@ from datetime import date
 
 from janus import store
 
-# Kairos palette, tuned for a white page rather than the dark app.
 INK = "#0B120E"
 DIM = "#5B6B5D"
 GRID = "#D7DED8"
@@ -33,17 +15,11 @@ TEAL_DK = "#049482"
 AMBER = "#E8A318"
 PAPER = "#FFFFFF"
 
-FONT = (
-    "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', "
-    "Arial, sans-serif"
-)
+FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
 
 FIGURE_KINDS = ("results", "study_area", "validation")
 
 
-# --------------------------------------------------------------------------- #
-# Data collection — numeric, straight from stored runs.
-# --------------------------------------------------------------------------- #
 def _num(value) -> float | None:
     try:
         if value is None or value == "":
@@ -54,7 +30,6 @@ def _num(value) -> float | None:
 
 
 def collect_runs(project_id: int) -> list[dict]:
-    """Every run_analysis event, with numeric headline value + uncertainty."""
     runs = []
     for msg in store.get_messages(project_id):
         for ev in msg.get("tool_events") or []:
@@ -83,9 +58,7 @@ def collect_validations(project_id: int) -> list[dict]:
     vals = []
     for msg in store.get_messages(project_id):
         for ev in msg.get("tool_events") or []:
-            if ev.get("tool") != "run_ground_truth_validation" or not ev.get(
-                "validation"
-            ):
+            if ev.get("tool") != "run_ground_truth_validation" or not ev.get("validation"):
                 continue
             v = ev["validation"]
             m = v.get("metrics") or {}
@@ -102,7 +75,6 @@ def collect_validations(project_id: int) -> list[dict]:
 
 
 def available_figures(project_id: int) -> list[str]:
-    """Which figure kinds have data to render for this project."""
     kinds = []
     runs = collect_runs(project_id)
     if any(r["value"] is not None for r in runs):
@@ -114,9 +86,6 @@ def available_figures(project_id: int) -> list[str]:
     return kinds
 
 
-# --------------------------------------------------------------------------- #
-# SVG helpers.
-# --------------------------------------------------------------------------- #
 def _esc(s) -> str:
     return html.escape(str(s), quote=True)
 
@@ -139,7 +108,6 @@ def _text(x, y, s, size=13, fill=INK, weight="normal", anchor="start", rotate=No
 
 
 def _nice_ticks(max_value: float, count: int = 5) -> list[float]:
-    """A small set (~count) of round-number gridline values covering 0..max."""
     if max_value <= 0:
         return [0, 1]
     rough = max_value / count
@@ -163,9 +131,6 @@ def _fmt(v: float) -> str:
     return f"{v:.3f}".rstrip("0").rstrip(".")
 
 
-# --------------------------------------------------------------------------- #
-# Results figure — horizontal bars of every headline metric.
-# --------------------------------------------------------------------------- #
 def results_figure_svg(project_id: int) -> str:
     project = store.get_project(project_id)
     runs = [r for r in collect_runs(project_id) if r["value"] is not None]
@@ -180,7 +145,7 @@ def results_figure_svg(project_id: int) -> str:
         _text(
             48,
             70,
-            "Headline analysis results — Kairos + Janus",
+            "Headline analysis results, Kairos + Janus",
             13,
             DIM,
         )
@@ -191,10 +156,6 @@ def results_figure_svg(project_id: int) -> str:
         out.append("</svg>")
         return "\n".join(out)
 
-    # Different analyses report different units (km², t/ha, ppb…). Putting them
-    # on one shared axis would be dishonest, so bars are scaled WITHIN each unit
-    # and a shared axis with tick numbers is only drawn when every run shares a
-    # single unit (then the comparison is real).
     units = [r["unit"] for r in runs]
     single_unit = len(set(units)) == 1
     unit_max = {}
@@ -203,7 +164,6 @@ def results_figure_svg(project_id: int) -> str:
     for u in unit_max:
         unit_max[u] = unit_max[u] or 1.0
 
-    # Leave the right third for the value + confidence labels.
     plot_w = (W - pad_l - pad_r) * 0.72
     bottom = pad_t + len(runs) * (row_h + gap)
 
@@ -222,16 +182,13 @@ def results_figure_svg(project_id: int) -> str:
                 f'stroke="{GRID}" stroke-width="1"/>'
             )
             out.append(_text(x, bottom + 22, _fmt(t), 12, DIM, anchor="middle"))
-        out.append(
-            _text(pad_l + plot_w / 2, H - 18, units[0], 12, DIM, anchor="middle")
-        )
+        out.append(_text(pad_l + plot_w / 2, H - 18, units[0], 12, DIM, anchor="middle"))
     else:
         out.append(
             _text(
                 pad_l,
                 H - 18,
-                "Bars scaled within each metric — compare the printed values, "
-                "not bar lengths, across rows.",
+                "Bars scaled within each metric, compare the printed values, not bar lengths, across rows.",
                 11,
                 DIM,
             )
@@ -245,13 +202,11 @@ def results_figure_svg(project_id: int) -> str:
             name = name[:29] + "…"
         out.append(_text(pad_l - 16, cy - 2, name, 14, INK, "600", "end"))
         out.append(_text(pad_l - 16, cy + 15, r["label"], 11, DIM, anchor="end"))
-        # Bar.
         bar_end = pad_l + frac(r, r["value"]) * plot_w
         out.append(
             f'<rect x="{pad_l}" y="{y + 8}" width="{max(bar_end - pad_l, 1):.1f}" '
             f'height="{row_h - 16}" rx="4" fill="{TEAL}"/>'
         )
-        # Uncertainty whisker (same unit scale).
         right_edge = bar_end
         if r["low"] is not None and r["high"] is not None and r["high"] > r["low"]:
             x1 = pad_l + frac(r, r["low"]) * plot_w
@@ -259,38 +214,30 @@ def results_figure_svg(project_id: int) -> str:
             right_edge = max(right_edge, x2)
             wy = y + row_h / 2
             out.append(
-                f'<line x1="{x1:.1f}" y1="{wy}" x2="{x2:.1f}" y2="{wy}" '
-                f'stroke="{TEAL_DK}" stroke-width="2"/>'
+                f'<line x1="{x1:.1f}" y1="{wy}" x2="{x2:.1f}" y2="{wy}" stroke="{TEAL_DK}" stroke-width="2"/>'
             )
             for xx in (x1, x2):
                 out.append(
                     f'<line x1="{xx:.1f}" y1="{wy - 6}" x2="{xx:.1f}" '
                     f'y2="{wy + 6}" stroke="{TEAL_DK}" stroke-width="2"/>'
                 )
-        # Value + confidence, always clear of the bar and whisker.
         vx = right_edge + 12
-        out.append(
-            _text(vx, cy + 5, f'{_fmt(r["value"])} {r["unit"]}'.strip(), 13, INK, "700")
-        )
+        out.append(_text(vx, cy + 5, f"{_fmt(r['value'])} {r['unit']}".strip(), 13, INK, "700"))
         if r["confidence"] is not None:
             conf = (
-                f'confidence {int(round(r["confidence"] * 100))}%'
+                f"confidence {int(round(r['confidence'] * 100))}%"
                 if r["confidence"] <= 1
-                else f'confidence {_fmt(r["confidence"])}'
+                else f"confidence {_fmt(r['confidence'])}"
             )
             out.append(_text(vx, cy + 21, conf, 10, DIM))
 
     out.append(
-        f'<line x1="{pad_l}" y1="{pad_t - 10}" x2="{pad_l}" y2="{bottom}" '
-        f'stroke="{INK}" stroke-width="1.5"/>'
+        f'<line x1="{pad_l}" y1="{pad_t - 10}" x2="{pad_l}" y2="{bottom}" stroke="{INK}" stroke-width="1.5"/>'
     )
     out.append("</svg>")
     return "\n".join(out)
 
 
-# --------------------------------------------------------------------------- #
-# Study-area figure — the AOI bbox drawn to scale + a global locator.
-# --------------------------------------------------------------------------- #
 def _project_bbox(project_id: int) -> list | None:
     design = store.get_project(project_id).get("design") or {}
     if design.get("bbox"):
@@ -307,9 +254,7 @@ def study_area_figure_svg(project_id: int) -> str:
     W, H = 900, 520
     out = _svg_open(W, H, "Study area")
     out.append(_text(48, 46, "Study area", 20, INK, "700"))
-    out.append(
-        _text(48, 70, project.get("title", ""), 13, DIM)
-    )
+    out.append(_text(48, 70, project.get("title", ""), 13, DIM))
     if not bbox or len(bbox) != 4:
         out.append(_text(48, 120, "No study area defined yet.", 14, DIM))
         out.append("</svg>")
@@ -318,7 +263,6 @@ def study_area_figure_svg(project_id: int) -> str:
     min_lon, min_lat, max_lon, max_lat = [float(v) for v in bbox]
     c_lon, c_lat = (min_lon + max_lon) / 2, (min_lat + max_lat) / 2
 
-    # --- Main panel: AOI rectangle to scale with lon/lat ticks. ---
     px, py, pw, ph = 48, 100, 520, 360
     out.append(
         f'<rect x="{px}" y="{py}" width="{pw}" height="{ph}" fill="#F5F8F5" '
@@ -326,17 +270,18 @@ def study_area_figure_svg(project_id: int) -> str:
     )
     span_lon = max(max_lon - min_lon, 1e-4)
     span_lat = max(max_lat - min_lat, 1e-4)
-    # Pad the view so the AOI sits in a margin of context.
     view_lon = span_lon * 1.6
     view_lat = span_lat * 1.6
-    # Keep aspect ratio square-ish by matching the larger span.
     view = max(view_lon, view_lat)
     vlon0, vlon1 = c_lon - view / 2, c_lon + view / 2
     vlat0, vlat1 = c_lat - view / 2, c_lat + view / 2
-    sx = lambda lon: px + (lon - vlon0) / (vlon1 - vlon0) * pw
-    sy = lambda lat: py + (vlat1 - lat) / (vlat1 - vlat0) * ph
 
-    # graticule
+    def sx(lon):
+        return px + (lon - vlon0) / (vlon1 - vlon0) * pw
+
+    def sy(lat):
+        return py + (vlat1 - lat) / (vlat1 - vlat0) * ph
+
     for k in range(5):
         gx = px + k * pw / 4
         gy = py + k * ph / 4
@@ -353,24 +298,19 @@ def study_area_figure_svg(project_id: int) -> str:
         out.append(_text(gx, py + ph + 18, f"{lon_v:.2f}°", 10, DIM, anchor="middle"))
         out.append(_text(px - 8, gy + 4, f"{lat_v:.2f}°", 10, DIM, anchor="end"))
 
-    # AOI rectangle
     rx, ry = sx(min_lon), sy(max_lat)
     rw, rh = sx(max_lon) - sx(min_lon), sy(min_lat) - sy(max_lat)
     out.append(
         f'<rect x="{rx:.1f}" y="{ry:.1f}" width="{rw:.1f}" height="{rh:.1f}" '
         f'fill="{AMBER}" fill-opacity="0.18" stroke="{AMBER}" stroke-width="2"/>'
     )
-    out.append(
-        f'<circle cx="{sx(c_lon):.1f}" cy="{sy(c_lat):.1f}" r="3" fill="{AMBER}"/>'
-    )
+    out.append(f'<circle cx="{sx(c_lon):.1f}" cy="{sy(c_lat):.1f}" r="3" fill="{AMBER}"/>')
 
-    # scale bar (approx km, longitude at centre latitude)
     import math
 
     km_per_deg_lon = 111.32 * math.cos(math.radians(c_lat))
     width_km = span_lon * km_per_deg_lon
     height_km = span_lat * 110.57
-    # pick a round scale-bar length ~ 1/3 of the view width in km
     view_km = view * km_per_deg_lon
     target = view_km / 3
     nice = 1
@@ -381,12 +321,10 @@ def study_area_figure_svg(project_id: int) -> str:
     bar_px = nice / view_km * pw if view_km else 0
     bx, by = px + 14, py + ph - 20
     out.append(
-        f'<line x1="{bx}" y1="{by}" x2="{bx + bar_px:.1f}" y2="{by}" '
-        f'stroke="{INK}" stroke-width="3"/>'
+        f'<line x1="{bx}" y1="{by}" x2="{bx + bar_px:.1f}" y2="{by}" stroke="{INK}" stroke-width="3"/>'
     )
     out.append(_text(bx, by - 8, f"{nice} km", 11, INK, "600"))
 
-    # --- Side facts + global locator. ---
     fx = 600
     out.append(_text(fx, py + 8, "COORDINATES", 11, DIM, "700"))
     facts = [
@@ -399,7 +337,6 @@ def study_area_figure_svg(project_id: int) -> str:
     for i, f in enumerate(facts):
         out.append(_text(fx, py + 34 + i * 22, f, 13, INK))
 
-    # global locator: equirectangular graticule + AOI marker
     gx0, gy0, gw, gh = fx, py + 170, 252, 126
     out.append(
         f'<rect x="{gx0}" y="{gy0}" width="{gw}" height="{gh}" fill="#EEF3EE" '
@@ -417,25 +354,21 @@ def study_area_figure_svg(project_id: int) -> str:
             f'<line x1="{gx0}" y1="{gy:.1f}" x2="{gx0 + gw}" y2="{gy:.1f}" '
             f'stroke="{GRID}" stroke-width="0.5"/>'
         )
-    # equator emphasised
     eq = gy0 + gh / 2
     out.append(
-        f'<line x1="{gx0}" y1="{eq:.1f}" x2="{gx0 + gw}" y2="{eq:.1f}" '
-        f'stroke="{DIM}" stroke-width="0.75"/>'
+        f'<line x1="{gx0}" y1="{eq:.1f}" x2="{gx0 + gw}" y2="{eq:.1f}" stroke="{DIM}" stroke-width="0.75"/>'
     )
     mx = gx0 + (c_lon + 180) / 360 * gw
     my = gy0 + (90 - c_lat) / 180 * gh
-    out.append(f'<circle cx="{mx:.1f}" cy="{my:.1f}" r="5" fill="{AMBER}" '
-               f'stroke="{PAPER}" stroke-width="1.5"/>')
+    out.append(
+        f'<circle cx="{mx:.1f}" cy="{my:.1f}" r="5" fill="{AMBER}" stroke="{PAPER}" stroke-width="1.5"/>'
+    )
     out.append(_text(gx0, gy0 + gh + 18, "Global location", 10, DIM))
 
     out.append("</svg>")
     return "\n".join(out)
 
 
-# --------------------------------------------------------------------------- #
-# Validation figure — IoU / precision / recall / F1 per benchmark.
-# --------------------------------------------------------------------------- #
 def validation_figure_svg(project_id: int) -> str:
     vals = collect_validations(project_id)
     W = 900
@@ -444,9 +377,7 @@ def validation_figure_svg(project_id: int) -> str:
     H = 460
     out = _svg_open(W, H, "Ground-truth validation")
     out.append(_text(48, 46, "Ground-truth validation", 20, INK, "700"))
-    out.append(
-        _text(48, 70, "Skill against independent benchmark events", 13, DIM)
-    )
+    out.append(_text(48, 70, "Skill against independent benchmark events", 13, DIM))
     if not vals:
         out.append(_text(48, pad_t + 30, "No validation runs yet.", 14, DIM))
         out.append("</svg>")
@@ -456,13 +387,11 @@ def validation_figure_svg(project_id: int) -> str:
     colors = [TEAL, TEAL_DK, AMBER, "#9BA7F5"]
     plot_h = 260
     base = pad_t + plot_h
-    # y grid 0..1
     for g in range(6):
         v = g / 5
         y = base - v * plot_h
         out.append(
-            f'<line x1="{pad_l}" y1="{y:.1f}" x2="{W - 40}" y2="{y:.1f}" '
-            f'stroke="{GRID}" stroke-width="1"/>'
+            f'<line x1="{pad_l}" y1="{y:.1f}" x2="{W - 40}" y2="{y:.1f}" stroke="{GRID}" stroke-width="1"/>'
         )
         out.append(_text(pad_l - 10, y + 4, f"{v:.1f}", 11, DIM, anchor="end"))
 
@@ -483,23 +412,16 @@ def validation_figure_svg(project_id: int) -> str:
                 f'<rect x="{bx:.1f}" y="{base - bh:.1f}" width="{bar_w - 3:.1f}" '
                 f'height="{bh:.1f}" rx="2" fill="{colors[mi]}"/>'
             )
-            out.append(
-                _text(bx + bar_w / 2 - 1, base - bh - 5, _fmt(val), 9, INK, anchor="middle")
-            )
+            out.append(_text(bx + bar_w / 2 - 1, base - bh - 5, _fmt(val), 9, INK, anchor="middle"))
         region = v["region"]
         if len(region) > 22:
             region = region[:21] + "…"
-        out.append(
-            _text(gx + bar_w * len(metrics) / 2, base + 20, region, 12, INK, "600", "middle")
-        )
+        out.append(_text(gx + bar_w * len(metrics) / 2, base + 20, region, 12, INK, "600", "middle"))
 
-    # legend
     lx = pad_l
     ly = base + 56
     for mi, (mlabel, _k) in enumerate(metrics):
-        out.append(
-            f'<rect x="{lx}" y="{ly - 10}" width="12" height="12" rx="2" fill="{colors[mi]}"/>'
-        )
+        out.append(f'<rect x="{lx}" y="{ly - 10}" width="12" height="12" rx="2" fill="{colors[mi]}"/>')
         out.append(_text(lx + 18, ly, mlabel, 12, INK))
         lx += 130
 
@@ -507,17 +429,14 @@ def validation_figure_svg(project_id: int) -> str:
     return "\n".join(out)
 
 
-# --------------------------------------------------------------------------- #
-# Standalone figures (no project store needed) — used by the research API.
-# --------------------------------------------------------------------------- #
 def timeseries_figure_svg(
-    points: list, variable: str, unit: str, source: str, trend: dict = None,
+    points: list,
+    variable: str,
+    unit: str,
+    source: str,
+    trend: dict = None,
     title: str = "",
 ) -> str:
-    """
-    Publication line chart of an extracted signal series ([{date, value}...]),
-    with the OLS trend line overlaid when trend stats are provided.
-    """
     W, H = 900, 420
     pad_l, pad_r, pad_t, pad_b = 80, 40, 96, 60
     out = _svg_open(W, H, f"{variable} time series")
@@ -538,10 +457,13 @@ def timeseries_figure_svg(
 
     plot_w = W - pad_l - pad_r
     plot_h = H - pad_t - pad_b
-    x_at = lambda t: pad_l + (t - t0).days / trange * plot_w
-    y_at = lambda v: pad_t + (vmax - v) / (vmax - vmin) * plot_h
 
-    # Horizontal gridlines + y labels.
+    def x_at(t):
+        return pad_l + (t - t0).days / trange * plot_w
+
+    def y_at(v):
+        return pad_t + (vmax - v) / (vmax - vmin) * plot_h
+
     for g in range(5):
         v = vmin + g * (vmax - vmin) / 4
         y = y_at(v)
@@ -550,14 +472,9 @@ def timeseries_figure_svg(
             f'stroke="{GRID}" stroke-width="1"/>'
         )
         out.append(_text(pad_l - 10, y + 4, _fmt(v), 11, DIM, anchor="end"))
-    # X labels: first, middle, last date.
     for t in (t0, ts[len(ts) // 2], t1):
-        out.append(
-            _text(x_at(t), H - pad_b + 22, t.strftime("%Y-%m-%d"), 11, DIM,
-                  anchor="middle")
-        )
+        out.append(_text(x_at(t), H - pad_b + 22, t.strftime("%Y-%m-%d"), 11, DIM, anchor="middle"))
 
-    # OLS trend line under the data.
     if trend and trend.get("ols"):
         ols = trend["ols"]
         y_start = ols["intercept"]
@@ -568,39 +485,31 @@ def timeseries_figure_svg(
             f'stroke="{AMBER}" stroke-width="2" stroke-dasharray="6 4"/>'
         )
 
-    # The series itself.
     path = " ".join(
-        f'{"M" if i == 0 else "L"}{x_at(t):.1f},{y_at(v):.1f}'
-        for i, (t, v) in enumerate(zip(ts, values))
+        f"{'M' if i == 0 else 'L'}{x_at(t):.1f},{y_at(v):.1f}" for i, (t, v) in enumerate(zip(ts, values))
     )
-    out.append(
-        f'<path d="{path}" fill="none" stroke="{TEAL}" stroke-width="2"/>'
-    )
+    out.append(f'<path d="{path}" fill="none" stroke="{TEAL}" stroke-width="2"/>')
     for t, v in zip(ts, values):
-        out.append(
-            f'<circle cx="{x_at(t):.1f}" cy="{y_at(v):.1f}" r="3" '
-            f'fill="{TEAL_DK}"/>'
-        )
+        out.append(f'<circle cx="{x_at(t):.1f}" cy="{y_at(v):.1f}" r="3" fill="{TEAL_DK}"/>')
 
     out.append(
-        _text(pad_l, H - 16,
-              f"{variable} ({unit})"
-              + (f" — {trend['summary']}" if trend and trend.get("summary") else ""),
-              10, DIM)
+        _text(
+            pad_l,
+            H - 16,
+            f"{variable} ({unit})" + (f", {trend['summary']}" if trend and trend.get("summary") else ""),
+            10,
+            DIM,
+        )
     )
     out.append("</svg>")
     return "\n".join(out)
 
 
 def comparison_figure_svg(a: dict, b: dict, metric_label: str, unit: str) -> str:
-    """
-    Two labelled bars for an A/B comparison (two sites or two periods) of the
-    same analysis: a = {"label", "value"}, b likewise.
-    """
     W, H = 900, 320
     pad_l = 260
     out = _svg_open(W, H, "Comparison")
-    out.append(_text(48, 46, f"{metric_label} — comparison", 20, INK, "700"))
+    out.append(_text(48, 46, f"{metric_label}, comparison", 20, INK, "700"))
 
     vmax = max(a["value"], b["value"]) or 1.0
     plot_w = (W - pad_l - 60) * 0.8
@@ -610,28 +519,17 @@ def comparison_figure_svg(a: dict, b: dict, metric_label: str, unit: str) -> str
         label = r["label"] if len(r["label"]) <= 30 else r["label"][:29] + "…"
         out.append(_text(pad_l - 16, y + 26, label, 14, INK, "600", "end"))
         bw = max(1.0, r["value"] / vmax * plot_w)
-        out.append(
-            f'<rect x="{pad_l}" y="{y}" width="{bw:.1f}" height="40" rx="4" '
-            f'fill="{color}"/>'
-        )
-        out.append(
-            _text(pad_l + bw + 12, y + 26,
-                  f'{_fmt(r["value"])} {unit}'.strip(), 13, INK, "700")
-        )
+        out.append(f'<rect x="{pad_l}" y="{y}" width="{bw:.1f}" height="40" rx="4" fill="{color}"/>')
+        out.append(_text(pad_l + bw + 12, y + 26, f"{_fmt(r['value'])} {unit}".strip(), 13, INK, "700"))
 
     if a["value"] > 0:
         delta_pct = round(100 * (b["value"] - a["value"]) / a["value"], 1)
         sign = "+" if delta_pct >= 0 else ""
-        out.append(
-            _text(48, H - 20, f"B relative to A: {sign}{delta_pct}%", 12, DIM)
-        )
+        out.append(_text(48, H - 20, f"B relative to A: {sign}{delta_pct}%", 12, DIM))
     out.append("</svg>")
     return "\n".join(out)
 
 
-# --------------------------------------------------------------------------- #
-# Dispatch.
-# --------------------------------------------------------------------------- #
 _BUILDERS = {
     "results": results_figure_svg,
     "study_area": study_area_figure_svg,
@@ -647,12 +545,8 @@ def build_figure(project_id: int, kind: str) -> str:
 
 
 def project_slug(project: dict) -> str:
-    """Collapse a title to a filename slug — matches the frontend's slugify so a
-    LaTeX \\includesvg reference resolves to the SVG the user downloaded."""
     return (
-        re.sub(r"[^a-z0-9]+", "-", (project.get("title") or "project").lower())
-        .strip("-")[:50]
-        or "project"
+        re.sub(r"[^a-z0-9]+", "-", (project.get("title") or "project").lower()).strip("-")[:50] or "project"
     )
 
 

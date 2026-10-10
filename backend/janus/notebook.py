@@ -1,19 +1,3 @@
-"""
-Reproducible code export (docs/JANUS.md v3).
-
-The reproducibility pack (reproducibility.py) documents a project in prose. This
-goes one better for a technical reviewer: it emits a runnable Python script,
-using the same google earth-engine API Kairos itself runs on, that reproduces
-every analysis in the project from scratch. A researcher can paste it into a
-Colab, authenticate their own Earth Engine account, and get the same maps and
-numbers — the strongest possible form of "show your work".
-
-The generated methods mirror Kairos's real detectors (a >3 dB VV drop for
-floods, a VH rise for burn scars, etc.), reconstructed from each run's stored
-parameters. It is intentionally standalone and dependency-light: `earthengine
--api` and, optionally, `geemap` for display.
-"""
-
 from datetime import date
 
 from janus import store
@@ -60,8 +44,7 @@ def area_km2(mask, geometry, scale=30):
 
 '''
 
-# Per-analysis snippet templates. {i} numbers the run; params filled per run.
-_FLOOD = '''
+_FLOOD = """
 # --- Run {i}: {display_name} ---
 # Method: flooded land reflects radar away, so VV backscatter drops. Compare
 # the event window against a pre-event baseline and flag drops beyond 3 dB,
@@ -74,9 +57,9 @@ diff_{i} = post_{i}.mean().focalMedian(50, "circle", "meters").subtract(
 permanent_{i} = ee.Image("JRC/GSW1_4/GlobalSurfaceWater").select("occurrence").gt(75)
 flood_{i} = diff_{i}.lt(-3).where(permanent_{i}, 0).selfMask().clip(geom_{i})
 print("Run {i} flood area km2:", area_km2(flood_{i}, geom_{i}).getInfo())
-'''
+"""
 
-_BURN = '''
+_BURN = """
 # --- Run {i}: {display_name} ---
 # Method: fire strips vegetation and roughens soil, raising VH backscatter.
 # Flag a VH rise beyond 2.5 dB versus a pre-fire baseline.
@@ -87,9 +70,9 @@ diff_{i} = post_{i}.mean().focalMedian(50, "circle", "meters").subtract(
     pre_{i}.mean().focalMedian(50, "circle", "meters"))
 burn_{i} = diff_{i}.gt(2.5).selfMask().clip(geom_{i})
 print("Run {i} burn area km2:", area_km2(burn_{i}, geom_{i}).getInfo())
-'''
+"""
 
-_GENERIC = '''
+_GENERIC = """
 # --- Run {i}: {display_name} ({analysis_type}) ---
 # Kairos ran a "{analysis_type}" analysis over this area and window. See the
 # Kairos source (backend/gee/{analysis_type}.py) for the exact method; the
@@ -98,9 +81,8 @@ geom_{i} = ee.Geometry.Rectangle({bbox})
 collection_{i} = s1_collection(geom_{i}, "{pol}").filterDate("{start}", "{end}")
 print("Run {i} scene count:", collection_{i}.size().getInfo())
 # TODO: apply the {analysis_type} method to collection_{i} (see Kairos source).
-'''
+"""
 
-# Which polarization each analysis uses (for the generic template).
 _POL = {
     "deforestation": "VH",
     "crop_monitoring": "VH",
@@ -117,7 +99,6 @@ def _lead_start(start: str) -> str:
 
 
 def build_notebook(project_id: int) -> str:
-    """Return a runnable Python Earth Engine script reproducing the project."""
     project = store.get_project(project_id)
     parts = [_HEADER.format(title=project["title"], today=date.today().isoformat())]
 
@@ -129,8 +110,8 @@ def build_notebook(project_id: int) -> str:
 
     if not runs:
         parts.append(
-            '\n# No analyses were run in this project yet, so there is nothing\n'
-            '# to reproduce. Run one in Janus, then export again.\n'
+            "\n# No analyses were run in this project yet, so there is nothing\n"
+            "# to reproduce. Run one in Janus, then export again.\n"
         )
         return "".join(parts)
 
@@ -152,17 +133,15 @@ def build_notebook(project_id: int) -> str:
             parts.append(_GENERIC.format(pol=_POL.get(atype, "VV"), **common_kw))
 
     parts.append(
-        '\n# --- Display (optional) ---\n'
-        '# import geemap\n'
-        '# m = geemap.Map()\n'
+        "\n# --- Display (optional) ---\n"
+        "# import geemap\n"
+        "# m = geemap.Map()\n"
         '# m.add_layer(flood_1, {"palette": ["#00BFA8"]}, "Run 1")\n'
-        '# m\n'
+        "# m\n"
     )
     return "".join(parts)
 
 
 def notebook_filename(project: dict) -> str:
-    slug = "".join(
-        c.lower() if c.isalnum() else "_" for c in project["title"]
-    ).strip("_")[:50] or "project"
+    slug = "".join(c.lower() if c.isalnum() else "_" for c in project["title"]).strip("_")[:50] or "project"
     return f"kairos_reproduce_{slug}.py"

@@ -1,23 +1,7 @@
-"""
-Janus's hands: the tools the mentor can call while it works with a student.
-
-Each tool returns two things:
-  - a compact `payload` that goes back to the model (kept small on purpose;
-    tile URLs and rasters never ride through the prompt), and
-  - an `event` for the frontend: a human-readable chip in the conversation,
-    carrying the full analysis result when there is one so the UI can put it
-    straight onto the globe.
-
-This is the moat in code form (docs/JANUS.md §8): a generic chatbot can talk
-about a flood; Janus runs the flood analysis mid-sentence and reads the
-actual numbers back to the student.
-"""
-
 import json
 
 from janus import catalog, curriculum, knowledge, literature, store
 
-# OpenAI function-calling schemas, served to OpenRouter with every turn.
 TOOL_SCHEMAS = [
     {
         "type": "function",
@@ -43,7 +27,7 @@ TOOL_SCHEMAS = [
                 "and should usually span less than ~2 degrees. "
                 "IMPORTANT: analysis types whose mode is 'simulated' (e.g. "
                 "flood_simulation) are FORWARD MODEL output, not observations "
-                "— never describe their results as something a satellite "
+                "- never describe their results as something a satellite "
                 "detected or measured, and never use one to answer a question "
                 "about what actually happened. Types with accepts_params take "
                 "an optional `params` object described by their params_schema."
@@ -460,9 +444,9 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "extract_time_series",
             "description": (
-                "Extract a per-scene signal time series over an AOI — every "
+                "Extract a per-scene signal time series over an AOI, every "
                 "usable observation of VV/VH backscatter or an optical index "
-                "(NDVI, NDWI, NDSI) — with formal trend statistics (OLS with "
+                "(NDVI, NDWI, NDSI), with formal trend statistics (OLS with "
                 "exact p-value, Mann-Kendall + Sen's slope). THE tool for "
                 "'is this changing over time?' questions. Slow-ish (10-30 s)."
             ),
@@ -498,7 +482,7 @@ TOOL_SCHEMAS = [
             "description": (
                 "Run the SAME analysis on two sites (place-vs-place) or two "
                 "time windows (time-vs-time) and get both results plus the "
-                "delta — the shape a comparative case study needs. Slow "
+                "delta. The shape a comparative case study needs. Slow "
                 "(two full analyses)."
             ),
             "parameters": {
@@ -507,23 +491,31 @@ TOOL_SCHEMAS = [
                     "analysis_type": {"type": "string"},
                     "a_label": {"type": "string"},
                     "a_bbox": {
-                        "type": "array", "items": {"type": "number"},
-                        "minItems": 4, "maxItems": 4,
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "minItems": 4,
+                        "maxItems": 4,
                     },
                     "a_start_date": {"type": "string"},
                     "a_end_date": {"type": "string"},
                     "b_label": {"type": "string"},
                     "b_bbox": {
-                        "type": "array", "items": {"type": "number"},
-                        "minItems": 4, "maxItems": 4,
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "minItems": 4,
+                        "maxItems": 4,
                     },
                     "b_start_date": {"type": "string"},
                     "b_end_date": {"type": "string"},
                 },
                 "required": [
                     "analysis_type",
-                    "a_bbox", "a_start_date", "a_end_date",
-                    "b_bbox", "b_start_date", "b_end_date",
+                    "a_bbox",
+                    "a_start_date",
+                    "a_end_date",
+                    "b_bbox",
+                    "b_start_date",
+                    "b_end_date",
                 ],
             },
         },
@@ -545,7 +537,7 @@ TOOL_SCHEMAS = [
             "name": "validate_against_my_data",
             "description": (
                 "Score a Kairos analysis against one of the student's own "
-                "uploaded polygon datasets as ground truth — same "
+                "uploaded polygon datasets as ground truth, same "
                 "IoU/precision/recall/F1 machinery as the public benchmarks, "
                 "run over the dataset's own extent. Slow (a full analysis)."
             ),
@@ -565,7 +557,6 @@ TOOL_SCHEMAS = [
 
 
 def _slim_result(result: dict) -> dict:
-    """Analysis result cut down for the prompt: scalars only, no tile URLs."""
     mode = result.get("mode", "observed")
     slim = {
         "analysis_type": result.get("analysis_type"),
@@ -573,9 +564,6 @@ def _slim_result(result: dict) -> dict:
         "data_date": result.get("data_date"),
         "confidence": result.get("confidence"),
         "headline_stat": result.get("headline_stat"),
-        # Carried explicitly. Without it the mentor sees numbers with no way to
-        # tell a measurement from a model run, and would describe simulated
-        # water as something a satellite observed.
         "mode": mode,
     }
     if mode == "simulated":
@@ -587,18 +575,11 @@ def _slim_result(result: dict) -> dict:
             "what actually happened."
         )
     stats = result.get("stats") or {}
-    slim["stats"] = {
-        k: v for k, v in stats.items() if isinstance(v, (int, float, str, bool))
-    }
+    slim["stats"] = {k: v for k, v in stats.items() if isinstance(v, (int, float, str, bool))}
     return slim
 
 
 def execute_tool(name: str, args: dict, project_id: int) -> tuple:
-    """
-    Run one tool call. Returns (payload_for_model, event_for_frontend).
-    Errors come back as payloads, not exceptions — the mentor should read
-    the failure and adapt, not crash the turn.
-    """
     try:
         if name == "list_analysis_types":
             from gee.registry import registry_as_json
@@ -609,9 +590,6 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                     "name": t["display_name"],
                     "description": t["description"],
                     "data_sources": t["data_sources"],
-                    # "observed" = measured from imagery; "simulated" = forward
-                    # model output. Never describe a simulated result as a
-                    # detection or as something a satellite saw.
                     "mode": t["mode"],
                     "accepts_params": t["accepts_params"],
                     "params_schema": t["params_schema"],
@@ -634,8 +612,6 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                 end_date=args["end_date"],
                 params=args.get("params"),
             )
-            # Remember this run so proactive monitoring knows what to watch
-            # over this AOI and from which imagery date onward.
             store.record_last_run(
                 project_id,
                 {
@@ -655,7 +631,6 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                     f"{hs.get('label')} = {hs.get('value')} {hs.get('unit')}"
                 ),
                 "status": "ok",
-                # Full payload so the UI can drop the result on the globe.
                 "result": result,
             }
 
@@ -663,9 +638,7 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
             from gee import common
 
             geometry = common.bbox_geometry(args["bbox"])
-            coll = common.s1_collection(geometry).filterDate(
-                args["start_date"], args["end_date"]
-            )
+            coll = common.s1_collection(geometry).filterDate(args["start_date"], args["end_date"])
             count = coll.size().getInfo()
             payload = {"scene_count": count}
             if count > 0:
@@ -677,9 +650,7 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
             }
 
         if name == "search_literature":
-            papers = literature.search_literature(
-                args["query"], year_from=args.get("year_from")
-            )
+            papers = literature.search_literature(args["query"], year_from=args.get("year_from"))
             if not papers:
                 return (
                     {
@@ -703,9 +674,7 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
             }
 
         if name == "literature_review":
-            review = literature.systematic_review(
-                args.get("queries") or [], year_from=args.get("year_from")
-            )
+            review = literature.systematic_review(args.get("queries") or [], year_from=args.get("year_from"))
             if review["paper_count"] == 0:
                 return (
                     {"papers": [], "note": "No papers found; say so, don't invent."},
@@ -733,9 +702,7 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
             result = format_bibliography(project_id, style=args.get("style", "apa"))
             return result, {
                 "tool": name,
-                "label": (
-                    f"Formatted {result['count']} references ({result['style'].upper()})"
-                ),
+                "label": (f"Formatted {result['count']} references ({result['style'].upper()})"),
                 "status": "ok",
                 "citations": result,
             }
@@ -836,9 +803,7 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
 
         if name == "update_study_design":
             stage = args.pop("stage", None)
-            project = store.update_project(
-                project_id, stage=stage, design=args
-            )
+            project = store.update_project(project_id, stage=stage, design=args)
             return {"design": project["design"], "stage": project["stage"]}, {
                 "tool": name,
                 "label": "Study design updated",
@@ -858,17 +823,14 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
             return report, {
                 "tool": name,
                 "label": (
-                    f"Confounder check: {report['overall_concern']} concern of "
-                    "a false-positive driver"
+                    f"Confounder check: {report['overall_concern']} concern of a false-positive driver"
                 ),
                 "status": "ok",
                 "confounders": report,
             }
 
         if name == "log_hypothesis":
-            hyp = store.add_hypothesis(
-                project_id, args["statement"], evidence=args.get("evidence")
-            )
+            hyp = store.add_hypothesis(project_id, args["statement"], evidence=args.get("evidence"))
             return {"hypothesis": hyp}, {
                 "tool": name,
                 "label": f"Logged hypothesis: {args['statement'][:70]}",
@@ -891,9 +853,7 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
 
         if name == "record_skill":
             owner = store.get_project(project_id)["owner"]
-            saved = store.record_skill(
-                owner, args["skill"], args["level"], note=args.get("note")
-            )
+            saved = store.record_skill(owner, args["skill"], args["level"], note=args.get("note"))
             return {"skill": saved}, {
                 "tool": name,
                 "label": f"Skill noted: {args['skill']} ({args['level']})",
@@ -938,7 +898,6 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                 "count": series["count"],
                 "first": series["points"][0],
                 "last": series["points"][-1],
-                # A thinned series keeps the prompt small but the shape visible.
                 "points": series["points"][:: max(1, len(series["points"]) // 40)],
                 "trend": trend,
             }
@@ -946,7 +905,7 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
                 "tool": name,
                 "label": (
                     f"{series['variable']} series: {series['count']} obs"
-                    + (f" — {trend['mann_kendall']['trend']}" if trend else "")
+                    + (f", {trend['mann_kendall']['trend']}" if trend else "")
                 ),
                 "status": "ok",
                 "series": series,
@@ -1012,10 +971,7 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
             m = report["metrics"]
             return report, {
                 "tool": name,
-                "label": (
-                    f"Validated vs '{report['dataset']['name']}': "
-                    f"F1 {m.get('f1')}"
-                ),
+                "label": (f"Validated vs '{report['dataset']['name']}': F1 {m.get('f1')}"),
                 "status": "ok",
                 "validation": report,
             }
@@ -1027,7 +983,6 @@ def execute_tool(name: str, args: dict, project_id: int) -> tuple:
         }
 
     except ValueError as e:
-        # User-facing tool failures (no data, bad params): mentor adapts.
         return {"error": str(e)}, {
             "tool": name,
             "label": f"{name} failed: {str(e)[:90]}",

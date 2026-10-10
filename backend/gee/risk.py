@@ -1,26 +1,6 @@
-"""
-Foresight — hazard exposure outlooks from the measured satellite record.
-
-This is deliberately NOT a forecast. Each function answers three questions for
-one place, using decades of public observations and nothing else:
-
-  1. How exposed is this area to the hazard, historically? (0-100 score)
-  2. When in the year does it peak?
-  3. Is it getting worse? (OLS + Mann-Kendall, only reported when significant)
-
-Every number is computed live from a public archive when the request comes in,
-so anyone can check it against the same data. Where a claim cannot be backed by
-the record — a trend with too few years, a skill score with no independent
-reference — the function returns None rather than guessing.
-
-The scoring constants (e.g. burned fraction x 300) are transparent linear
-scalings chosen so that typical exposed areas land in a readable 0-100 band.
-They are stated in each `method` string rather than hidden, because they are
-conventions, not physics.
-"""
+from datetime import date, timedelta
 
 import ee
-from datetime import date, timedelta
 
 import stats
 from gee import common
@@ -34,8 +14,18 @@ CHIRPS_PENTAD = "UCSB-CHG/CHIRPS/PENTAD"
 WORLDCOVER = "ESA/WorldCover/v200"
 
 MONTH_NAMES = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
 ]
 
 FLOOD_PALETTE = ["#00BFA8", "#7BC043", "#E8A318", "#FF3B5C"]
@@ -54,7 +44,6 @@ def _level(score: float) -> str:
 
 
 def _area_fraction(mask: ee.Image, geometry: ee.Geometry, scale: int) -> float:
-    """Fraction of the AOI where `mask` is set, by true pixel area."""
     stacked = ee.Image.cat(
         [
             ee.Image.pixelArea().updateMask(mask).rename("part"),
@@ -74,14 +63,11 @@ def _area_fraction(mask: ee.Image, geometry: ee.Geometry, scale: int) -> float:
 
 
 def _monthly_profile(values: list) -> dict:
-    """Twelve monthly values plus the months within 60% of the peak."""
     total = sum(values)
     if total <= 0:
         return {"months": values, "peak_months": []}
     peak = max(values)
-    peak_months = [
-        MONTH_NAMES[i] for i, v in enumerate(values) if v >= 0.6 * peak and v > 0
-    ]
+    peak_months = [MONTH_NAMES[i] for i, v in enumerate(values) if v >= 0.6 * peak and v > 0]
     return {"months": [round(v, 3) for v in values], "peak_months": peak_months}
 
 
@@ -98,7 +84,6 @@ def _yearly_series(fc_info: dict, key: str) -> list:
 
 
 def _safe_trend(points: list):
-    """A trend test, or None when the record cannot support one."""
     if len(points) < 4:
         return None
     values = [p["value"] for p in points]
@@ -115,14 +100,12 @@ def flood_risk(bbox: list) -> dict:
     gsw = ee.Image(GSW)
     occurrence = gsw.select("occurrence").unmask(0)
 
-    # 5-85% of observations wet = flood-prone; above that it is a water body.
     prone = occurrence.gte(5).And(occurrence.lt(85))
     permanent = occurrence.gte(85)
 
     prone_frac = _area_fraction(prone, geometry, 60)
     permanent_frac = _area_fraction(permanent, geometry, 60)
 
-    # Score against the land area, so a coastal AOI is not diluted by ocean.
     land_frac = 1.0 - permanent_frac
     exposure = prone_frac / land_frac if land_frac > 0.02 else prone_frac
     score = round(min(100.0, exposure * 400))
@@ -152,9 +135,7 @@ def flood_risk(bbox: list) -> dict:
             month_vals[int(m) - 1] = float(v)
     seasonal = _monthly_profile(month_vals)
 
-    yearly = ee.ImageCollection(GSW_YEARLY).filter(
-        ee.Filter.rangeContains("year", 2010, 2021)
-    )
+    yearly = ee.ImageCollection(GSW_YEARLY).filter(ee.Filter.rangeContains("year", 2010, 2021))
 
     def year_area(img):
         seasonal_water = img.select("waterClass").eq(2)
@@ -170,15 +151,11 @@ def flood_risk(bbox: list) -> dict:
             )
             .get("area")
         )
-        return ee.Feature(
-            None, {"year": img.get("year"), "km2": ee.Number(area).divide(1e6)}
-        )
+        return ee.Feature(None, {"year": img.get("year"), "km2": ee.Number(area).divide(1e6)})
 
     trend_points = _yearly_series(yearly.map(year_area).getInfo(), "km2")
     trend = _safe_trend(trend_points)
 
-    # Self-graded skill: how much independently mapped flooding lands inside
-    # the zones this method calls flood-prone. Computed, never asserted.
     skill = None
     try:
         events = ee.ImageCollection(GLOBAL_FLOOD_DB).filterBounds(geometry)
@@ -250,15 +227,14 @@ def flood_risk(bbox: list) -> dict:
 
 def wildfire_risk(bbox: list) -> dict:
     geometry = common.bbox_geometry(bbox)
-    burns = ee.ImageCollection(MCD64A1).select("BurnDate").filterDate(
-        "2001-01-01", f"{date.today().year}-01-01"
+    burns = (
+        ee.ImageCollection(MCD64A1).select("BurnDate").filterDate("2001-01-01", f"{date.today().year}-01-01")
     )
 
     burn_count = burns.map(lambda img: img.gt(0).unmask(0)).sum().rename("count")
     burned_ever = burn_count.gt(0)
     burned_frac = _area_fraction(burned_ever, geometry, 500)
 
-    # WorldCover 10/20/30 = trees / shrubland / grassland: the fuel that carries fire.
     lc = ee.ImageCollection(WORLDCOVER).mosaic().select("Map")
     fuel = lc.eq(10).Or(lc.eq(20)).Or(lc.eq(30))
     fuel_frac = _area_fraction(fuel, geometry, 100)
@@ -316,9 +292,7 @@ def wildfire_risk(bbox: list) -> dict:
 
     last_full_year = date.today().year - 1
     years = ee.List.sequence(2001, last_full_year)
-    trend_points = _yearly_series(
-        ee.FeatureCollection(years.map(year_area)).getInfo(), "km2"
-    )
+    trend_points = _yearly_series(ee.FeatureCollection(years.map(year_area)).getInfo(), "km2")
     trend = _safe_trend(trend_points)
 
     drivers = [
@@ -381,13 +355,17 @@ def drought_risk(bbox: list) -> dict:
     baseline_vals = [p["value"] for p in trend_points]
     baseline_mean = sum(baseline_vals) / len(baseline_vals) if baseline_vals else None
 
-    recent_mm_raw = recent.reduceRegion(
-        reducer=ee.Reducer.mean(),
-        geometry=geometry,
-        scale=5500,
-        maxPixels=1e10,
-        bestEffort=True,
-    ).getInfo().get("precipitation")
+    recent_mm_raw = (
+        recent.reduceRegion(
+            reducer=ee.Reducer.mean(),
+            geometry=geometry,
+            scale=5500,
+            maxPixels=1e10,
+            bestEffort=True,
+        )
+        .getInfo()
+        .get("precipitation")
+    )
     recent_mm = round(float(recent_mm_raw), 1) if recent_mm_raw is not None else None
 
     deficit_pct = None
@@ -403,17 +381,11 @@ def drought_risk(bbox: list) -> dict:
         score = min(100, score + 15)
 
     baseline_img = (
-        chirps.filter(
-            ee.Filter.calendarRange(baseline_years[0], baseline_years[-1], "year")
-        )
+        chirps.filter(ee.Filter.calendarRange(baseline_years[0], baseline_years[-1], "year"))
         .sum()
         .divide(len(baseline_years))
     )
-    anomaly = (
-        recent.subtract(baseline_img)
-        .divide(baseline_img.max(ee.Image.constant(1)))
-        .clip(geometry)
-    )
+    anomaly = recent.subtract(baseline_img).divide(baseline_img.max(ee.Image.constant(1))).clip(geometry)
     tile = common.tile_url(anomaly, {"min": -0.6, "max": 0.6, "palette": DROUGHT_PALETTE})
 
     def month_mean(m):
@@ -446,14 +418,9 @@ def drought_risk(bbox: list) -> dict:
         )
     if deficit_pct is not None:
         if deficit_pct > 0:
-            drivers.append(
-                f"That is a {deficit_pct}% rainfall deficit versus the "
-                "long-term normal."
-            )
+            drivers.append(f"That is a {deficit_pct}% rainfall deficit versus the long-term normal.")
         else:
-            drivers.append(
-                f"Rainfall is {abs(deficit_pct)}% above the long-term normal."
-            )
+            drivers.append(f"Rainfall is {abs(deficit_pct)}% above the long-term normal.")
 
     return {
         "hazard": "drought",

@@ -1,14 +1,3 @@
-"""
-GET /scenes — list available Sentinel-1 scenes for an AOI + date range
-without running an analysis. Powers the data-availability sparkline and
-the Preview Scenes sidebar step.
-
-Implementation note: we query scene metadata through GEE rather than an
-external STAC catalog — GEE is already authenticated, has the full archive,
-and this removes an external failure mode. pystac-client remains in
-requirements.txt for the Phase 2 InSAR pipeline which downloads SLC data.
-"""
-
 import ee
 from fastapi import APIRouter, HTTPException, Query
 
@@ -36,7 +25,6 @@ def get_scenes(
             .sort("system:time_start")
         )
 
-        # Pull only the metadata we need, capped to keep the payload small
         info = collection.limit(200).getInfo()
         features = info.get("features", [])
 
