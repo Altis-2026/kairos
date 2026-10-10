@@ -220,7 +220,7 @@ def test_briefing_escapes_user_text(client):
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;" in page
     assert "<img src=x" not in page
-    assert "Prem Kamasani and Amogh Vinaykumar" in page
+    assert "Amogh Vinaykumar and Prem Kamasani" in page
 
 
 def test_featured_lists_stories_and_rejects_unknown_ids(client):

@@ -3,8 +3,8 @@ import KairosMark from "../KairosMark";
 import { navigate } from "../../lib/navigation";
 
 const BUILDERS = [
-  { name: "Prem Kamasani", role: "Co-founder" },
   { name: "Amogh Vinaykumar", role: "Co-founder" },
+  { name: "Prem Kamasani", role: "Co-founder" },
 ];
 
 const DATA = [
