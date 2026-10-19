@@ -266,6 +266,13 @@ def chat(project_id: int, request: ChatRequest):
         return run_turn(project_id, request.message, mode=request.mode)
     except HTTPException:
         raise
+    except RuntimeError as e:
+        # The key is present (checked above) but OpenRouter rejected it, or
+        # some other configuration problem `_complete` already turned into a
+        # plain message — a 503 and that message as-is, same as every other
+        # AI entry point, rather than "Mentor turn failed: {e}" wrapping it
+        # in a prefix that implies the mentor itself is what broke.
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Mentor turn failed: {e}")
 
