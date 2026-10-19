@@ -2,7 +2,7 @@ import os
 from datetime import date
 from pathlib import Path
 
-from openai import OpenAI
+from openai import AuthenticationError, OpenAI, PermissionDeniedError
 
 from ai.parser import MissionPlan, ParsedQuery, parse_query_response
 
@@ -30,6 +30,51 @@ def _get_client() -> OpenAI:
             max_retries=1,
         )
     return _client
+
+
+def _openrouter_message(e: Exception) -> str:
+    """Pull OpenRouter's own one-line reason out of the SDK exception body."""
+    body = getattr(e, "body", None)
+    if isinstance(body, dict):
+        msg = (body.get("error") or {}).get("message")
+        if msg:
+            return msg
+    return str(e)
+
+
+def _complete(client: OpenAI, **kwargs):
+    """
+    `client.chat.completions.create`, with a bad credential told apart from
+    a flaky one.
+
+    Every call in this module goes through here rather than calling the SDK
+    directly, so this is the one place that needs to know OpenRouter can
+    reject a key two different ways. `_get_client()` already has a path for
+    "no key at all" — a RuntimeError, surfaced as a 503 with a plain
+    configuration-problem message rather than treated as a transient
+    failure worth retrying. A key that IS set but invalid, revoked, or tied
+    to a deleted OpenRouter account is the same category of problem from
+    every caller's point of view: nothing will succeed until a person
+    replaces the credential. Before this, that case fell through to the
+    generic exception handler in api/query.py and came out as "the language
+    model did not answer in time ... try again in a moment" — actively
+    wrong advice for an error retrying can never fix, and the raw SDK text
+    ("Error code: 401 - {'error': {'message': 'User not found.'...") when it
+    leaked past that unchanged. Routing it into the same RuntimeError path
+    as a missing key means both show the operator the one thing they
+    actually need to know: which credential to replace, and where.
+    """
+    try:
+        return client.chat.completions.create(**kwargs)
+    except (AuthenticationError, PermissionDeniedError) as e:
+        raise RuntimeError(
+            "OPENROUTER_API_KEY is set but OpenRouter rejected it "
+            f'({e.__class__.__name__}: "{_openrouter_message(e)}"). The key '
+            "may have been revoked, deleted, or belongs to a different "
+            "account than this project expects. Generate a fresh key at "
+            "https://openrouter.ai/keys and update OPENROUTER_API_KEY "
+            "wherever this backend is deployed."
+        ) from e
 
 
 def _get_system_prompt() -> str:
@@ -72,7 +117,8 @@ def parse_natural_language(
     messages.extend(prior)
     messages.append({"role": "user", "content": user_message})
 
-    response = client.chat.completions.create(
+    response = _complete(
+        client,
         model=MODEL,
         max_tokens=1000,
         messages=messages,
@@ -83,7 +129,8 @@ def parse_natural_language(
     try:
         return parse_query_response(text)
     except Exception as first_error:
-        retry = client.chat.completions.create(
+        retry = _complete(
+            client,
             model=MODEL,
             max_tokens=1000,
             messages=[
@@ -120,7 +167,8 @@ def narrate_result(result: dict, language: str = None) -> str:
     if language:
         prefix = f"NARRATE (write in language {language}): "
 
-    response = client.chat.completions.create(
+    response = _complete(
+        client,
         model=MODEL,
         max_tokens=400,
         messages=[
@@ -174,7 +222,8 @@ def _result_facts(result: dict, method_description: str = "", place_name: str = 
 
 def interpret_result(result: dict, method_description: str = "", place_name: str = None) -> str:
     client = _get_client()
-    response = client.chat.completions.create(
+    response = _complete(
+        client,
         model=MODEL,
         max_tokens=500,
         messages=[
@@ -200,7 +249,8 @@ def search_regional_context(result: dict, place_name: str = None) -> str:
         "long-term trends, or local concerns) and cite each source inline like "
         "[source]. If nothing relevant turns up, say so plainly. 160 words max."
     )
-    response = client.chat.completions.create(
+    response = _complete(
+        client,
         model=MODEL + ":online",
         max_tokens=700,
         messages=[
@@ -282,7 +332,8 @@ def plan_mission(goal: str, viewport_bbox: list = None, history: list = None) ->
     messages.extend(_history_messages(history))
     messages.append({"role": "user", "content": user_message})
 
-    response = client.chat.completions.create(
+    response = _complete(
+        client,
         model=MODEL,
         max_tokens=1200,
         messages=messages,
@@ -292,7 +343,8 @@ def plan_mission(goal: str, viewport_bbox: list = None, history: list = None) ->
     try:
         return parse_mission_response(text)
     except Exception as first_error:
-        retry = client.chat.completions.create(
+        retry = _complete(
+            client,
             model=MODEL,
             max_tokens=1200,
             messages=[
@@ -345,7 +397,8 @@ def write_mission_report(goal: str, plan_summary: str, outcomes: list) -> str:
         f"Goal: {goal}\nPlan: {plan_summary}\n"
         f"Step outcomes: {_json.dumps(outcomes, default=str)}"
     )
-    response = client.chat.completions.create(
+    response = _complete(
+        client,
         model=MODEL,
         max_tokens=500,
         messages=[{"role": "user", "content": prompt}],
@@ -392,7 +445,8 @@ def _foresight_facts(ctx: dict) -> str:
 
 def answer_foresight_question(ctx: dict) -> str:
     client = _get_client()
-    response = client.chat.completions.create(
+    response = _complete(
+        client,
         model=MODEL,
         max_tokens=450,
         messages=[

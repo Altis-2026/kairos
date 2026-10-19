@@ -2,7 +2,7 @@ import json
 from datetime import date
 
 from ai.client import MODEL as MODEL_FAST
-from ai.client import _get_client
+from ai.client import _complete, _get_client
 from janus import store
 from janus.tools import TOOL_SCHEMAS, execute_tool, parse_tool_args
 
@@ -122,7 +122,8 @@ def run_turn(project_id: int, user_message: str, mode: str = "mentor") -> dict:
     rounds = AUTOPILOT_TOOL_ROUNDS if mode == "autopilot" else MAX_TOOL_ROUNDS
 
     for _ in range(rounds + 1):
-        response = client.chat.completions.create(
+        response = _complete(
+            client,
             model=model,
             max_tokens=1200,
             messages=messages,

@@ -141,11 +141,12 @@ def build_review(project_id: int) -> str:
     if not os.getenv("OPENROUTER_API_KEY"):
         return _deterministic(project_id)
     try:
-        from ai.client import MODEL, _get_client
+        from ai.client import MODEL, _complete, _get_client
 
         deep = "anthropic/claude-sonnet-4.6"
         client = _get_client()
-        response = client.chat.completions.create(
+        response = _complete(
+            client,
             model=deep or MODEL,
             max_tokens=1100,
             messages=[
