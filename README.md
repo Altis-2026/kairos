@@ -14,7 +14,7 @@ then simulate what could happen next and learn how to prepare.
 ![CI](https://github.com/Altis-2026/kairos/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/license-MIT-00BFA8)
 
-Built by **Amogh Vinaykumar** and **Prem Kamasani**, Flower Mound High School, Texas.
+Developed by **Amogh Vinaykumar**, Flower Mound High School, Texas.
 
 </div>
 
