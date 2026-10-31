@@ -243,3 +243,7 @@ Open-source libraries are listed in [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md).
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Team
+
+Amogh Vinaykumar and Prem Kamasani, Flower Mound High School, Texas.
