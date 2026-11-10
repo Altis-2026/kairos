@@ -2,11 +2,6 @@ import { ArrowLeft, Github, Satellite } from "lucide-react";
 import KairosMark from "../KairosMark";
 import { navigate } from "../../lib/navigation";
 
-const BUILDERS = [
-  { name: "Amogh Vinaykumar", role: "Co-founder" },
-  { name: "Prem Kamasani", role: "Co-founder" },
-];
-
 const DATA = [
   ["Sentinel-1 radar", "European Space Agency, Copernicus programme"],
   ["Sentinel-2 optical, Sentinel-5P atmosphere", "European Space Agency, Copernicus programme"],
@@ -85,15 +80,7 @@ export default function About() {
           helps families, local leaders and students prepare for what comes next.
         </p>
 
-        <Section title="Built by">
-          <div className="grid sm:grid-cols-2 gap-3">
-            {BUILDERS.map((b) => (
-              <div key={b.name} className="rounded-2xl bg-surface ring-1 ring-line p-4">
-                <div className="font-display text-lg">{b.name}</div>
-                <div className="text-xs text-dim">{b.role} · Flower Mound High School, Texas</div>
-              </div>
-            ))}
-          </div>
+        <Section title="Free and open">
           <p className="text-dim">
             Kairos is part of Altis, alongside our other projects. It is free to use, has no ads, and needs no
             account.

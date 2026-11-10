@@ -303,7 +303,7 @@ const STEPS: Step[] = [
       "That is the whole tour. A good first move is a featured story, then try your own address in My Place.",
       "You can replay this guide any time with the question mark button at the top right.",
     ],
-    tip: "Built by Amogh Vinaykumar and Prem Kamasani. Questions or ideas are welcome on GitHub.",
+    tip: "Questions or ideas are welcome on GitHub.",
   },
 ];
 

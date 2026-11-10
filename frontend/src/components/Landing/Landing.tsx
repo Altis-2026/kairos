@@ -85,8 +85,9 @@ const COPY = {
     liveBody:
       "Every few hours it checks active events from NASA and a watchlist of hotspots, runs the analyses, and posts what it finds.",
     openWatch: "Open Live Watch",
-    builtEyebrow: "BUILT BY",
-    builtBody: "Students at Flower Mound High School in Flower Mound, Texas.",
+    builtEyebrow: "OPEN TO EVERYONE",
+    builtTitle: "No account. No ads. No cost.",
+    builtBody: "Free to use, no ads, no account, and the code is open source.",
     cta: "The data to see a disaster through the clouds was always free. Now anyone can use it.",
     about: "About",
     academy: "Academy",
@@ -165,8 +166,9 @@ const COPY = {
     liveBody:
       "Cada pocas horas revisa los eventos activos de la NASA y una lista de puntos críticos, corre los análisis y publica lo que encuentra.",
     openWatch: "Abrir En vivo",
-    builtEyebrow: "CREADO POR",
-    builtBody: "Estudiantes de Flower Mound High School en Flower Mound, Texas.",
+    builtEyebrow: "ABIERTO A TODOS",
+    builtTitle: "Sin cuenta. Sin anuncios. Sin costo.",
+    builtBody: "Gratis, sin anuncios, sin cuenta y con código abierto.",
     cta: "Los datos para ver un desastre a través de las nubes siempre fueron gratuitos. Ahora cualquiera puede usarlos.",
     about: "Acerca de",
     academy: "Academia",
@@ -601,9 +603,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
       <section className="px-5 py-24 sm:px-10">
         <motion.div {...reveal} className="mx-auto max-w-3xl text-center">
           <p className="font-mono text-[11px] tracking-[0.3em] text-teal">{c.builtEyebrow}</p>
-          <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold">
-            Amogh Vinaykumar & Prem Kamasani
-          </h2>
+          <h2 className="mt-3 font-display text-3xl sm:text-4xl font-semibold">{c.builtTitle}</h2>
           <p className="mt-3 text-dim">{c.builtBody}</p>
           <p className="mx-auto mt-8 max-w-xl text-lg leading-relaxed">{c.cta}</p>
           <button
@@ -619,7 +619,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-xs text-dim sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
             <KairosMark size={18} />
-            <span>Kairos · Amogh Vinaykumar & Prem Kamasani</span>
+            <span>Kairos</span>
           </div>
           <div className="flex flex-wrap gap-4 sm:ml-auto">
             <button onClick={() => navigate("about")} className="hover:text-ink">
